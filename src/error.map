@@ -1,0 +1,10 @@
+{
+  "version": 3,
+  "file": "error.js",
+  "sourceRoot": "",
+  "sources": [
+    "error.coffee"
+  ],
+  "names": [],
+  "mappings": ";AAAA;CAAA;CAAA"
+}
