@@ -22,11 +22,12 @@ utils = require "f:/node-utils/src/set"
 
 set = utils.set
 
-isinstance = (x, klass) -> isinstance(x, klass)
-
+isinstance = (x, klass) -> (x instanceof klass)
 assert = (arg,  message) -> unless arg then throw new Error(message or '')
-
 len = (obj) -> obj.length
+tuple = (obj) -> obj
+join = (sep, list) -> list.join(sep)
+repr = (x) -> x.toString()
 
 prelude = '''
           # generated file from compiled daonode expression.
@@ -48,7 +49,7 @@ exports.dao = dao = {}
 dao.compileToJSFile = (exp, env) ->
   code = compileToJavascript exp, env
   fs = require "fs"
-  fs.writeSync '..\test\compiled.js', code
+  fs.writeSync fs.openSync('f:\\daonode\\test\\compiled.js', 'w'), code
 
 compileToJavascript = (exp, env) ->
   '''assemble steps from dao expression to javascript code'''
@@ -61,18 +62,18 @@ compileToJavascript = (exp, env) ->
   env = new Environment()
   exp = exp.optimize(env, compiler)
   #exp = exp.tail_recursive_convert()
-  fun = compiler.new_var(new il.ConstLocalVar('compiled_dao_fun'))
-  exp = new il.Function(fun, [], exp)
   exp = il.begin(exp.javascriptize(env, compiler)[0])
   if isinstance(exp, il.Begin)
     exp = exp.statements[0]
+  exp = new il.Lamda([], exp)
   exp.body = exp.body.replace_return_with_pyyield()
-  result = exp.to_code(compiler)
-  return prelude + result
+  exp = new il.Call(exp, new il.ConstLocalVar('this'))
+  exp.to_code(compiler)
+#  return prelude + result
 
 solve = (exp, env) ->
   compileToJSFile exp, env
-  compiled = require '../bin/compiled'
+  compiled = require 'f:\\daonode\\test\\bin\\compiled.js'
   Solutions(exp, compiled.fun())
 
 evald = (exp, env) ->  solve(exp, env).next()
@@ -156,7 +157,7 @@ class LogicVar
     solver.bindings[x] = y
     return true
 
-  __eq__: (x, y) -> x.__class__==y.__class__ and x.name==y.name
+  __eq__: (x, y) -> x.constructor is y.constructor and x.name==y.name
   __hash__: () ->  hash(@name)
   toString: () ->  "%s"%@name
 
@@ -167,7 +168,7 @@ class Cons
   constructor: (@head, @tail) ->
 
   unify: (other, solver) ->
-    if @__class__!=other.__class__
+    if @constructor isnt  other.constructor
       return solver.fail_cont.callOn(false)
     if solver.unify(@head, other.head)
       if solver.unify(@tail, other.tail)
@@ -175,11 +176,11 @@ class Cons
     return solver.fail_cont.callOn(false)
 
   match: (other) ->
-    if @__class__!=other.__class__ then return false
+    if @constructor isnt  other.constructor then return false
     return match(@head, other.head) and match(@tail, other.tail)
 
   unify_rule_head: (other, env, subst) ->
-    if @__class__!=other.__class__ then return
+    if @constructor isnt  other.constructor then return
     for _ in unify_rule_head(@head, other.head, env, subst)
       for _ in unify_rule_head(@tail, other.tail, env, subst)
         pyyield true
@@ -210,7 +211,7 @@ class Cons
       return @
     return Cons(head, tail)
 
-  __eq__: (other) ->  @__class__==other.__class__ and @head==other.head and @tail==other.tail
+  __eq__: (other) -> @constructor is other.constructor and @head is other.head and @tail is other.tail
 
   __iter__: () ->
     tail = @
@@ -223,17 +224,14 @@ class Cons
         pyyield tail.tail
         return
   length: () ->  len([e for e in @])
-  toString: () ->  "L(#{' '.join([repr(e) for e in @])})"
+  toString: () ->  "L(#{join(' ', [repr(e) for e in @])})"
 
 cons = (head, tail) -> new Cons head, tail
 
 class Nil
   alpha: (env, compiler) -> new il.Nil()
-
   length: () ->  0
-
   __iter__: () -> if 0 then pyyield
-
   toString: () ->  'nil'
 
 nil = new Nil()
@@ -255,7 +253,7 @@ class UnquoteSplice
 
 class ExpressionWithCode
   constructor: (@exp, @fun) ->
-  __eq__: (x, y) ->  (x.__class__==y.__class__ and x.exp==y.exp) or x.exp==y
+  __eq__: (x, y) ->  (x.constructor is y.constructor and x.exp==y.exp) or x.exp==y
 
   __iter__ = () ->  iter(@exp)
 
@@ -367,7 +365,7 @@ class Compiler
     try
       suffix = str(@newvar_map[variable.name])
       @newvar_map[variable.name] += 1
-      return variable.__class__(variable.name+suffix)
+      return variable.constructor(variable.name+suffix)
     catch e
       @newvar_map[variable.name] = 1
       return variable
@@ -388,7 +386,7 @@ class Compiler
     '''javascript's famous indent'''
     lines = code.split('\n')
     lines = tuple(@indent_space*level + line for line in lines)
-    return '\n'.join(lines)
+    return join('\n', lines)
 
 MAX_EXTEND_CODE_SIZE = 10
 
@@ -429,8 +427,8 @@ class Atom extends Element
   quasiquote: (compiler, cont) -> cont.callOn(@interlang())
   subst: (bindings) -> @
   interlang: ( ) -> new il.Atom(@item)
-  __eq__: (x, y) ->  x.__class__==y.__class__ and x.item==y.item
-  to_code: (compiler) -> "#{@__class__.__name__}(#{@item})"
+  __eq__: (x, y) ->  x.constructor is y.constructor and x.item==y.item
+  to_code: (compiler) -> "#{@constructor.__name__}(#{@item})"
   toString: ( ) ->  '%s'%@item
 
 class Integer extends Atom
@@ -480,9 +478,9 @@ make_tuple = (value) -> new Tuple(tuple(element(x) for x in value)...)
 class Tuple extends Atom
   constructor: (items...)-> @item = items
   interlang: ( ) ->  new il.Tuple(tuple(x.interlang() for x in @item)...)
-  to_code:  (compiler) -> "#{@__class__.__name__}(#{', '.join([repr(x) for x in @item])})"
+  to_code:  (compiler) -> "#{@constructor.__name__}(#{join(', ', [repr(x) for x in @item])})"
   __iter__: ( ) ->  iter(@item)
-  toString: ( ) ->  "#{@__class__.__name__}(#{@item})"
+  toString: ( ) ->  "#{@constructor.__name__}(#{@item})"
 
 class Var extends Element
   constructor: (@name) ->
@@ -547,7 +545,7 @@ class Var extends Element
   to_code: (compiler) -> "DaoVar('%s')"%@name
   __eq__: (x, y) ->  classeq(x, y) and x.name==y.name
   hash: ( ) ->  hash(@name)
-  toString: ( ) ->  "#{@__class__.__name__}('#{@name}')"
+  toString: ( ) ->  "#{@constructor.__name__}('#{@name}')"
 
 class Const extends Var
   interlang: ( ) ->  new ConstLocalVar(@name)
@@ -602,15 +600,13 @@ class DummyVar extends LogicVar
 class Cons extends Element
   constructor: (@head, @tail) ->
 
-  alpha: (env, compiler) -> Cons(@head.alpha(env, compiler),
-                               @tail.alpha(env, compiler))
-
+  alpha: (env, compiler) -> Cons(@head.alpha(env, compiler),  @tail.alpha(env, compiler))
   cps: (compiler, cont) -> cont.callOn(@interlang())
   interlang: ( ) ->  new il.Cons(@head.interlang(), @tail.interlang())
   cps_convert_unify: (x, y, compiler, cont) -> cps_convert_unify(x, y, compiler, cont)
 
   unify_rule_head: (other, env, subst) ->
-    if @__class__!=other.__class__ then return
+    if @constructor isnt  other.constructor then return
     for _ in unify_rule_head(@head, other.head, env, subst)
       for _ in unify_rule_head(@tail, other.tail, env, subst)
         pyield true
@@ -624,13 +620,11 @@ class Cons extends Element
   getvalue: (env) ->
     head = getvalue(@head, env)
     tail = getvalue(@tail, env)
-    if head==@head and tail==@tail
-      return @
-    return Cons(head, tail)
+    if head is @head and tail is @tail then @
+    else Cons(head, tail)
 
   copy: (memo) -> Cons(copy(@head, memo), copy(@tail, memo))
-
-  __eq__: (other) -> @__class__==other.__class__ and @head==other.head and @tail==other.tail
+  __eq__: (other) -> @constructor is other.constructor and @head==other.head and @tail==other.tail
 
   __iter__: ( ) ->
     tail = @
@@ -644,15 +638,13 @@ class Cons extends Element
         return
 
   length: ( ) ->  len([e for e in @])
-
-  toString: ( ) ->  "L(#{' '.join([repr(e) for e in @])})"
+  toString: ( ) ->  "L(#{join(' ', [repr(e) for e in @])})"
 
 class Nil extends Element
   alpha: (env, compiler) -> @
   interlang: ( ) ->  il.nil
   length: ( ) ->  0
   __iter__: ( ) -> if 0 then pyield
-
   toString: ( ) ->  'nil'
 
 nil = new Nil()
@@ -719,19 +711,18 @@ cps_convert_unify = (x, y, compiler, cont) ->
 
 class Apply extends Element
   constructor: (@caller, @args) ->
-  alpha: (env, compiler) ->  @__class__(@caller.alpha(env, compiler),  tuple(arg.alpha(env, compiler) for arg in @args))
+  alpha: (env, compiler) ->  @constructor(@caller.alpha(env, compiler),  tuple(arg.alpha(env, compiler) for arg in @args))
   # see The 90 minute Scheme to C compiler by Marc Feeley
   cps: (compiler, cont) ->  @caller.cps_call(compiler, cont, @args)
-  subst: (bindings) -> @__class__(@caller.subst(bindings),
+  subst: (bindings) -> @constructor(@caller.subst(bindings),
                                 tuple(arg.subst(bindings) for arg in @args))
-  toString: ( ) ->  "#{@caller}(#{', '.join([repr(x) for x in @args])})"
+  toString: ( ) ->  "#{@caller}(#{join(', ', [repr(x) for x in @args])})"
 
 class Command extends Element
 
-
 class CommandCall extends Element
   constructor: (@fun, @args) ->
-  subst: (bindings) -> @__class__(@fun,  tuple(arg.subst(bindings) for arg in @args))
+  subst: (bindings) -> @constructor(@fun,  tuple(arg.subst(bindings) for arg in @args))
 
   quasiquote:(compiler, cont) ->
     result = compiler.new_var(il.LocalVar('result'))
@@ -740,7 +731,7 @@ class CommandCall extends Element
                new il.If(il.Isinstance(var1, new il.Klass('UnquoteSplice')),
                      new il.AddAssign(result, new il.Call(il.Symbol('list'), new il.Attr(var1, new il.Symbol('item')))),
                      new il.ListAppend(result, var1)
-                    ) for var1 in vars+[cont.callOn(il.Call(il.Klass(@__class__.__name__), new il.QuoteItem(@fun), new il.MakeTuple(result)))]
+                    ) for var1 in vars+[cont.callOn(il.Call(il.Klass(@constructor.__name__), new il.QuoteItem(@fun), new il.MakeTuple(result)))]
     body = [il.Assign(result, il.empty_list)]+t)
     fun = il.begin(body...)
     for var1, arg in reversed(zip(vars, @args))
@@ -748,7 +739,7 @@ class CommandCall extends Element
     return fun
 
   __eq__: (x, y) ->  classeq(x, y) and x.fun==y.fun and x.args==y.args
-  toString: ( ) ->  "#{@fun}(#{ ', '.join([repr(x) for x in @args])})"
+  toString: ( ) ->  "#{@fun}(#{join( ', ', [repr(x) for x in @args])})"
 
 class Special extends Command
   constructor: (@fun) ->
@@ -775,17 +766,17 @@ quasiquote_args: (args) ->
 class SpecialCall extends CommandCall
   constructor: (@command, @args) -> @fun = command.fun
 
-  alpha: (env, compiler) -> @__class__(@command, tuple(arg.alpha(env, compiler) for arg in @args))
+  alpha: (env, compiler) -> @constructor(@command, tuple(arg.alpha(env, compiler) for arg in @args))
 
   cps: (compiler, cont) -> @fun(compiler, cont, @args...)
-  to_code: (compiler) -> "#{@fun.__name__}(#{', '.join([x.to_code(compiler) for x in @args])})"
+  to_code: (compiler) -> "#{@fun.__name__}(#{join(', ', [x.to_code(compiler) for x in @args])})"
 
   free_vars: ( ) ->
     result = set()
     for arg in @args then  result |= arg.free_vars()
     return result
 
-  toString: ( ) ->  "#{@fun.__name__}(#{', '.join(tuple(repr(x) for x in @args))})"
+  toString: ( ) ->  "#{@fun.__name__}(#{join(', ', tuple(repr(x) for x in @args))})"
 
 class BuiltinFunction extends Command
   constructor: (@name, @fun) ->
@@ -802,7 +793,7 @@ class BuiltinFunction extends Command
   toString: ( ) ->  @name
 
 class BuiltinFunctionCall extends CommandCall
-  alpha:(env, compiler) -> @__class__(@fun, tuple(arg.alpha(env, compiler) for arg in @args))
+  alpha:(env, compiler) -> @constructor(@fun, tuple(arg.alpha(env, compiler) for arg in @args))
 
   cps:(compiler, cont) ->
     #see The 90 minute Scheme to C compiler by Marc Feeley
@@ -823,8 +814,8 @@ class BuiltinFunctionCall extends CommandCall
     return result
 
   javascriptize: (env, compiler) -> [@]
-  to_code: (compiler) -> "#{@fun.name}(#{', '.join([x.to_code(compiler) for x in @args])})"
-  toString: ( ) ->  "#{@fun.name}(#{', '.join([x.to_code(compiler) for x in @args])})"
+  to_code: (compiler) -> "#{@fun.name}(#{join(', ', [x.to_code(compiler) for x in @args])})"
+  toString: ( ) ->  "#{@fun.name}(#{join(', ', [x.to_code(compiler) for x in @args])})"
   assign: (var1, exp) -> Assign(var1, element(exp))
 
 class MultiAssignToConstError
@@ -868,15 +859,7 @@ class DirectInterlang extends Element
 type_map = {int:Integer, float: Float, str:String, unicode: String
   tuple: make_tuple, list:List, dict:Dict,
   bool:Bool
-}     #type(lambda:1):PyFunction  type(undefined) : Atom
-
-###############################################################################
-# interlang
-# element.py
-#from dao.base import classeq
-#from dao import base
-#
-#from dao.compilebase import CompileTypeError #VariableNotBound, CompileTypeError
+} #type(lambda:1):PyFunction  type(undefined) : Atom
 
 il = interlang = {}
 
@@ -912,17 +895,17 @@ do ->
       exps = []
       for arg in args
         exps2 = arg.javascriptize(env, compiler)
-        result_args.append(exps2[-1])
+        result_args.push(exps2[-1])
         exps += exps2[..-1]
-        return [exps, result_arg]
+        return [exps, result_args]
 
     class il.Element
       tail_recursive_convert: ( ) ->  @
       find_assign_lefts: ( ) ->  set()
-      replace_return_with_yield: ( ) ->  @
+      replace_return_with_pyyield: ( ) ->  @
       interlang: ( ) ->  @
       __eq__: (x, y) ->  classeq(x, y)
-      toString: ( ) ->  @__class__.__name__
+      toString: ( ) ->  @constructor.__name__
 
     class il.Atom extends il.Element
       constructor: (@item) ->
@@ -934,7 +917,7 @@ do ->
       replace_assign: (compiler) ->  @
       tail_recursive_convert: ( ) ->  @
       insert_return_statement: ( ) ->  Return(@)
-      replace_return_with_yield: ( ) ->  @
+      replace_return_with_pyyield: ( ) ->  @
       javascriptize: (env, compiler) ->  [@]
       code_size: ( ) ->  1
       to_code: (compiler) ->  repr(@item)
@@ -986,10 +969,10 @@ do ->
       code_size: ( ) ->  sum([x.code_size() for x in @item])
       optimize: (env, compiler) ->  Tuple(tuple(x.optimize(env, compiler) for x in @item)...)
       to_code: (compiler) ->
-        if len(@item)!=1 then  "(#{', '.join([x.to_code(compiler) for x in @item])})"
+        if len(@item)!=1 then  "(#{join(', ', [x.to_code(compiler) for x in @item])})"
         else  "(#{@item[0].to_code(compiler)}, )"
       __eq__: (x, y) ->  classeq(x, y) and x.item==y.item
-      toString: ( ) ->  "il.#{@__class__.__name__}(#{@item})"
+      toString: ( ) ->  "il.#{@constructor.__name__}(#{@item})"
 
     class il.MutableAtom extends il.Atom
 
@@ -1027,11 +1010,11 @@ do ->
 
       to_code: (compiler) ->
         if len(@item)!=1
-          return '(%s)'% ', '.join([x.to_code(compiler) for x in @item])
+          return '(%s)'% join(', ', [x.to_code(compiler) for x in @item])
         else return '(%s, )'%@item[0].to_code(compiler)
 
       __eq__: (x, y) ->  classeq(x, y) and x.item==y.item
-      toString: ( ) ->  "il.#{@__class__.__name__}(#{@item})"
+      toString: ( ) ->  "il.#{@constructor.__name__}(#{@item})"
 
     class il.Return extends il.Element
       constructor: (@args...) ->
@@ -1043,15 +1026,15 @@ do ->
         for x in @args then  result |= x.free_vars()
         return result
 
-      subst: (bindings) -> @__class__(tuple(arg.subst(bindings) for arg in @args)...)
+      subst: (bindings) -> @constructor(tuple(arg.subst(bindings) for arg in @args)...)
 
       optimize: (env, compiler) ->
         if len(@args)==1 and isinstance(@args[0], Return)
-          return @__class__(@args[0].args...)
+          return @constructor(@args[0].args...)
         else
           for arg in @args
             if isinstance(arg, Return)  then throw new make_new CompileError
-          return @__class__(optimize_args(@args, env, compiler)...)
+          return @constructor(optimize_args(@args, env, compiler)...)
 
       javascriptize: (env, compiler) ->
         if len(@args)==1 and isinstance(@args[0], Begin)
@@ -1059,18 +1042,18 @@ do ->
         else if len(@args)==1 and isinstance(@args[0], If)
           return If(@args[0].test, Return(@args[0].then), Return(@args[0].else_)).javascriptize(env, compiler)
         [exps, args] = javascriptize_args(@args, env, compiler)
-        return [exps+[@__class__(args...)], true]
+        return [exps+[@constructor(args...)], true]
 
-      to_code: (compiler) ->   "return #{', '.join([x.to_code(compiler) for x in @args])}"
+      to_code: (compiler) ->   "return #{join(', ', [x.to_code(compiler) for x in @args])}"
       insert_return_statement: ( ) ->  Return(@args...)
-      replace_return_with_yield: ( ) ->  Begin([Yield(@args...), Return()])
+      replace_return_with_pyyield: ( ) ->  Begin([Yield(@args...), Return()])
       __eq__: (x, y) ->  classeq(x, y) and x.args==y.args
       toString: ( ) ->  "il.Return(#{','.join([repr(x) for x in @args])})"
 
     class il.Yield extends il.Return
-      to_code: (compiler) ->   "pyield #{', '.join([x.to_code(compiler) for x in @args])}"
+      to_code: (compiler) ->   "pyield #{join(', ', [x.to_code(compiler) for x in @args])}"
       insert_return_statement: ( ) ->  @
-      toString: ( ) ->  "il.Yield(#{', '.join([repr(x) for x in @args])})"
+      toString: ( ) ->  "il.Yield(#{join(', ', [repr(x) for x in @args])})"
 
     class il.Try extends il.Element
       constructor: (@test, @body) ->
@@ -1085,7 +1068,7 @@ do ->
       optimize: (env, compiler) ->  Try(@test.optimize(env, compiler), @body.optimize(env, compiler))
       insert_return_statement: ( ) -> Try(@test, @body.insert_return_statement())
 
-      replace_return_with_yield: ( ) -> Try(@test,  @body.replace_return_with_yield())
+      replace_return_with_pyyield: ( ) -> Try(@test,  @body.replace_return_with_pyyield())
 
       javascriptize: (env, compiler) ->
         test = @test.javascriptize(env, compiler)
@@ -1107,9 +1090,9 @@ do ->
         else
           if e is NULL and i!=length-1 then continue
           else result.push(e)
-        if result.length is 0 then return_statement
-        else if result.length is 1 then result[0]
-        else il.Begin(result)
+      if result.length is 0 then return_statement
+      else if result.length is 1 then result[0]
+      else il.Begin(result)
 
     class il.Begin extends il.Element
       constructor: (@statements) ->
@@ -1122,11 +1105,7 @@ do ->
       side_effects: ( ) ->  true
       subst: (bindings) ->  Begin(tuple(x.subst(bindings) for x in @statements))
 
-      free_vars: ( ) ->
-        result = set()
-        for exp in @statements
-          result |= exp.free_vars()
-        return result
+      free_vars: ( ) -> set().merge(exp.free_vars() for exp in @statements)
 
       code_size: ( ) ->  1
       analyse: (compiler) -> for x in @statements then x.analyse(compiler)
@@ -1151,7 +1130,7 @@ do ->
         inserted = @statements[-1].insert_return_statement()
         return begin((@statements[..-1]+[inserted])...)
 
-      replace_return_with_yield: ( ) ->  Begin(tuple(exp.replace_return_with_yield() for exp in @statements))
+      replace_return_with_pyyield: ( ) ->  Begin(tuple(exp.replace_return_with_pyyield() for exp in @statements))
 
       javascriptize: (env, compiler) ->
         result = []
@@ -1173,7 +1152,7 @@ do ->
       optimize: (env, compiler) -> @
       javascriptize: (env, compiler) ->  [@]
       insert_return_statement: ( ) ->  @
-      replace_return_with_yield: ( ) ->  @
+      replace_return_with_pyyield: ( ) ->  @
       subst: (bindings) ->  @
       __eq__: (x, y) ->  classeq(x, y)
       to_code: (compiler) ->  'pass'
@@ -1189,7 +1168,7 @@ do ->
       optimize: (env, compiler) ->  nil
       javascriptize: (env, compiler) ->  [@]
       insert_return_statement: ( ) ->  @
-      replace_return_with_yield: ( ) ->  @
+      replace_return_with_pyyield: ( ) ->  @
       subst: (bindings) ->  @
       __eq__: (x, y) ->  classeq(x, y)
       to_code: (compiler) ->  'nil'
@@ -1219,7 +1198,7 @@ do ->
 
     class il.Lamda extends il.Element
       constructor: (@params, @body) -> @has_javascriptized = false
-      make_new: (params, body) ->  @__class__(params, body)
+      make_new: (params, body) ->  new il.Lamda(params, body)
       callOn: (args...) ->  Apply(args)
       find_assign_lefts: ( ) ->  @body.find_assign_lefts()
       analyse: (compiler) ->
@@ -1281,24 +1260,21 @@ do ->
           if bindings then @body.subst(bindings).optimize(env, compiler)
           else  @body.optimize(env, compiler)
 
-      insert_return_statement: () ->  Return(@)
+      insert_return_statement: () ->  new il.Return(@)
 
       javascriptize: (env, compiler) ->
         if @has_javascriptized then return [@name]
+        @has_javascriptized = true
         body_exps = @body.javascriptize(env, compiler)
-        global_vars = il.begin(body_exps...).find_assign_lefts()-set(@params)
-        global_vars = set(x for x in global_vars when isinstance(x, Var) and not isinstance(x, LocalVar)  and not isinstance(x, SolverVar))
-        if global_vars
-          body_exps = [GlobalDecl(global_vars)]+body_exps
-          return [@make_new(@params, begin(body_exps...))]
+        [@make_new(@params, il.begin(body_exps...))]
 
-      to_code: (compiler) -> "lambda #{', '.join(tuple(x.to_code(compiler) for x in @params))}: "  + '%s'%@body.to_code(compiler)
+      to_code: (compiler) -> "function (#{join(', ', tuple(x.to_code(compiler) for x in @params))}) { "  + @body.to_code(compiler)+";}"
 
       free_vars: ( ) ->  @body.free_vars()-set(@params)
       bool: ( ) ->  true
       __eq__: (x, y) ->  classeq(x, y) and x.params==y.params and x.body==y.body
       __hash__: ( ) ->  hash(id(@))
-      toString: ( ) ->  "il.Lamda((#{', '.join([repr(x) for x in @params])}), \n#{repr(@body)})"
+      toString: ( ) ->  "il.Lamda((#{join(', ', [repr(x) for x in @params])}), \n#{repr(@body)})"
 
     class il.RulesLamda extends il.Lamda
       constructor: (@params, @body) ->  @has_javascriptized = false
@@ -1316,7 +1292,7 @@ do ->
         @params = [v]
         @name = undefined
 
-      make_new: (params, body) ->  @__class__(params[0], body)
+      make_new: (params, body) ->  @constructor(params[0], body)
 
       optimize_apply: (env, compiler, args) ->
         [param, arg] = [@params[0], args[0]]
@@ -1356,7 +1332,7 @@ do ->
         @params = [param]
         @body = param
 
-      make_new: (params, body) ->  @__class__(@params[0])
+      make_new: (params, body) ->  @constructor(@params[0])
       callOn: (args...) ->
         bindings = {}
         bindings[@params[0]] = args[0]
@@ -1367,41 +1343,12 @@ do ->
     class il.Function extends il.Lamda
       constructor: (@name, @params, @body) ->
 
-    class il.Lamda
-      constructor: (params, body) -> @name = name
-      make_new: (params, body) ->  @__class__(@name, params, body)
-
-      optimize: (env, compiler) ->
-        env = env.extend()
-        body = @body.optimize(env, compiler)
-        result = @make_new(@params, body)
-        return result
-
-      optimize_apply: (env, compiler, args) ->
-        result = Lamda.optimize_apply(env, compiler, args)
-        return result
-
-      javascriptize: (env, compiler) ->
-        if @has_javascriptized then return [@name]
-        @has_javascriptized = true
-        body_exps = @body.javascriptize(env, compiler)
-        global_vars = @find_assign_lefts()-set(@params)
-        global_vars = set(x for x in global_vars when isinstance(x, Var) and not isinstance(x, LocalVar) and not isinstance(x, SolverVar))
-        if global_vars then  body_exps = [GlobalDecl(global_vars)]+body_exps
-        body_exps = body_exps[..-1] + [body_exps[-1].insert_return_statement()]
-
-        return [@make_new(@params, begin(body_exps...)), @name]
-
-      to_code: (compiler) -> "  #{@name}(#{', '.join(tuple(x.to_code(compiler) for x in @params))}):\n"  + compiler.indent(@body.to_code(compiler))
-
-      toString: ( ) ->  "il.Function(#{@name}, #{', '.join([repr(x) for x in @params])})\n, #{repr(@body)})"
-
-    cfunction = (name, v, body...) ->  CFunction(name, v, begin(body...))
+    il.cfunction = (name, v, body...) ->  new il.CFunction(name, v, begin(body...))
 
     class il.CFunction extends il.Function
       is_fun: true
       constructor: (name, v, body) ->
-      make_new: (params, body) ->  @__class__(@name, params[0], body)
+      make_new: (params, body) ->  @constructor(@name, params[0], body)
       optimize_apply: (env, compiler, args) ->
         new_env = env.extend()
         bindings = {}
@@ -1443,7 +1390,7 @@ do ->
         else
           @to_coded = true
           ss = "#{arity}: #{funcname.to_code(compiler)}" for arity, funcname in @arity_body_map.items()
-          return "{#{', '.join(ss)}}"
+          return "{#{join(', ', ss)}}"
 
       toString: ( ) ->  'RulesDict(%s)'%@arity_body_map
 
@@ -1463,7 +1410,7 @@ do ->
           body_exps = [GlobalDecl(global_vars)]+body_exps
           return [MacroFunction(Lamda(@params, begin(body_exps...)))]
 
-      toString: ( ) ->  "il.MacroLamda((#{', '.join([repr(x) for x in @params])}), \n#{repr(@body)})"
+      toString: ( ) ->  "il.MacroLamda((#{join(', ', [repr(x) for x in @params])}), \n#{repr(@body)})"
 
     class il.MacroRules extends il.Lamda #, Macro):
       optimize_apply: (env, compiler, args) ->
@@ -1499,7 +1446,7 @@ do ->
     class il.GlobalDecl extends il.Element
       constructor: (@args) ->
       side_effects: ( ) ->  false
-      to_code: (compiler) ->  "global %s" % (', '.join([x.to_code(compiler) for x in @args]))
+      to_code: (compiler) ->  "global %s" % (join(', ', [x.to_code(compiler) for x in @args]))
       toString: ( ) ->  'GlobalDecl(%s)'%@args
 
     class il.Apply extends il.Element
@@ -1522,7 +1469,7 @@ do ->
           else return false # after cps, all of value have been solved before called,
       # so have no side effects.
 
-      subst: (bindings) ->  @__class__(@caller.subst(bindings),
+      subst: (bindings) ->  @constructor(@caller.subst(bindings),
                                        tuple(arg.subst(bindings) for arg in @args))
 
       free_vars: ( ) ->
@@ -1542,9 +1489,9 @@ do ->
               compiler.recursive_call_path.pop()
               return result
             else
-              return @__class__(caller, args)
+              return @constructor(caller, args)
           else
-            return @__class__(@caller, args)
+            return @constructor(@caller, args)
         else if isinstance(@caller, Lamda)
           return @caller.optimize_apply(env, compiler, args)
         else
@@ -1552,26 +1499,26 @@ do ->
           if isinstance(caller, Lamda)
             return caller.optimize_apply(env, compiler, args)
           else
-            return @__class__(caller, args)
+            return @constructor(caller, args)
 
       insert_return_statement: ( ) ->  Return(@)
-      replace_return_with_yield: ( ) ->  @
+      replace_return_with_pyyield: ( ) ->  @
       javascriptize: (env, compiler) ->
         exps = @caller.javascriptize(env, compiler)
         caller = exps[-1]
         exps = exps[..-1]
         exps2 = javascriptize_args(@args, env, compiler)
-        return exps+exps2+[@__class__(caller,args)]
+        return exps+exps2+[@constructor(caller,args)]
 
       to_code: (compiler) ->
         if isinstance(@caller, Lamda)
-          return "(%s)"%@caller.to_code(compiler) + '(%s)'%', '.join([x.to_code(compiler) for x in @args])
+          return "(%s)"%@caller.to_code(compiler) + '(%s)'%join(', ', [x.to_code(compiler) for x in @args])
         else
-          return @caller.to_code(compiler) + '(%s)'%', '.join([x.to_code(compiler) for x in @args])
+          return @caller.to_code(compiler) + '(%s)'%join(', ', [x.to_code(compiler) for x in @args])
 
       bool: ( ) ->  unknown
       __eq__: (x, y) ->  classeq(x, y) and x.caller==y.caller and x.args==y.args
-      toString: ( ) ->  "#{@caller}(#{', '.join([repr(x) for x in @args])})"
+      toString: ( ) ->  "#{@caller}(#{join(', ', [repr(x) for x in @args])})"
 
     class il.ExpressionWithCode extends il.Element
       constructor: (@exp, @fun) ->
@@ -1606,7 +1553,7 @@ do ->
         try env[@]
         catch e then @
       insert_return_statement: ( ) ->  Return(@)
-      replace_return_with_yield: ( ) ->  @
+      replace_return_with_pyyield: ( ) ->  @
       javascriptize: (env, compiler) ->  [@]
       to_code: (compiler) ->  @name
       __eq__: (x, y) ->  classeq(x, y) and x.name==y.name
@@ -1634,7 +1581,7 @@ do ->
       optimize: (env, compiler) ->  @
       replace_assign: (compiler) ->  @
       insert_return_statement: ( ) ->  Return(@)
-      replace_return_with_yield: ( ) ->  @
+      replace_return_with_pyyield: ( ) ->  @
       javascriptize: (env, compiler) -> [@]
 
       deref: (bindings) ->
@@ -1747,10 +1694,10 @@ do ->
         return value_exps[..-1]+[AssignFromList((@vars+[value_exps[-1]])...)]
 
       insert_return_statement: ( ) ->  Return(@)
-      replace_return_with_yield: ( ) ->  @
+      replace_return_with_pyyield: ( ) ->  @
       bool: ( ) ->  false
 
-      to_code: (compiler) ->  "#{', '.join([x.to_code(compiler) for x in @vars])} = #{@value.to_code(compiler)}"
+      to_code: (compiler) ->  "#{join(', ', [x.to_code(compiler) for x in @vars])} = #{@value.to_code(compiler)}"
 
       toString: ( ) ->  "il.AssignFromList(#{@vars}, #{@value})"
 
@@ -1803,8 +1750,8 @@ do ->
       insert_return_statement: ( ) ->  If(@test,  @then_.insert_return_statement()  @else_.insert_return_statement())
 
 
-      replace_return_with_yield: ( ) ->
-        If(@test, @then_.replace_return_with_yield(),  @else_.replace_return_with_yield())
+      replace_return_with_pyyield: ( ) ->
+        If(@test, @then_.replace_return_with_pyyield(),  @else_.replace_return_with_pyyield())
 
       javascriptize: (env, compiler) ->
         test = @test.javascriptize(env, compiler)
@@ -1832,7 +1779,7 @@ do ->
       constructor: ( ) ->
       code_size: ( ) ->  0
       insert_return_statement: ( ) ->  @
-      replace_return_with_yield: ( ) ->  @
+      replace_return_with_pyyield: ( ) ->  @
       to_code: (compiler) ->  ''
       __eq__: (x, y) ->  classeq(x, y)
       toString: ( ) ->  'il.pseudo_else'
@@ -1843,7 +1790,7 @@ do ->
       constructor: (@head, @tail) ->
       code_size: ( ) ->  1
       insert_return_statement: ( ) ->  @
-      replace_return_with_yield: ( ) ->  @
+      replace_return_with_pyyield: ( ) ->  @
       to_code: (compiler) ->  "Cons(#{@head.to_code(compiler)}, #{@tail.to_code(compiler)})"
       __eq__: (x, y) ->  classeq(x, y) and x.head==y.head and x.tail==y.tail
       toString: ( ) ->  "il.Cons(#{@head}, #{@tail})"
@@ -1871,8 +1818,8 @@ do ->
       insert_return_statement: ( ) ->
         While(@test, @body.insert_return_statement())
 
-      replace_return_with_yield: ( ) ->
-        While(@test  @body.replace_return_with_yield())
+      replace_return_with_pyyield: ( ) ->
+        While(@test  @body.replace_return_with_pyyield())
 
       javascriptize: (env, compiler) ->
         test = @test.javascriptize(env, compiler)
@@ -1909,7 +1856,7 @@ do ->
         return begin((tuple(assigns) + [For(@var1, @range.optimize(env, compiler), @body.optimize(env, compiler))])...)
 
       insert_return_statement: ( ) ->  For(@var1, @range, @body.insert_return_statement())
-      replace_return_with_yield: ( ) ->  For(@var1, @range, @body.replace_return_with_yield())
+      replace_return_with_pyyield: ( ) ->  For(@var1, @range, @body.replace_return_with_pyyield())
 
       javascriptize: (env, compiler) ->
         var1 = @var1.javascriptize(env, compiler)
@@ -1971,7 +1918,7 @@ do ->
         else  return false # after cps, all of value have been solved before called,
       # so have no side effects.
 
-      subst: (bindings) ->  @__class__(@caller.subst(bindings),
+      subst: (bindings) ->  @constructor(@caller.subst(bindings),
                                      tuple(arg.subst(bindings) for arg in @args))
 
       optimize: (env, compiler) ->
@@ -1980,13 +1927,13 @@ do ->
         for arg in args
           if not isinstance(arg, Atom) then  break
           else element(caller.operator_fun(tuple(arg.item for arg in args))...)
-        return @__class__(caller, args)
+        return @constructor(caller, args)
 
       insert_return_statement: ( ) ->  Return(@)
 
       javascriptize: (env, compiler) ->
         [exps, args] = javascriptize_args(@args, env, compiler)
-        exps+[@__class__(@caller, args)]
+        exps+[@constructor(@caller, args)]
 
       free_vars: ( ) ->
         result = set()
@@ -1999,7 +1946,7 @@ do ->
           return "(#{@args[0].to_code(compiler)})#{ @caller.to_code(compiler)}(#{@args[1].to_code(compiler)})"
         else"(#{@args[0].to_code(compiler)}) #{@caller.to_code(compiler)} (#{ @args[1].to_code(compiler)})"
 
-      toString: ( ) ->  "#{@caller}(#{', '.join([repr(arg) for arg in @args])})"
+      toString: ( ) ->  "#{@caller}(#{join(', ', [repr(arg) for arg in @args])})"
 
     class il.VirtualOperation extends il.Element
       constructor: (args...) ->
@@ -2011,10 +1958,10 @@ do ->
       find_assign_lefts: ( ) ->  set()
       side_effects: ( ) ->  true
       analyse: (compiler) -> for arg in @args then arg.analyse(compiler)
-      subst: (bindings) ->  @__class__(tuple(x.subst(bindings) for x in @args)...)
+      subst: (bindings) ->  @constructor(tuple(x.subst(bindings) for x in @args)...)
       code_size: ( ) ->  1
       optimize: (env, compiler) ->
-        if @has_side_effects then  @__class__(optimize_args(@args, env,compiler)...)
+        if @has_side_effects then  @constructor(optimize_args(@args, env,compiler)...)
 
         args = optimize_args(@args, env,compiler)
         free_vars = set()
@@ -2024,28 +1971,28 @@ do ->
           try assign = env[var1]
           catch e
             if assign isnt undefined then assign.dont_remove()
-            result = @__class__(args...)
+            result = @constructor(args...)
         return result
 
       bool: ( ) ->  unknown
       insert_return_statement: ( ) ->  Return(@)
-      replace_return_with_yield: ( ) ->  @
+      replace_return_with_pyyield: ( ) ->  @
       javascriptize: (env, compiler) ->
         [exps, args] = javascriptize_args(@args, env, compiler)
-        exps+@__class__(args...)
+        exps+new @constructor(args...)
 
       to_code: (compiler) ->
-        if isinstance(@__class__.code_format, str)
-          if @__class__.arity==0 then @__class__.code_format
-          else if @__class__.arity!=-1
-            @__class__.code_format % tuple(x.to_code(compiler) for x in @args)
+        if isinstance(@code_format, String)
+          if @constructor.arity==0 then @code_format
+          else if @constructor.arity!=-1
+            @code_format % tuple(x.to_code(compiler) for x in @args)
           else
-            @__class__.code_format % (', '.join([x.to_code(compiler) for x in @args]))
+            @code_format % (join(', ', [x.to_code(compiler) for x in @args]))
         else
-          @__class__.code_format(compiler)
+          @code_format(compiler)
 
       __eq__: (x, y) ->  classeq(x, y) and x.args==y.args
-      __hash__: ( ) ->  hash(@__class__.__name__)
+      __hash__: ( ) ->  hash(@constructor.__name__)
 
       free_vars: ( ) ->
         result = set()
@@ -2054,8 +2001,8 @@ do ->
         return result
 
       toString: ( ) ->
-        try if @arity==0 then "il.#{@__class__.__name__}"
-        catch e then "il.#{@__class__.__name__}(#{', '.join([repr(x) for x in @args])})"
+        try if @arity==0 then "il.#{@constructor.__name__}"
+        catch e then "il.#{@constructor.__name__}(#{join(', ', [repr(x) for x in @args])})"
 
     class il.Deref extends il.Element
       constructor: (@item) ->
@@ -2072,10 +2019,10 @@ do ->
 
       javascriptize: (env, compiler) ->
         exps = @item.javascriptize(env, compiler)
-        return exps[..-1]+[@__class__(exps[-1])]
+        return exps[..-1]+[@constructor(exps[-1])]
 
       insert_return_statement: ( ) ->  Return(@)
-      replace_return_with_yield: ( ) ->  @
+      replace_return_with_pyyield: ( ) ->  @
       to_code: (compiler) ->   "deref(#{@item.to_code(compiler)}, solver.bindings)"
       toString: ( ) ->  "il.Deref(#{@item})"
 
@@ -2096,10 +2043,10 @@ do ->
 
       javascriptize: (env, compiler) ->
         exps = @item.javascriptize(env, compiler)
-        return exps[..-1]+[@__class__(exps[-1])]
+        return exps[..-1]+[@constructor(exps[-1])]
 
       insert_return_statement: ( ) ->  Return(@)
-      replace_return_with_yield: ( ) ->  @
+      replace_return_with_pyyield: ( ) ->  @
       to_code: (compiler) ->   "(#{@item.to_code(compiler)}).fun()"
       toString: ( ) ->  "il.EvalExpressionWithCode(#{@item})"
 
@@ -2121,7 +2068,7 @@ do ->
         return exps[..-1]+[Len(exps[-1])]
 
       insert_return_statement: ( ) ->  Return(@)
-      replace_return_with_yield: ( ) ->  @
+      replace_return_with_pyyield: ( ) ->  @
       to_code: (compiler) ->   'len(%s)'%@item.to_code(compiler)
       toString: ( ) ->  'il.Len(%s)'%@item
 
@@ -2155,7 +2102,7 @@ do ->
         return exps1[..-1]+exps2[..-1]+[In(exps1[-1], exps2[-1])]
 
       insert_return_statement: ( ) ->  Return(@)
-      replace_return_with_yield: ( ) ->  @
+      replace_return_with_pyyield: ( ) ->  @
       bool: ( ) ->
         if isinstance(@item, Atom)
           if isinstance(@container, Atom)
@@ -2203,7 +2150,7 @@ do ->
         return container_exps[..-1]+index_exps[..-1]+[GetItem(container_exps[-1], index_exps[-1])]
 
       insert_return_statement: ( ) ->  Return(@)
-      replace_return_with_yield: ( ) ->  @
+      replace_return_with_pyyield: ( ) ->  @
       bool: ( ) ->
         if isinstance(@index, Atom)
           if isinstance(@container, Atom)
@@ -2240,7 +2187,7 @@ do ->
         container_exps[..-1]+value_exps[..-1]+[ListAppend(container_exps[-1], value_exps[-1])]
 
       insert_return_statement: ( ) ->  Return(@)
-      replace_return_with_yield: ( ) ->  @
+      replace_return_with_pyyield: ( ) ->  @
       bool: ( ) ->  false
       to_code: (compiler) ->   "#{@container.to_code(compiler)}.append(#{@value.to_code(compiler)})"
       toString: ( ) ->  "il.ListAppend(#{@container}, #{@value})"
@@ -2274,7 +2221,7 @@ do ->
         return [tag_exps[..-1]+cont_exps[..-1]+[PushCatchCont(tag_exps[-1], cont_exps[-1])], true]
 
       insert_return_statement: ( ) ->  Return(@)
-      replace_return_with_yield: ( ) ->  @
+      replace_return_with_pyyield: ( ) ->  @
       bool: ( ) ->  false
       to_code: (compiler) ->  "solver.catch_cont_map.setdefault(#{@tag}, []).append(#{@cont})"
       toString: ( ) ->  "il.PushCatchCont(#{@tag}, #{@cont})"
@@ -2302,7 +2249,7 @@ do ->
         return var_exps[..-1]+value_exps[..-1]+[SetBinding(var_exps[-1], value_exps[-1])]
 
       insert_return_statement: ( ) ->  Return(@)
-      replace_return_with_yield: ( ) ->  @
+      replace_return_with_pyyield: ( ) ->  @
       bool: ( ) ->  false
       to_code: (compiler) ->  "solver.bindings[#{@var1.to_code(compiler)}] = #{ @value.to_code(compiler)}"
       toString: ( ) ->  "il.SetBinding(#{@var1}, #{@value})"
@@ -2328,7 +2275,7 @@ do ->
         return tag_exps[..-1]+[FindCatchCont(tag_exps[-1])]
 
       insert_return_statement: ( ) ->  Return(@)
-      replace_return_with_yield: ( ) ->  @
+      replace_return_with_pyyield: ( ) ->  @
       bool: ( ) ->  false
       to_code: (compiler) ->  "solver.find_catch_cont.callOn(#{@tag})"
       toString: ( ) ->  "il.FindCatchCont(#{@tag})"
@@ -2339,14 +2286,14 @@ do ->
       side_effects: ( ) ->  false
       free_vars: ( ) ->  @item.free_vars()
       analyse: (compiler) -> @item.analyse(compiler)
-      subst: (bindings) ->  @__class__(@item.subst(bindings))
+      subst: (bindings) ->  @constructor(@item.subst(bindings))
       code_size: ( ) ->  1
-      optimize: (env, compiler) ->  @__class__(@item.optimize(env, compiler))
+      optimize: (env, compiler) ->  @constructor(@item.optimize(env, compiler))
       javascriptize: (env, compiler) ->
         exps = @item.javascriptize(env, compiler)
-        return exps[..-1]+[@__class__(exps[-1])]
+        return exps[..-1]+[@constructor(exps[-1])]
       insert_return_statement: ( ) ->  Return(@)
-      replace_return_with_yield: ( ) ->  @
+      replace_return_with_pyyield: ( ) ->  @
       bool: ( ) ->
         if isinstance(@item, Macro) then true
         else if isinstance(@item, Lamda) then false
@@ -2375,7 +2322,7 @@ do ->
 
     class il.VirtualOperation2 extends il.VirtualOperation
       insert_return_statement: ( ) ->  Begin((Return()))
-      replace_return_with_yield: ( ) ->  @
+      replace_return_with_pyyield: ( ) ->  @
 
     il.vop2 = vop2 = (name, arity, code_format, has_side_effects) ->
       class Vop extends il.VirtualOperation2
@@ -2390,12 +2337,12 @@ do ->
     class il.BinaryLogicOperation extends il.VirtualOperation
     class il.UnaryLogicOperation extends il.VirtualOperation
 
-    Call_to_code = (compiler) ->  "(#{@args[0].to_code(compiler)})(#{', '.join([x.to_code(compiler) for x in @args[1..]])})"
+    Call_to_code = (compiler) ->  "(#{@args[0].to_code(compiler)})(#{join(', ', [x.to_code(compiler) for x in @args[1..]])})"
     il.Call = vop('Call', -1, Call_to_code, true)
 
     il.Attr = vop('Attr', 2, '%s.%s', false)
 
-    AttrCall_to_code = (compiler) ->  "#{@args[0].to_code(compiler)}(#{', '.join([x.to_code(compiler) for x in @args[1..]])})"
+    AttrCall_to_code = (compiler) ->  "#{@args[0].to_code(compiler)}(#{join(', ', [x.to_code(compiler) for x in @args[1..]])})"
     il.AttrCall = vop('AttrCall', -1, AttrCall_to_code, true)
 
     il.SetItem = vop2('SetItem', 3, '(%s)[%s] = %s', true)
@@ -2490,13 +2437,13 @@ do ->
     il.Assert = vop('Assert', 1, 'assert %s', false)
     il.Int = new il.Symbol('int')
 
-    Format_to_code = (compiler) ->  "#{@args[0].to_code(compiler)}%#{', '.join(x.to_code(compiler) for x in @args[1..])}"
+    Format_to_code = (compiler) ->  "#{@args[0].to_code(compiler)}%#{join(', ', x.to_code(compiler) for x in @args[1..])}"
     il.Format = vop('Format', -1,Format_to_code, false)
 
     Concat_to_code = (compiler) ->  '%s'%''.join([arg.to_code(compiler) for arg in @args])
     il.Concat = vop('Concat', -1, Concat_to_code, false)
 
-    Format_to_code = (compiler) ->  "file(#{@args[0].to_code(compiler)}, #{', '.join(x.to_code(compiler) for x in @args[1...])})"
+    Format_to_code = (compiler) ->  "file(#{@args[0].to_code(compiler)}, #{join(', ', x.to_code(compiler) for x in @args[1...])})"
 
     il.OpenFile = vop('OpenFile', -1, Format_to_code, true)
     il.CloseFile = vop('CloseFile', 1, "%s.close()", true)

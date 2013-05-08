@@ -3,7 +3,7 @@
   ' some basic utilities for solve dao expression.';
   'code for compilation:\n-> alpha convert\n-> cps convert\n-> optimize\n-> tail recursive convert\n-> javascriptize\n-> generate code';
   'I = require \'utils\'\nI.at "solvebase.Solutions compile.compileToJSFile"\nI.use "compilebase: Environment, Compiler"\nI.at "command.element"\nI.use "compilebase: CompileTypeError, VariableNotBound, import_names"\nil = I.from "dao: interlang"';
-  var Apply, ArityError, Assign, Atom, BaseCommand, Bindings, Bool, BuiltinFunction, BuiltinFunctionCall, Command, CommandCall, CompileError, CompileTypeError, Compiler, Cons, Const, ConstLamdaVar, ConstMacroVar, DaoError, DaoNotImplemented, DaoStopIteration, DaoSyntaxError, DaoUncaughtThrow, Dict, DirectInterlang, DummyVar, Element, Environment, Exception, ExpressionWithCode, FALSE, Float, Integer, Klass, LamdaVar, List, LogicVar, MAX_EXTEND_CODE_SIZE, Macro, MacroFunction, MacroRules, MacroVar, MultiAssignToConstError, NULL, Nil, NoSolution, PyFunction, RecursiveFunctionVar, RecursiveMacroVar, Solutions, Solver, Special, SpecialCall, String, Symbol, TRUE, Tuple, UnquoteSplice, Var, VariableNotBound, assert, compileToJavascript, cons, cons2tuple, conslist, cps_convert_unify, cps_convert_unify_one_var, cps_convert_unify_two_var, dao, element, evald, il, import_names, interlang, isinstance, len, make_tuple, new_func_name, new_func_name_map, nil, prelude, register_fun, set, solve, special, type_map, utils, _ref, _ref1, _ref10, _ref11, _ref12, _ref13, _ref14, _ref15, _ref16, _ref17, _ref18, _ref19, _ref2, _ref20, _ref21, _ref22, _ref23, _ref24, _ref25, _ref3, _ref4, _ref5, _ref6, _ref7, _ref8, _ref9,
+  var Apply, ArityError, Assign, Atom, BaseCommand, Bindings, Bool, BuiltinFunction, BuiltinFunctionCall, Command, CommandCall, CompileError, CompileTypeError, Compiler, Cons, Const, ConstLamdaVar, ConstMacroVar, DaoError, DaoNotImplemented, DaoStopIteration, DaoSyntaxError, DaoUncaughtThrow, Dict, DirectInterlang, DummyVar, Element, Environment, Exception, ExpressionWithCode, FALSE, Float, Integer, Klass, LamdaVar, List, LogicVar, MAX_EXTEND_CODE_SIZE, Macro, MacroFunction, MacroRules, MacroVar, MultiAssignToConstError, NULL, Nil, NoSolution, PyFunction, RecursiveFunctionVar, RecursiveMacroVar, Solutions, Solver, Special, SpecialCall, String, Symbol, TRUE, Tuple, UnquoteSplice, Var, VariableNotBound, assert, compileToJavascript, cons, cons2tuple, conslist, cps_convert_unify, cps_convert_unify_one_var, cps_convert_unify_two_var, dao, element, evald, il, import_names, interlang, isinstance, join, len, make_tuple, new_func_name, new_func_name_map, nil, prelude, register_fun, repr, set, solve, special, tuple, type_map, utils, _ref, _ref1, _ref10, _ref11, _ref12, _ref13, _ref14, _ref15, _ref16, _ref17, _ref18, _ref19, _ref2, _ref20, _ref21, _ref22, _ref23, _ref24, _ref25, _ref3, _ref4, _ref5, _ref6, _ref7, _ref8, _ref9,
     __hasProp = {}.hasOwnProperty,
     __extends = function(child, parent) { for (var key in parent) { if (__hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; },
     __slice = [].slice,
@@ -14,7 +14,7 @@
   set = utils.set;
 
   isinstance = function(x, klass) {
-    return isinstance(x, klass);
+    return x instanceof klass;
   };
 
   assert = function(arg, message) {
@@ -27,6 +27,18 @@
     return obj.length;
   };
 
+  tuple = function(obj) {
+    return obj;
+  };
+
+  join = function(sep, list) {
+    return list.join(sep);
+  };
+
+  repr = function(x) {
+    return x.toString();
+  };
+
   prelude = '# generated file from compiled daonode expression.\nfrom dao.builtins import *\nfrom dao.command import LogicVar as DaoLogicVar\nfrom dao.command import Var as DaoVar\nfrom dao.solvebase import Solver, NoSolution\nfrom dao.solvebase import deref, get_value, LogicVar, DummyVar\nfrom dao.solvebase import Cons, nil\nfrom dao.solvebase import UnquoteSplice, ExpressionWithCode\nfrom dao.solvebase import Macro, MacroFunction, MacroRules\nfrom dao.solve import eval as eval_exp\nfrom dao.command import BuiltinFunctionCall\nfrom dao import interlang as il';
 
   exports.dao = dao = {};
@@ -36,12 +48,12 @@
 
     code = compileToJavascript(exp, env);
     fs = require("fs");
-    return fs.writeSync('..\test\compiled.js', code);
+    return fs.writeSync(fs.openSync('f:\\daonode\\test\\compiled.js', 'w'), code);
   };
 
   compileToJavascript = function(exp, env) {
     'assemble steps from dao expression to javascript code';
-    var compiler, fun, original_exp, result;
+    var compiler, original_exp;
 
     original_exp = exp;
     compiler = new Compiler();
@@ -51,22 +63,21 @@
     exp.analyse(compiler);
     env = new Environment();
     exp = exp.optimize(env, compiler);
-    fun = compiler.new_var(new il.ConstLocalVar('compiled_dao_fun'));
-    exp = new il.Function(fun, [], exp);
     exp = il.begin(exp.javascriptize(env, compiler)[0]);
     if (isinstance(exp, il.Begin)) {
       exp = exp.statements[0];
     }
+    exp = new il.Lamda([], exp);
     exp.body = exp.body.replace_return_with_pyyield();
-    result = exp.to_code(compiler);
-    return prelude + result;
+    exp = new il.Call(exp, new il.ConstLocalVar('this'));
+    return exp.to_code(compiler);
   };
 
   solve = function(exp, env) {
     var compiled;
 
     compileToJSFile(exp, env);
-    compiled = require('../bin/compiled');
+    compiled = require('f:\\daonode\\test\\bin\\compiled.js');
     return Solutions(exp, compiled.fun());
   };
 
@@ -280,7 +291,7 @@
     };
 
     LogicVar.prototype.__eq__ = function(x, y) {
-      return x.__class__ === y.__class__ && x.name === y.name;
+      return x.constructor === y.constructor && x.name === y.name;
     };
 
     LogicVar.prototype.__hash__ = function() {
@@ -318,7 +329,7 @@
     }
 
     Cons.prototype.unify = function(other, solver) {
-      if (this.__class__ !== other.__class__) {
+      if (this.constructor !== other.constructor) {
         return solver.fail_cont.callOn(false);
       }
       if (solver.unify(this.head, other.head)) {
@@ -330,7 +341,7 @@
     };
 
     Cons.prototype.match = function(other) {
-      if (this.__class__ !== other.__class__) {
+      if (this.constructor !== other.constructor) {
         return false;
       }
       return match(this.head, other.head) && match(this.tail, other.tail);
@@ -339,7 +350,7 @@
     Cons.prototype.unify_rule_head = function(other, env, subst) {
       var _, _i, _len, _ref3, _results;
 
-      if (this.__class__ !== other.__class__) {
+      if (this.constructor !== other.constructor) {
         return;
       }
       _ref3 = unify_rule_head(this.head, other.head, env, subst);
@@ -407,7 +418,7 @@
     };
 
     Cons.prototype.__eq__ = function(other) {
-      return this.__class__ === other.__class__ && this.head === other.head && this.tail === other.tail;
+      return this.constructor === other.constructor && this.head === other.head && this.tail === other.tail;
     };
 
     Cons.prototype.__iter__ = function() {
@@ -447,7 +458,7 @@
     Cons.prototype.toString = function() {
       var e;
 
-      return "L(" + (' '.join([
+      return "L(" + (join(' ', [
         (function() {
           var _i, _len, _results;
 
@@ -550,7 +561,7 @@
     }
 
     ExpressionWithCode.prototype.__eq__ = function(x, y) {
-      return (x.__class__ === y.__class__ && x.exp === y.exp) || x.exp === y;
+      return (x.constructor === y.constructor && x.exp === y.exp) || x.exp === y;
     };
 
     __iter__ = function() {
@@ -806,7 +817,7 @@
       try {
         suffix = str(this.newvar_map[variable.name]);
         this.newvar_map[variable.name] += 1;
-        return variable.__class__(variable.name + suffix);
+        return variable.constructor(variable.name + suffix);
       } catch (_error) {
         e = _error;
         this.newvar_map[variable.name] = 1;
@@ -853,7 +864,7 @@
         }
         return _results;
       }).call(this));
-      return '\n'.join(lines);
+      return join('\n', lines);
     };
 
     return Compiler;
@@ -938,11 +949,11 @@
     };
 
     Atom.prototype.__eq__ = function(x, y) {
-      return x.__class__ === y.__class__ && x.item === y.item;
+      return x.constructor === y.constructor && x.item === y.item;
     };
 
     Atom.prototype.to_code = function(compiler) {
-      return "" + this.__class__.__name__ + "(" + this.item + ")";
+      return "" + this.constructor.__name__ + "(" + this.item + ")";
     };
 
     Atom.prototype.toString = function() {
@@ -1195,7 +1206,7 @@
     Tuple.prototype.to_code = function(compiler) {
       var x;
 
-      return "" + this.__class__.__name__ + "(" + (', '.join([
+      return "" + this.constructor.__name__ + "(" + (join(', ', [
         (function() {
           var _i, _len, _ref14, _results;
 
@@ -1215,7 +1226,7 @@
     };
 
     Tuple.prototype.toString = function() {
-      return "" + this.__class__.__name__ + "(" + this.item + ")";
+      return "" + this.constructor.__name__ + "(" + this.item + ")";
     };
 
     return Tuple;
@@ -1341,7 +1352,7 @@
     };
 
     Var.prototype.toString = function() {
-      return "" + this.__class__.__name__ + "('" + this.name + "')";
+      return "" + this.constructor.__name__ + "('" + this.name + "')";
     };
 
     return Var;
@@ -1587,7 +1598,7 @@
     Cons.prototype.unify_rule_head = function(other, env, subst) {
       var _, _i, _len, _ref23, _results;
 
-      if (this.__class__ !== other.__class__) {
+      if (this.constructor !== other.constructor) {
         return;
       }
       _ref23 = unify_rule_head(this.head, other.head, env, subst);
@@ -1627,8 +1638,9 @@
       tail = getvalue(this.tail, env);
       if (head === this.head && tail === this.tail) {
         return this;
+      } else {
+        return Cons(head, tail);
       }
-      return Cons(head, tail);
     };
 
     Cons.prototype.copy = function(memo) {
@@ -1636,7 +1648,7 @@
     };
 
     Cons.prototype.__eq__ = function(other) {
-      return this.__class__ === other.__class__ && this.head === other.head && this.tail === other.tail;
+      return this.constructor === other.constructor && this.head === other.head && this.tail === other.tail;
     };
 
     Cons.prototype.__iter__ = function() {
@@ -1676,7 +1688,7 @@
     Cons.prototype.toString = function() {
       var e;
 
-      return "L(" + (' '.join([
+      return "L(" + (join(' ', [
         (function() {
           var _i, _len, _results;
 
@@ -1818,7 +1830,7 @@
     Apply.prototype.alpha = function(env, compiler) {
       var arg;
 
-      return this.__class__(this.caller.alpha(env, compiler), tuple((function() {
+      return this.constructor(this.caller.alpha(env, compiler), tuple((function() {
         var _i, _len, _ref24, _results;
 
         _ref24 = this.args;
@@ -1838,7 +1850,7 @@
     Apply.prototype.subst = function(bindings) {
       var arg;
 
-      return this.__class__(this.caller.subst(bindings), tuple((function() {
+      return this.constructor(this.caller.subst(bindings), tuple((function() {
         var _i, _len, _ref24, _results;
 
         _ref24 = this.args;
@@ -1854,7 +1866,7 @@
     Apply.prototype.toString = function() {
       var x;
 
-      return "" + this.caller + "(" + (', '.join([
+      return "" + this.caller + "(" + (join(', ', [
         (function() {
           var _i, _len, _ref24, _results;
 
@@ -1896,7 +1908,7 @@
     CommandCall.prototype.subst = function(bindings) {
       var arg;
 
-      return this.__class__(this.fun, tuple((function() {
+      return this.constructor(this.fun, tuple((function() {
         var _i, _len, _ref25, _results;
 
         _ref25 = this.args;
@@ -1927,7 +1939,7 @@
       t = tuple((function() {
         var _i, _len, _ref25, _results;
 
-        _ref25 = vars + [cont.callOn(il.Call(il.Klass(this.__class__.__name__), new il.QuoteItem(this.fun), new il.MakeTuple(result)))];
+        _ref25 = vars + [cont.callOn(il.Call(il.Klass(this.constructor.__name__), new il.QuoteItem(this.fun), new il.MakeTuple(result)))];
         _results = [];
         for (_i = 0, _len = _ref25.length; _i < _len; _i++) {
           var1 = _ref25[_i];
@@ -1951,7 +1963,7 @@
     CommandCall.prototype.toString = function() {
       var x;
 
-      return "" + this.fun + "(" + (', '.join([
+      return "" + this.fun + "(" + (join(', ', [
         (function() {
           var _i, _len, _ref25, _results;
 
@@ -2063,7 +2075,7 @@
     SpecialCall.prototype.alpha = function(env, compiler) {
       var arg;
 
-      return this.__class__(this.command, tuple((function() {
+      return this.constructor(this.command, tuple((function() {
         var _i, _len, _ref25, _results;
 
         _ref25 = this.args;
@@ -2083,7 +2095,7 @@
     SpecialCall.prototype.to_code = function(compiler) {
       var x;
 
-      return "" + this.fun.__name__ + "(" + (', '.join([
+      return "" + this.fun.__name__ + "(" + (join(', ', [
         (function() {
           var _i, _len, _ref25, _results;
 
@@ -2113,7 +2125,7 @@
     SpecialCall.prototype.toString = function() {
       var x;
 
-      return "" + this.fun.__name__ + "(" + (', '.join(tuple((function() {
+      return "" + this.fun.__name__ + "(" + (join(', ', tuple((function() {
         var _i, _len, _ref25, _results;
 
         _ref25 = this.args;
@@ -2196,7 +2208,7 @@
     BuiltinFunctionCall.prototype.alpha = function(env, compiler) {
       var arg;
 
-      return this.__class__(this.fun, tuple((function() {
+      return this.constructor(this.fun, tuple((function() {
         var _i, _len, _ref26, _results;
 
         _ref26 = this.args;
@@ -2262,7 +2274,7 @@
     BuiltinFunctionCall.prototype.to_code = function(compiler) {
       var x;
 
-      return "" + this.fun.name + "(" + (', '.join([
+      return "" + this.fun.name + "(" + (join(', ', [
         (function() {
           var _i, _len, _ref26, _results;
 
@@ -2280,7 +2292,7 @@
     BuiltinFunctionCall.prototype.toString = function() {
       var x;
 
-      return "" + this.fun.name + "(" + (', '.join([
+      return "" + this.fun.name + "(" + (join(', ', [
         (function() {
           var _i, _len, _ref26, _results;
 
@@ -2418,7 +2430,7 @@
   il = interlang = {};
 
   (function() {
-    var AttrCall_to_code, Call_to_code, Concat_to_code, Format_to_code, QuoteItem_to_code, SetBindings, SetCutCont, SetParseState, append_failcont, catch_cont_map, cfunction, clamda, continue_, empty_dict, empty_list, for_, if_, javascriptize_args, no_side_effects, optimize_args, vop, vop2, _ref26, _ref27, _ref28, _ref29, _ref30, _ref31, _ref32, _ref33, _ref34, _ref35, _ref36, _ref37, _ref38, _ref39, _ref40, _ref41, _ref42, _ref43, _ref44, _ref45, _ref46, _ref47, _ref48;
+    var AttrCall_to_code, Call_to_code, Concat_to_code, Format_to_code, QuoteItem_to_code, SetBindings, SetCutCont, SetParseState, append_failcont, catch_cont_map, clamda, continue_, empty_dict, empty_list, for_, if_, javascriptize_args, no_side_effects, optimize_args, vop, vop2, _ref26, _ref27, _ref28, _ref29, _ref30, _ref31, _ref32, _ref33, _ref34, _ref35, _ref36, _ref37, _ref38, _ref39, _ref40, _ref41, _ref42, _ref43, _ref44, _ref45, _ref46, _ref47, _ref48;
 
     il.unknown = -1;
     il.element = function(exp) {
@@ -2465,9 +2477,9 @@
       for (_i = 0, _len = args.length; _i < _len; _i++) {
         arg = args[_i];
         exps2 = arg.javascriptize(env, compiler);
-        result_args.append(exps2[-1]);
+        result_args.push(exps2[-1]);
         exps += exps2.slice(0);
-        return [exps, result_arg];
+        return [exps, result_args];
       }
     };
     il.Element = (function() {
@@ -2481,7 +2493,7 @@
         return set();
       };
 
-      Element.prototype.replace_return_with_yield = function() {
+      Element.prototype.replace_return_with_pyyield = function() {
         return this;
       };
 
@@ -2494,7 +2506,7 @@
       };
 
       Element.prototype.toString = function() {
-        return this.__class__.__name__;
+        return this.constructor.__name__;
       };
 
       return Element;
@@ -2537,7 +2549,7 @@
         return Return(this);
       };
 
-      Atom.prototype.replace_return_with_yield = function() {
+      Atom.prototype.replace_return_with_pyyield = function() {
         return this;
       };
 
@@ -2809,7 +2821,7 @@
         var x;
 
         if (len(this.item) !== 1) {
-          return "(" + (', '.join([
+          return "(" + (join(', ', [
             (function() {
               var _i, _len, _ref34, _results;
 
@@ -2832,7 +2844,7 @@
       };
 
       Tuple.prototype.toString = function() {
-        return "il." + this.__class__.__name__ + "(" + this.item + ")";
+        return "il." + this.constructor.__name__ + "(" + this.item + ")";
       };
 
       return Tuple;
@@ -2980,7 +2992,7 @@
         var x;
 
         if (len(this.item) !== 1) {
-          return '(%s)' % ', '.join([
+          return '(%s)' % join(', ', [
             (function() {
               var _i, _len, _ref37, _results;
 
@@ -3003,7 +3015,7 @@
       };
 
       MacroArgs.prototype.toString = function() {
-        return "il." + this.__class__.__name__ + "(" + this.item + ")";
+        return "il." + this.constructor.__name__ + "(" + this.item + ")";
       };
 
       return MacroArgs;
@@ -3068,7 +3080,7 @@
       Return.prototype.subst = function(bindings) {
         var arg;
 
-        return this.__class__.apply(this, tuple((function() {
+        return this.constructor.apply(this, tuple((function() {
           var _i, _len, _ref37, _results;
 
           _ref37 = this.args;
@@ -3085,7 +3097,7 @@
         var arg, _i, _len, _ref37;
 
         if (len(this.args) === 1 && isinstance(this.args[0], Return)) {
-          return this.__class__.apply(this, this.args[0].args);
+          return this.constructor.apply(this, this.args[0].args);
         } else {
           _ref37 = this.args;
           for (_i = 0, _len = _ref37.length; _i < _len; _i++) {
@@ -3094,7 +3106,7 @@
               throw new make_new(CompileError);
             }
           }
-          return this.__class__.apply(this, optimize_args(this.args, env, compiler));
+          return this.constructor.apply(this, optimize_args(this.args, env, compiler));
         }
       };
 
@@ -3107,13 +3119,13 @@
           return If(this.args[0].test, Return(this.args[0].then), Return(this.args[0].else_)).javascriptize(env, compiler);
         }
         _ref37 = javascriptize_args(this.args, env, compiler), exps = _ref37[0], args = _ref37[1];
-        return [exps + [this.__class__.apply(this, args)], true];
+        return [exps + [this.constructor.apply(this, args)], true];
       };
 
       Return.prototype.to_code = function(compiler) {
         var x;
 
-        return "return " + (', '.join([
+        return "return " + (join(', ', [
           (function() {
             var _i, _len, _ref37, _results;
 
@@ -3132,7 +3144,7 @@
         return Return.apply(null, this.args);
       };
 
-      Return.prototype.replace_return_with_yield = function() {
+      Return.prototype.replace_return_with_pyyield = function() {
         return Begin([Yield.apply(null, this.args), Return()]);
       };
 
@@ -3172,7 +3184,7 @@
       Yield.prototype.to_code = function(compiler) {
         var x;
 
-        return "pyield " + (', '.join([
+        return "pyield " + (join(', ', [
           (function() {
             var _i, _len, _ref38, _results;
 
@@ -3194,7 +3206,7 @@
       Yield.prototype.toString = function() {
         var x;
 
-        return "il.Yield(" + (', '.join([
+        return "il.Yield(" + (join(', ', [
           (function() {
             var _i, _len, _ref38, _results;
 
@@ -3249,8 +3261,8 @@
         return Try(this.test, this.body.insert_return_statement());
       };
 
-      Try.prototype.replace_return_with_yield = function() {
-        return Try(this.test, this.body.replace_return_with_yield());
+      Try.prototype.replace_return_with_pyyield = function() {
+        return Try(this.test, this.body.replace_return_with_pyyield());
       };
 
       Try.prototype.javascriptize = function(env, compiler) {
@@ -3277,12 +3289,11 @@
 
     })(il.Element);
     il.begin = function() {
-      var e, exps, i, length, result, _i, _len, _results;
+      var e, exps, i, length, result, _i, _len;
 
       exps = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
       result = [];
       length = exps.length;
-      _results = [];
       for (i = _i = 0, _len = exps.length; _i < _len; i = ++_i) {
         e = exps[i];
         if (isinstance(e, il.Begin)) {
@@ -3296,15 +3307,14 @@
             result.push(e);
           }
         }
-        if (result.length === 0) {
-          _results.push(return_statement);
-        } else if (result.length === 1) {
-          _results.push(result[0]);
-        } else {
-          _results.push(il.Begin(result));
-        }
       }
-      return _results;
+      if (result.length === 0) {
+        return return_statement;
+      } else if (result.length === 1) {
+        return result[0];
+      } else {
+        return il.Begin(result);
+      }
     };
     il.Begin = (function(_super) {
       __extends(Begin, _super);
@@ -3346,15 +3356,19 @@
       };
 
       Begin.prototype.free_vars = function() {
-        var exp, result, _i, _len, _ref38;
+        var exp;
 
-        result = set();
-        _ref38 = this.statements;
-        for (_i = 0, _len = _ref38.length; _i < _len; _i++) {
-          exp = _ref38[_i];
-          result |= exp.free_vars();
-        }
-        return result;
+        return set().merge((function() {
+          var _i, _len, _ref38, _results;
+
+          _ref38 = this.statements;
+          _results = [];
+          for (_i = 0, _len = _ref38.length; _i < _len; _i++) {
+            exp = _ref38[_i];
+            _results.push(exp.free_vars());
+          }
+          return _results;
+        }).call(this));
       };
 
       Begin.prototype.code_size = function() {
@@ -3426,7 +3440,7 @@
         return begin.apply(null, this.statements.slice(0) + [inserted]);
       };
 
-      Begin.prototype.replace_return_with_yield = function() {
+      Begin.prototype.replace_return_with_pyyield = function() {
         var exp;
 
         return Begin(tuple((function() {
@@ -3436,7 +3450,7 @@
           _results = [];
           for (_i = 0, _len = _ref38.length; _i < _len; _i++) {
             exp = _ref38[_i];
-            _results.push(exp.replace_return_with_yield());
+            _results.push(exp.replace_return_with_pyyield());
           }
           return _results;
         }).call(this)));
@@ -3525,7 +3539,7 @@
         return this;
       };
 
-      PassStatement.prototype.replace_return_with_yield = function() {
+      PassStatement.prototype.replace_return_with_pyyield = function() {
         return this;
       };
 
@@ -3576,7 +3590,7 @@
         return this;
       };
 
-      Nil.prototype.replace_return_with_yield = function() {
+      Nil.prototype.replace_return_with_pyyield = function() {
         return this;
       };
 
@@ -3628,7 +3642,7 @@
       }
 
       Lamda.prototype.make_new = function(params, body) {
-        return this.__class__(params, body);
+        return new il.Lamda(params, body);
       };
 
       Lamda.prototype.callOn = function() {
@@ -3742,39 +3756,24 @@
       };
 
       Lamda.prototype.insert_return_statement = function() {
-        return Return(this);
+        return new il.Return(this);
       };
 
       Lamda.prototype.javascriptize = function(env, compiler) {
-        var body_exps, global_vars, x;
+        var body_exps;
 
         if (this.has_javascriptized) {
           return [this.name];
         }
+        this.has_javascriptized = true;
         body_exps = this.body.javascriptize(env, compiler);
-        global_vars = il.begin.apply(il, body_exps).find_assign_lefts() - set(this.params);
-        global_vars = set((function() {
-          var _i, _len, _results;
-
-          _results = [];
-          for (_i = 0, _len = global_vars.length; _i < _len; _i++) {
-            x = global_vars[_i];
-            if (isinstance(x, Var) && !isinstance(x, LocalVar) && !isinstance(x, SolverVar)) {
-              _results.push(x);
-            }
-          }
-          return _results;
-        })());
-        if (global_vars) {
-          body_exps = [GlobalDecl(global_vars)] + body_exps;
-          return [this.make_new(this.params, begin.apply(null, body_exps))];
-        }
+        return [this.make_new(this.params, il.begin.apply(il, body_exps))];
       };
 
       Lamda.prototype.to_code = function(compiler) {
         var x;
 
-        return ("lambda " + (', '.join(tuple((function() {
+        return ("function (" + (join(', ', tuple((function() {
           var _i, _len, _ref38, _results;
 
           _ref38 = this.params;
@@ -3784,7 +3783,7 @@
             _results.push(x.to_code(compiler));
           }
           return _results;
-        }).call(this)))) + ": ") + '%s' % this.body.to_code(compiler);
+        }).call(this)))) + ") { ") + this.body.to_code(compiler) + ";}";
       };
 
       Lamda.prototype.free_vars = function() {
@@ -3806,7 +3805,7 @@
       Lamda.prototype.toString = function() {
         var x;
 
-        return "il.Lamda((" + (', '.join([
+        return "il.Lamda((" + (join(', ', [
           (function() {
             var _i, _len, _ref38, _results;
 
@@ -3877,7 +3876,7 @@
       }
 
       Clamda.prototype.make_new = function(params, body) {
-        return this.__class__(params[0], body);
+        return this.constructor(params[0], body);
       };
 
       Clamda.prototype.optimize_apply = function(env, compiler, args) {
@@ -3969,7 +3968,7 @@
       }
 
       Done.prototype.make_new = function(params, body) {
-        return this.__class__(this.params[0]);
+        return this.constructor(this.params[0]);
       };
 
       Done.prototype.callOn = function() {
@@ -4004,101 +4003,11 @@
       return Function;
 
     })(il.Lamda);
-    il.Lamda = (function() {
-      function Lamda(params, body) {
-        this.name = name;
-      }
-
-      Lamda.prototype.make_new = function(params, body) {
-        return this.__class__(this.name, params, body);
-      };
-
-      Lamda.prototype.optimize = function(env, compiler) {
-        var body, result;
-
-        env = env.extend();
-        body = this.body.optimize(env, compiler);
-        result = this.make_new(this.params, body);
-        return result;
-      };
-
-      Lamda.prototype.optimize_apply = function(env, compiler, args) {
-        var result;
-
-        result = Lamda.optimize_apply(env, compiler, args);
-        return result;
-      };
-
-      Lamda.prototype.javascriptize = function(env, compiler) {
-        var body_exps, global_vars, x;
-
-        if (this.has_javascriptized) {
-          return [this.name];
-        }
-        this.has_javascriptized = true;
-        body_exps = this.body.javascriptize(env, compiler);
-        global_vars = this.find_assign_lefts() - set(this.params);
-        global_vars = set((function() {
-          var _i, _len, _results;
-
-          _results = [];
-          for (_i = 0, _len = global_vars.length; _i < _len; _i++) {
-            x = global_vars[_i];
-            if (isinstance(x, Var) && !isinstance(x, LocalVar) && !isinstance(x, SolverVar)) {
-              _results.push(x);
-            }
-          }
-          return _results;
-        })());
-        if (global_vars) {
-          body_exps = [GlobalDecl(global_vars)] + body_exps;
-        }
-        body_exps = body_exps.slice(0) + [body_exps[-1].insert_return_statement()];
-        return [this.make_new(this.params, begin.apply(null, body_exps)), this.name];
-      };
-
-      Lamda.prototype.to_code = function(compiler) {
-        var x;
-
-        return ("  " + this.name + "(" + (', '.join(tuple((function() {
-          var _i, _len, _ref38, _results;
-
-          _ref38 = this.params;
-          _results = [];
-          for (_i = 0, _len = _ref38.length; _i < _len; _i++) {
-            x = _ref38[_i];
-            _results.push(x.to_code(compiler));
-          }
-          return _results;
-        }).call(this)))) + "):\n") + compiler.indent(this.body.to_code(compiler));
-      };
-
-      Lamda.prototype.toString = function() {
-        var x;
-
-        return "il.Function(" + this.name + ", " + (', '.join([
-          (function() {
-            var _i, _len, _ref38, _results;
-
-            _ref38 = this.params;
-            _results = [];
-            for (_i = 0, _len = _ref38.length; _i < _len; _i++) {
-              x = _ref38[_i];
-              _results.push(repr(x));
-            }
-            return _results;
-          }).call(this)
-        ])) + ")\n, " + (repr(this.body)) + ")";
-      };
-
-      return Lamda;
-
-    })();
-    cfunction = function() {
+    il.cfunction = function() {
       var body, name, v;
 
       name = arguments[0], v = arguments[1], body = 3 <= arguments.length ? __slice.call(arguments, 2) : [];
-      return CFunction(name, v, begin.apply(null, body));
+      return new il.CFunction(name, v, begin.apply(null, body));
     };
     il.CFunction = (function(_super) {
       __extends(CFunction, _super);
@@ -4108,7 +4017,7 @@
       function CFunction(name, v, body) {}
 
       CFunction.prototype.make_new = function(params, body) {
-        return this.__class__(this.name, params[0], body);
+        return this.constructor(this.name, params[0], body);
       };
 
       CFunction.prototype.optimize_apply = function(env, compiler, args) {
@@ -4216,7 +4125,7 @@
             arity = _ref38[funcname];
             ss = "" + arity + ": " + (funcname.to_code(compiler));
           }
-          return "{" + (', '.join(ss)) + "}";
+          return "{" + (join(', ', ss)) + "}";
         }
       };
 
@@ -4274,7 +4183,7 @@
       MacroLamda.prototype.toString = function() {
         var x;
 
-        return "il.MacroLamda((" + (', '.join([
+        return "il.MacroLamda((" + (join(', ', [
           (function() {
             var _i, _len, _ref39, _results;
 
@@ -4385,7 +4294,7 @@
       GlobalDecl.prototype.to_code = function(compiler) {
         var x;
 
-        return "global %s" % (', '.join([
+        return "global %s" % (join(', ', [
           (function() {
             var _i, _len, _ref40, _results;
 
@@ -4468,7 +4377,7 @@
       Apply.prototype.subst = function(bindings) {
         var arg;
 
-        return this.__class__(this.caller.subst(bindings), tuple((function() {
+        return this.constructor(this.caller.subst(bindings), tuple((function() {
           var _i, _len, _ref40, _results;
 
           _ref40 = this.args;
@@ -4506,10 +4415,10 @@
               compiler.recursive_call_path.pop();
               return result;
             } else {
-              return this.__class__(caller, args);
+              return this.constructor(caller, args);
             }
           } else {
-            return this.__class__(this.caller, args);
+            return this.constructor(this.caller, args);
           }
         } else if (isinstance(this.caller, Lamda)) {
           return this.caller.optimize_apply(env, compiler, args);
@@ -4518,7 +4427,7 @@
           if (isinstance(caller, Lamda)) {
             return caller.optimize_apply(env, compiler, args);
           } else {
-            return this.__class__(caller, args);
+            return this.constructor(caller, args);
           }
         }
       };
@@ -4527,7 +4436,7 @@
         return Return(this);
       };
 
-      Apply.prototype.replace_return_with_yield = function() {
+      Apply.prototype.replace_return_with_pyyield = function() {
         return this;
       };
 
@@ -4538,14 +4447,14 @@
         caller = exps[-1];
         exps = exps.slice(0);
         exps2 = javascriptize_args(this.args, env, compiler);
-        return exps + exps2 + [this.__class__(caller, args)];
+        return exps + exps2 + [this.constructor(caller, args)];
       };
 
       Apply.prototype.to_code = function(compiler) {
         var x;
 
         if (isinstance(this.caller, Lamda)) {
-          return "(%s)" % this.caller.to_code(compiler) + '(%s)' % ', '.join([
+          return "(%s)" % this.caller.to_code(compiler) + '(%s)' % join(', ', [
             (function() {
               var _i, _len, _ref40, _results;
 
@@ -4559,7 +4468,7 @@
             }).call(this)
           ]);
         } else {
-          return this.caller.to_code(compiler) + '(%s)' % ', '.join([
+          return this.caller.to_code(compiler) + '(%s)' % join(', ', [
             (function() {
               var _i, _len, _ref40, _results;
 
@@ -4586,7 +4495,7 @@
       Apply.prototype.toString = function() {
         var x;
 
-        return "" + this.caller + "(" + (', '.join([
+        return "" + this.caller + "(" + (join(', ', [
           (function() {
             var _i, _len, _ref40, _results;
 
@@ -4718,7 +4627,7 @@
         return Return(this);
       };
 
-      Var.prototype.replace_return_with_yield = function() {
+      Var.prototype.replace_return_with_pyyield = function() {
         return this;
       };
 
@@ -4844,7 +4753,7 @@
         return Return(this);
       };
 
-      LogicVar.prototype.replace_return_with_yield = function() {
+      LogicVar.prototype.replace_return_with_pyyield = function() {
         return this;
       };
 
@@ -5089,7 +4998,7 @@
         return Return(this);
       };
 
-      AssignFromList.prototype.replace_return_with_yield = function() {
+      AssignFromList.prototype.replace_return_with_pyyield = function() {
         return this;
       };
 
@@ -5100,7 +5009,7 @@
       AssignFromList.prototype.to_code = function(compiler) {
         var x;
 
-        return "" + (', '.join([
+        return "" + (join(', ', [
           (function() {
             var _i, _len, _ref44, _results;
 
@@ -5199,8 +5108,8 @@
         return If(this.test, this.then_.insert_return_statement()(this.else_.insert_return_statement()));
       };
 
-      If.prototype.replace_return_with_yield = function() {
-        return If(this.test, this.then_.replace_return_with_yield(), this.else_.replace_return_with_yield());
+      If.prototype.replace_return_with_pyyield = function() {
+        return If(this.test, this.then_.replace_return_with_pyyield(), this.else_.replace_return_with_pyyield());
       };
 
       If.prototype.javascriptize = function(env, compiler) {
@@ -5258,7 +5167,7 @@
         return this;
       };
 
-      PseudoElse.prototype.replace_return_with_yield = function() {
+      PseudoElse.prototype.replace_return_with_pyyield = function() {
         return this;
       };
 
@@ -5294,7 +5203,7 @@
         return this;
       };
 
-      Cons.prototype.replace_return_with_yield = function() {
+      Cons.prototype.replace_return_with_pyyield = function() {
         return this;
       };
 
@@ -5377,8 +5286,8 @@
         return While(this.test, this.body.insert_return_statement());
       };
 
-      While.prototype.replace_return_with_yield = function() {
-        return While(this.test(this.body.replace_return_with_yield()));
+      While.prototype.replace_return_with_pyyield = function() {
+        return While(this.test(this.body.replace_return_with_pyyield()));
       };
 
       While.prototype.javascriptize = function(env, compiler) {
@@ -5477,8 +5386,8 @@
         return For(this.var1, this.range, this.body.insert_return_statement());
       };
 
-      For.prototype.replace_return_with_yield = function() {
-        return For(this.var1, this.range, this.body.replace_return_with_yield());
+      For.prototype.replace_return_with_pyyield = function() {
+        return For(this.var1, this.range, this.body.replace_return_with_pyyield());
       };
 
       For.prototype.javascriptize = function(env, compiler) {
@@ -5634,7 +5543,7 @@
       BinaryOperationApply.prototype.subst = function(bindings) {
         var arg;
 
-        return this.__class__(this.caller.subst(bindings), tuple((function() {
+        return this.constructor(this.caller.subst(bindings), tuple((function() {
           var _i, _len, _ref44, _results;
 
           _ref44 = this.args;
@@ -5669,7 +5578,7 @@
             })())));
           }
         }
-        return this.__class__(caller, args);
+        return this.constructor(caller, args);
       };
 
       BinaryOperationApply.prototype.insert_return_statement = function() {
@@ -5680,7 +5589,7 @@
         var args, exps, _ref44;
 
         _ref44 = javascriptize_args(this.args, env, compiler), exps = _ref44[0], args = _ref44[1];
-        return exps + [this.__class__(this.caller, args)];
+        return exps + [this.constructor(this.caller, args)];
       };
 
       BinaryOperationApply.prototype.free_vars = function() {
@@ -5706,7 +5615,7 @@
       BinaryOperationApply.prototype.toString = function() {
         var arg;
 
-        return "" + this.caller + "(" + (', '.join([
+        return "" + this.caller + "(" + (join(', ', [
           (function() {
             var _i, _len, _ref44, _results;
 
@@ -5767,7 +5676,7 @@
       VirtualOperation.prototype.subst = function(bindings) {
         var x;
 
-        return this.__class__.apply(this, tuple((function() {
+        return this.constructor.apply(this, tuple((function() {
           var _i, _len, _ref44, _results;
 
           _ref44 = this.args;
@@ -5788,7 +5697,7 @@
         var arg, args, assign, e, free_vars, result, var1, _i, _j, _len, _len1;
 
         if (this.has_side_effects) {
-          this.__class__.apply(this, optimize_args(this.args, env, compiler));
+          this.constructor.apply(this, optimize_args(this.args, env, compiler));
         }
         args = optimize_args(this.args, env, compiler);
         free_vars = set();
@@ -5805,7 +5714,7 @@
             if (assign !== void 0) {
               assign.dont_remove();
             }
-            result = this.__class__.apply(this, args);
+            result = this.constructor.apply(this, args);
           }
         }
         return result;
@@ -5819,7 +5728,7 @@
         return Return(this);
       };
 
-      VirtualOperation.prototype.replace_return_with_yield = function() {
+      VirtualOperation.prototype.replace_return_with_pyyield = function() {
         return this;
       };
 
@@ -5827,17 +5736,21 @@
         var args, exps, _ref44;
 
         _ref44 = javascriptize_args(this.args, env, compiler), exps = _ref44[0], args = _ref44[1];
-        return exps + this.__class__.apply(this, args);
+        return exps + (function(func, args, ctor) {
+          ctor.prototype = func.prototype;
+          var child = new ctor, result = func.apply(child, args);
+          return Object(result) === result ? result : child;
+        })(this.constructor, args, function(){});
       };
 
       VirtualOperation.prototype.to_code = function(compiler) {
         var x;
 
-        if (isinstance(this.__class__.code_format, str)) {
-          if (this.__class__.arity === 0) {
-            return this.__class__.code_format;
-          } else if (this.__class__.arity !== -1) {
-            return this.__class__.code_format % tuple((function() {
+        if (isinstance(this.code_format, String)) {
+          if (this.constructor.arity === 0) {
+            return this.code_format;
+          } else if (this.constructor.arity !== -1) {
+            return this.code_format % tuple((function() {
               var _i, _len, _ref44, _results;
 
               _ref44 = this.args;
@@ -5849,7 +5762,7 @@
               return _results;
             }).call(this));
           } else {
-            return this.__class__.code_format % (', '.join([
+            return this.code_format % (join(', ', [
               (function() {
                 var _i, _len, _ref44, _results;
 
@@ -5864,7 +5777,7 @@
             ]));
           }
         } else {
-          return this.__class__.code_format(compiler);
+          return this.code_format(compiler);
         }
       };
 
@@ -5873,7 +5786,7 @@
       };
 
       VirtualOperation.prototype.__hash__ = function() {
-        return hash(this.__class__.__name__);
+        return hash(this.constructor.__name__);
       };
 
       VirtualOperation.prototype.free_vars = function() {
@@ -5893,11 +5806,11 @@
 
         try {
           if (this.arity === 0) {
-            return "il." + this.__class__.__name__;
+            return "il." + this.constructor.__name__;
           }
         } catch (_error) {
           e = _error;
-          return "il." + this.__class__.__name__ + "(" + (', '.join([
+          return "il." + this.constructor.__name__ + "(" + (join(', ', [
             (function() {
               var _i, _len, _ref44, _results;
 
@@ -5960,14 +5873,14 @@
         var exps;
 
         exps = this.item.javascriptize(env, compiler);
-        return exps.slice(0) + [this.__class__(exps[-1])];
+        return exps.slice(0) + [this.constructor(exps[-1])];
       };
 
       Deref.prototype.insert_return_statement = function() {
         return Return(this);
       };
 
-      Deref.prototype.replace_return_with_yield = function() {
+      Deref.prototype.replace_return_with_pyyield = function() {
         return this;
       };
 
@@ -6026,14 +5939,14 @@
         var exps;
 
         exps = this.item.javascriptize(env, compiler);
-        return exps.slice(0) + [this.__class__(exps[-1])];
+        return exps.slice(0) + [this.constructor(exps[-1])];
       };
 
       EvalExpressionWithCode.prototype.insert_return_statement = function() {
         return Return(this);
       };
 
-      EvalExpressionWithCode.prototype.replace_return_with_yield = function() {
+      EvalExpressionWithCode.prototype.replace_return_with_pyyield = function() {
         return this;
       };
 
@@ -6096,7 +6009,7 @@
         return Return(this);
       };
 
-      Len.prototype.replace_return_with_yield = function() {
+      Len.prototype.replace_return_with_pyyield = function() {
         return this;
       };
 
@@ -6172,7 +6085,7 @@
         return Return(this);
       };
 
-      In.prototype.replace_return_with_yield = function() {
+      In.prototype.replace_return_with_pyyield = function() {
         return this;
       };
 
@@ -6263,7 +6176,7 @@
         return Return(this);
       };
 
-      GetItem.prototype.replace_return_with_yield = function() {
+      GetItem.prototype.replace_return_with_pyyield = function() {
         return this;
       };
 
@@ -6350,7 +6263,7 @@
         return Return(this);
       };
 
-      ListAppend.prototype.replace_return_with_yield = function() {
+      ListAppend.prototype.replace_return_with_pyyield = function() {
         return this;
       };
 
@@ -6424,7 +6337,7 @@
         return Return(this);
       };
 
-      PushCatchCont.prototype.replace_return_with_yield = function() {
+      PushCatchCont.prototype.replace_return_with_pyyield = function() {
         return this;
       };
 
@@ -6492,7 +6405,7 @@
         return Return(this);
       };
 
-      SetBinding.prototype.replace_return_with_yield = function() {
+      SetBinding.prototype.replace_return_with_pyyield = function() {
         return this;
       };
 
@@ -6564,7 +6477,7 @@
         return Return(this);
       };
 
-      FindCatchCont.prototype.replace_return_with_yield = function() {
+      FindCatchCont.prototype.replace_return_with_pyyield = function() {
         return this;
       };
 
@@ -6607,7 +6520,7 @@
       };
 
       IsMacro.prototype.subst = function(bindings) {
-        return this.__class__(this.item.subst(bindings));
+        return this.constructor(this.item.subst(bindings));
       };
 
       IsMacro.prototype.code_size = function() {
@@ -6615,21 +6528,21 @@
       };
 
       IsMacro.prototype.optimize = function(env, compiler) {
-        return this.__class__(this.item.optimize(env, compiler));
+        return this.constructor(this.item.optimize(env, compiler));
       };
 
       IsMacro.prototype.javascriptize = function(env, compiler) {
         var exps;
 
         exps = this.item.javascriptize(env, compiler);
-        return exps.slice(0) + [this.__class__(exps[-1])];
+        return exps.slice(0) + [this.constructor(exps[-1])];
       };
 
       IsMacro.prototype.insert_return_statement = function() {
         return Return(this);
       };
 
-      IsMacro.prototype.replace_return_with_yield = function() {
+      IsMacro.prototype.replace_return_with_pyyield = function() {
         return this;
       };
 
@@ -6721,7 +6634,7 @@
         return Begin(Return());
       };
 
-      VirtualOperation2.prototype.replace_return_with_yield = function() {
+      VirtualOperation2.prototype.replace_return_with_pyyield = function() {
         return this;
       };
 
@@ -6790,7 +6703,7 @@
     Call_to_code = function(compiler) {
       var x;
 
-      return "(" + (this.args[0].to_code(compiler)) + ")(" + (', '.join([
+      return "(" + (this.args[0].to_code(compiler)) + ")(" + (join(', ', [
         (function() {
           var _i, _len, _ref49, _results;
 
@@ -6809,7 +6722,7 @@
     AttrCall_to_code = function(compiler) {
       var x;
 
-      return "" + (this.args[0].to_code(compiler)) + "(" + (', '.join([
+      return "" + (this.args[0].to_code(compiler)) + "(" + (join(', ', [
         (function() {
           var _i, _len, _ref49, _results;
 
@@ -6890,7 +6803,7 @@
     Format_to_code = function(compiler) {
       var x;
 
-      return "" + (this.args[0].to_code(compiler)) + "%" + (', '.join((function() {
+      return "" + (this.args[0].to_code(compiler)) + "%" + (join(', ', (function() {
         var _i, _len, _ref49, _results;
 
         _ref49 = this.args.slice(1);
@@ -6924,7 +6837,7 @@
     Format_to_code = function(compiler) {
       var x;
 
-      return "file(" + (this.args[0].to_code(compiler)) + ", " + (', '.join((function() {
+      return "file(" + (this.args[0].to_code(compiler)) + ", " + (join(', ', (function() {
         var _i, _len, _ref49, _results;
 
         _ref49 = this.args.slice(1);
