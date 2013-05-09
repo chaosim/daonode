@@ -1,28 +1,23 @@
 global._ =  require("underscore")
-daonode = require('../src/solve')
+dao = require('../src/compile')
 
 I = require("f:/node-utils/src/importer")
 
 xexports = {}
 
-exports.Test1 =
-  setUp: (callback) ->
-    @global = I.set_global daonode.dao
-    callback()
-
-  tearDown:(callback) ->
-    I.set_global  @global
-    callback()
+xexports.Test1 =
+  setUp: (callback) -> callback()
+  tearDown:(callback) -> callback()
 
   "test 1": (test) ->
-    compileToJSFile integer(1)
+    dao.compileToJSFile dao.integer(1)
 #    test.throws (-> new Error() ), Error
     test.equal 1, 1
     test.done()
 
-exports.Test2 =
+xexports.Test2 =
   setUp: (callback) ->
-    @global = I.set_global daonode
+    @global = I.set_global dao, "compileToJSFile integer begin, if"
     callback()
 
   tearDown:(callback) ->
@@ -30,5 +25,23 @@ exports.Test2 =
     callback()
 
   test: (test) ->
-    test.equal 1, 1
+    test.equal integer(1).toString(), "1"
+    test.done()
+
+  test: (test) ->
+    compileToJSFile begin(integer(1), integer(2))
+    compileToJSFile add(1, 2)
+    test.done()
+
+exports.Test3 =
+  setUp: (callback) ->
+    @global = I.set_global dao, "compileToJSFile integer begin, if_, add"
+    callback()
+
+  tearDown:(callback) ->
+    I.set_global  @global
+    callback()
+
+  test: (test) ->
+    compileToJSFile add(1, 2)
     test.done()

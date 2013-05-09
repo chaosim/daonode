@@ -9,3 +9,6 @@ test/*.js
 examples/beautiful_code/parse.coffee
 *.gem
 /node_modules
+
+/src/compile.js
+/src/interlang.js
