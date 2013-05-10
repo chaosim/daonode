@@ -1,3 +1,29 @@
+dao = require("../compile")
+il = require("../interlang")
+
+builtins = exports
+builtins.toString = () -> 'builtins'
+
+dao.format = new dao.BuiltinFunction('format', il.Format)
+
+builtins.add = (x, y) -> new dao.Apply(dao.builtinFuntion(il.addop), [x, y])
+
+#    il.add = (x, y) -> new il.BinaryOperationApply(il.addop, [x,y])
+#    il.sub = (x, y) -> new il.BinaryOperationApply(il.subop, [x,y])
+#    il.mul = (x, y) -> new il.BinaryOperationApply(il.mulop, [x,y])
+#    il.div = (x, y) -> new il.BinaryOperationApply(il.divop, [x,y])
+#    il.isnot = (x, y) -> new il.BinaryOperationApply(il.isnotop, [x,y])
+#    il.and_ = (x, y) -> new il.BinaryOperationApply(il.andop, [x,y])
+#    il.or_ = (x, y) -> new il.BinaryOperationApply(il.orop, [x,y])
+#
+#    il.lt = (x, y) -> new il.BinaryOperationApply(il.ltop, [x,y])
+#    il.le = (x, y) -> new il.BinaryOperationApply(il.leop, [x,y])
+#    il.eq = (x, y) -> new il.BinaryOperationApply(il.eqop, [x,y])
+#    il.ne = (x, y) -> new il.BinaryOperationApply(il.neop, [x,y])
+#    il.ge = (x, y) -> new il.BinaryOperationApply(il.geop, [x,y])
+#    il.gt = (x, y) -> new il.BinaryOperationApply(il.gtop, [x,y])
+
+###
 add = BuiltinFunction('add', il.add)
 sub = BuiltinFunction('sub', il.sub)
 mul = BuiltinFunction('mul', il.mul)
@@ -2728,3 +2754,4 @@ number = float
 
 '''
 
+###

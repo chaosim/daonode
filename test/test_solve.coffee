@@ -1,5 +1,6 @@
 global._ =  require("underscore")
 dao = require('../src/compile')
+builtins = require('../src/builtins/builtins')
 
 I = require("f:/node-utils/src/importer")
 
@@ -35,13 +36,17 @@ xexports.Test2 =
 
 exports.Test3 =
   setUp: (callback) ->
-    @global = I.set_global dao, "compileToJSFile integer begin, if_, add"
+    @global = I.set_global dao, "compileToJSFile integer begin, if_"
+    @global2 = I.set_global builtins, "add"
     callback()
 
   tearDown:(callback) ->
     I.set_global  @global
+    I.set_global  @global2
     callback()
 
   test: (test) ->
     compileToJSFile add(1, 2)
     test.done()
+
+

@@ -82,7 +82,7 @@ class dao.Cons
   getvalue: (memo, env) ->
     head = get_value(@head, memo, env)
     tail = get_value(@tail, memo, env)
-    return Cons(head, tail)
+    if head is @head and tail is @tail then @ Cons(head, tail)
 
   take_value: (env) ->
     head = take_value(@head, env)
@@ -90,7 +90,7 @@ class dao.Cons
     if head==@head and tail==@tail then return @
     return Cons(head, tail)
 
-  copy: (memo) ->  Cons(copy(@head, memo), copy(@tail, memo))
+  copy: (memo) ->  new Cons(copy(@head, memo), copy(@tail, memo))
 
   closure: (env) ->
     head = closure(@head, env)
@@ -179,3 +179,14 @@ class dao.Solver
     try cont_stack = @catch_cont_map[tag]
     catch e then throw new dao.UncaughtThrow(tag)
     cont_stack.pop()
+
+dao.eval = (exp, env) ->  dao.solve(exp, env).next()
+
+compileToJSFile = require('../src/compile').compileToJSFile
+
+dao.solve = (exp, env, path) ->
+  path = path or 'f:\\daonode\\test\\compiled.js'
+  compileToJSFile exp, env, path
+  compiled = require(path)
+  new dao.Solutions(exp, compiled.fun())
+

@@ -1,6 +1,10 @@
 # stuffs for dao's inter langugage, aka interlang
 
-il = exports
+I = require "f:/node-utils/src/importer"
+I.use "f:/node-utils/src/utils:   dict, assert"
+
+il = interlang = exports
+il.toString = () -> 'interlang'
 
 #true == 1
 #false==0
@@ -1050,22 +1054,6 @@ il.neop = new il.BinaryOperation('Ne', '!=', false)
 il.geop = new il.BinaryOperation('Ge', '>=', false)
 il.gtop = new il.BinaryOperation('Gt', '>', false)
 
-dao.add = (x, y) -> new dao.Apply(dao.builtinFuntion(il.addop), [x, y])
-#    il.add = (x, y) -> new il.BinaryOperationApply(il.addop, [x,y])
-#    il.sub = (x, y) -> new il.BinaryOperationApply(il.subop, [x,y])
-#    il.mul = (x, y) -> new il.BinaryOperationApply(il.mulop, [x,y])
-#    il.div = (x, y) -> new il.BinaryOperationApply(il.divop, [x,y])
-#    il.isnot = (x, y) -> new il.BinaryOperationApply(il.isnotop, [x,y])
-#    il.and_ = (x, y) -> new il.BinaryOperationApply(il.andop, [x,y])
-#    il.or_ = (x, y) -> new il.BinaryOperationApply(il.orop, [x,y])
-#
-#    il.lt = (x, y) -> new il.BinaryOperationApply(il.ltop, [x,y])
-#    il.le = (x, y) -> new il.BinaryOperationApply(il.leop, [x,y])
-#    il.eq = (x, y) -> new il.BinaryOperationApply(il.eqop, [x,y])
-#    il.ne = (x, y) -> new il.BinaryOperationApply(il.neop, [x,y])
-#    il.ge = (x, y) -> new il.BinaryOperationApply(il.geop, [x,y])
-#    il.gt = (x, y) -> new il.BinaryOperationApply(il.gtop, [x,y])
-
 class il.VirtualOperation extends il.Element
   constructor: (args...) ->
     if @arity>=0
@@ -1489,7 +1477,6 @@ il.IsLogicVar = vop('IsLogicVar', 1, 'isinstance(%s, LogicVar)', false)
 il.DelBinding = vop2('DelBinding', 1, 'del solver.bindings[%s]', true)
 il.DelItem = vop2('DelItem', 2, 'del %s[%s]', true)
 
-
 il.GetValue = vop('GetValue', 1, 'get_value(%s, {}, solver.bindings)', false)
 
 il.parse_state = new il.SolverVar('parse_state')
@@ -1498,7 +1485,6 @@ SetParseState = (state) ->  new il.Assign(parse_state, state)
 il.Unify = vop('Unify', 2, 'solver.unify(%s, %s)', false)
 il.Nil = vop('Nil', 0, 'nil', false)
 il.nil = new il.Nil()
-
 
 il.bindings = new il.SolverVar('bindings')
 SetBindings = (bindings1) ->  new il.Assign(bindings, bindings1)
@@ -1517,7 +1503,6 @@ il.PrintLn = vop2('PrintLn', 1, "print %s", true)
 il.DelListItem = vop2('DelListItem', 2, 'del %s[%s]', true)
 
 il.MakeList = vop('MakeList', 1, '[%s]', false)
-
 
 il.Copy = vop('Copy', 1, '(%s).copy()', false)
 
