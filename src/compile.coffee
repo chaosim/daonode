@@ -1,3 +1,17 @@
+###
+  规则（rule)：先对参数求值，再合一，然后求值规则体
+  规则组：合并成单一规则
+  rule Cons{x:1, y:Cons: ?x}
+
+  macro
+  宏：先合一，参数代入规则体（在规则体就地求值参数），求值替换后的规则体
+  宏组：合并成单一宏
+
+  合一: 类兼容，则继续字段合一
+
+
+  最终都化成函数
+###
 I = require "f:/node-utils/src/importer"
 [_, fs] = I.require_multiple "underscore fs"
 
@@ -59,26 +73,11 @@ class dao.MultiAssignToConstError
 
 class dao.Environment
   '''environment for compilation, in alpha convert, block/exit/continue'''
-  constructor = (@outer) -> @bindings = {}
-  extend = () -> Environment()
-
-  getitem = (vari) ->
-    try  return @bindings[vari]
-    catch e
-      result = @outer
-      while result isnt undefined
-        try return @bindings[vari]
-        catch e then result = @outer
-      throw new dao.VariableNotBound(vari)
-
-  setitem = (vari, value) ->  @bindings[vari] = value
-
-  toString = () ->
-    result = ''
-    while x isnt undefined
-      result += @bindings.toString()
-      x = @outer
-    return result
+  constructor: (@outer) -> @bindings = {}
+  extend: () -> new Environment(@)
+  get: (vari) -> if  @bindings[vari]?  else outer?.get(vari)
+  set : (vari, value) ->  @bindings[vari] = value
+  toString : () -> result = '';  env = @; ((result += JSON.stringify(env.bindings); env = env.outer) while env?);  result
 
 class dao.Compiler
   constructor:  (env = new dao.Environment(), options) ->
@@ -108,11 +107,11 @@ class dao.Compiler
     @recusive_variables_stack = [set()]
 
   new_var: (vari) ->
-    try
-      suffix = toString(@newvar_map[vari.name])
+    suffix = @newvar_map[vari.name]
+    if suffix?
       @newvar_map[vari.name] += 1
-      vari.constructor(vari.name+suffix)
-    catch e
+      new vari.constructor(vari.name+suffix)
+    else
       @newvar_map[vari.name] = 1
       vari
 
@@ -121,44 +120,41 @@ class dao.Compiler
     else throw new dao.BlockError("should not escape from top level outside of all block.")
 
   get_block_label: (old_label) ->
-    for i in range(@block_label_stack.length)
-      if old_label==@block_label_stack[-(i+1)][0]
-        return @block_label_stack[-(i+1)][1]
-      throw new dao.BlockError("Block %s is not found."%old_label)
+    for i in [@block_label_stack.length-1..0] by -1
+      if old_label==@block_label_stack[i][0]
+        return @block_label_stack[i][1]
+    throw new dao.BlockError("Block #{old_label} is not found.")
 
-  indent: (code, level=1) ->
-    '''javascript's famous indent'''
-    lines = code.split('\n')
-    lines = (times_string(@indent_space, level) + line for line in lines)
-    join('\n', lines)
+  indent: (code, level=1) -> (times_string(@indent_space, level) + line for line in code.split '\n').join '\n'
 
 MAX_EXTEND_CODE_SIZE = 10
 
 import_names = []
 
 register_fun = (name, fun) ->
-  name = new_func_name(name)
+  name = uniqueName(name, new_func_name_map)
   fun.func_name = name
-  globals()[name] = fun
+  global[name] = fun
   import_names.append(name)
   fun
 
 new_func_name_map = {}
 
-new_func_name = (name) ->
-  try
-    suffix = toString(new_func_name_map[name])
-    new_func_name_map[name] += 1
+uniqueName = (name, name2Suffix) ->
+  suffix = name2Suffix[name]
+  if suffix
+    name2Suffix[name] += 1
     name+suffix
-  catch e
-    new_func_name_map[name] = 1
+  else
+    name2Suffix[name] = 1
     name
 
 dao.element = (exp)->
   if (exp instanceof dao.Element) then exp
   else
-    try new dao.type_map[typeof(exp)](exp)
-    catch e then throw new dao.CompileTypeError(exp)
+    maker = dao.type_map[typeof(exp)]
+    if maker then new maker(exp)
+    else throw new dao.CompileTypeError(exp)
 
 class dao.Element
 
@@ -197,95 +193,99 @@ class dao.BuiltinFunction extends dao.Command
 class dao.Apply extends dao.Element
   constructor:  (@caller, @args) ->
 class dao.Assign extends dao.Command
-  constructor:  (@var1, @exp) ->
+  constructor:  (@vari, @exp) ->
 class dao.DirectInterlang extends dao.Element
   constructor:  (@body) ->
 class dao.Lamda extends dao.Element
   constructor:  (@params, @body) ->
 class dao.Macro extends dao.Element
-  constructor:  (@arams, @body) ->
+  constructor:  (@params, @body) ->
 class dao.Let extends dao.Element
   constructor:  (@bindings, @body) ->
 class dao.Letrec extends dao.Element
   constructor:  (@bindings, @body) ->
 class dao.Rules  extends dao.Lamda
   constructor:  (@rules) -> @arity = rules[0][0].length
-class dao.MacroRules extends dao.Element
-  constructor:  (@rules) ->  @arity = rules[0][0].length
+class dao.MacroRules extends dao.Rules
 
-dao.Atom::toString = ( ) ->  "#{@item}"
-dao.Var::toString = ( ) ->  "#{@constructor.name}('#{@name}')"
-dao.LogicVar::toString = () ->  "%s"%@name
-dao.LogicVar::toString = ( ) ->  "dao.LogicVar('#{@name}')"
+# toString: be used as hash in {}, and used as eval to restore itself.
+dao.Atom::toString = ( ) ->  "new dao.#{@constructor.name}(#{@item})"
+dao.Var::toString = ( ) ->  "new dao.#{@constructor.name}(#{name})"
+dao.Cons::toString = ( ) ->  "new dao.Cons(#{@head}, #{@tail})"
+dao.Nil::toString = ( ) ->  'dao.nil'
+dao.Apply::toString = ( ) ->  "new Dao.Apply(#{@caller}, [#{(x for x in @args).join ', '}])"
+#dao.Special::toString = ( ) ->  "#{@name}(#{join(', ', (x for x in @args))})"
+#dao.BuiltinFunction::toString = ( ) ->  "#{@fun.name}(#{join(', ', [x.to_code(compiler) for x in @args])})"
+dao.Assign::toString = ( ) ->  "dao.assign(#{@var1}, #{@exp})"
+dao.Lamda::toString = () -> "dao.lamda([#{', '.join(x for x in @params)}], #{@body}"
+dao.Macro::toString = () ->  "dao.macro((#{join(', ', [x for x in @params])}), #{@body})"
+dao.Macro::toString = () -> "dao.let_(#{@bindings}, #{@body})"
+dao.Letrec::toString = () -> "dao.letrec(#{@bindings}, #{@body})"
+dao.Rules::toString = () -> "dao.rules(#{@rules})"
+dao.MacroRules::toString = () -> "dao.macrorules(#{@rules})"
 
-dao.Cons::toString = ( ) ->  "L(#{join(' ', [e for e in @])})"
-dao.Nil::toString = ( ) ->  'nil'
-dao.Apply::toString = ( ) ->  "#{@caller}(#{join(', ', [x for x in @args])})"
-dao.Command::toString = ( ) ->  "#{@fun}(#{join( ', ', [x for x in @args])})"
-dao.Special::toString = ( ) ->  "#{@name}(#{join(', ', (x for x in @args))})"
-dao.BuiltinFunction::toString = ( ) ->  "#{@fun.name}(#{join(', ', [x.to_code(compiler) for x in @args])})"
-dao.Assign::toString = ( ) ->  "assign#{@var1}, #{@exp})"
-dao.Lamda::toString = () -> "Lamda((#{', '.join(x for x in @params)}), #{@body}"
-dao.Macro::toString = () ->  "Macro((#{join(', ', [x for x in @params])}), #{@body})"
-dao.Macro::toString = () -> "Let(#{@bindings}, #{@body})"
-dao.Letrec::toString = () -> "Letrec(#{@bindings}, #{@body})"
-dao.Rules::toString = () -> "rules(#{@rules})"
-dao.MacroRules::toString = () -> "macrorules(#{@rules})"
-
+# ported from python's __eq__, not used until now.
 dao.Atom::equal = (x, y) ->  x.constructor is y.constructor and x.item==y.item
-
 dao.Number::equal = (x, y) -> Atom.equal(x, y) or (isinstance(y, int) and x.item==y)
 dao.String::equal = (x, y) -> Atom.equal(x, y) or (isinstance(y, String) and x.item==y)
 dao.List::equal = (x, y) -> Atom.equal(x, y) or (isinstance(y, Array) and x.item==y)
 #dao.dict::equal = (x, y) -> Atom.equal(x, y) or (isinstance(y, Object) and x.item==y)
 dao.Bool::equal = (x, y) -> Atom.equal(x, y) or (isinstance(y, Boolean) and x.item==y)
 dao.Symbol::equal = (x, y) -> Atom.equal(x, y) or (isinstance(y, Symbol) and x.item==y)
-
 dao.Var::equal = (x, y) ->  classeq(x, y) and x.name==y.name
 dao.LogicVar::equal = (x, y) -> x.constructor is y.constructor and x.name==y.name # obviously unnecessary
 dao.LogicVar::equal = (x, y) ->  classeq(x, y) and x.name==y.name
-
 dao.Cons::equal = (other) -> @constructor is other.constructor and @head==other.head and @tail==other.tail
 dao.Command::equal = (x, y) ->  classeq(x, y) and x.fun==y.fun and x.args==y.args
 dao.Assign::equal = (x, y) ->  classeq(x, y) and x.var1==y.var1 and x.exp==y.exp
 dao.Lamda::equal = (x, y) -> classeq(x, y) and x.params==y.params and x.body==y.body
 dao.Macro::equal = (x, y) -> classeq(x, y) and x.params==y.params and x.body==y.body
 
-dao.Atom::alpha = (env, compiler) -> @
-dao.Var::alpha = (env, compiler) -> env[@]
+dao.Element::alpha = (env, compiler) -> @
+dao.Var::alpha = (env, compiler) -> env.get(@)
 dao.LogicVar::alpha = (env, compiler) -> @
-dao.Cons::alpha = (env, compiler) -> Cons(@head.alpha(env, compiler),  @tail.alpha(env, compiler))
-dao.Nil::alpha = (env, compiler) -> @
+dao.Cons::alpha = (env, compiler) ->
+  new dao.Cons(@head.alpha(env, compiler),  @tail.alpha(env, compiler))
 
-dao.Apply::alpha = (env, compiler) ->  new @constructor(@caller.alpha(env, compiler),  (arg.alpha(env, compiler) for arg in @args))
-dao.Special::alpha = (env, compiler) -> new @constructor(@name, @fun, (arg.alpha(env, compiler) for arg in @args))
-dao.BuiltinFunction::alpha = (env, compiler) -> new @constructor(@name, @fun, (arg.alpha(env, compiler) for arg in @args))
+dao.Apply::alpha = (env, compiler) ->
+  new @constructor(@caller.alpha(env, compiler),  (arg.alpha(env, compiler) for arg in @args))
+dao.Special::alpha = (env, compiler) ->
+  new @constructor(@name, @fun, (arg.alpha(env, compiler) for arg in @args))
+dao.BuiltinFunction::alpha = (env, compiler) ->
+  new @constructor(@name, @fun, (arg.alpha(env, compiler) for arg in @args))
 dao.Assign::alpha = (env, compiler) ->
-  try var1 = env[@var1]
-  catch VariableNotBound
-    env[@var1] = var1 = compiler.new_var(@var1)
-    if isinstance(var1, Const)
-      var1.assigned = true
-      return Assign(var1, @exp.alpha(env, compiler))
-  if isinstance(var1, Const) and var1.assigned
-    throw new dao.MultiAssignToConstError(var1)
-    dao.Assign(var1, @exp.alpha(env, compiler))
-dao.DirectInterlang::alpha = (env, compiler) ->  @
+  vari = env.get(@vari)
+  unless vari
+    env.set(@vari, (vari = compiler.new_var(@vari)))
+    if vari.isConst()
+      vari.assigned = true
+      return new dao.Assign(vari, @exp.alpha(env, compiler))
+  if vari.isConst() and vari.assigned
+    throw new dao.MultiAssignToConstError(vari)
+  else new dao.Assign(vari, @exp.alpha(env, compiler))
+
+# rule head, body
+# first eval, then unify
+dao.Rule::alpha = (env, compiler) ->
+
 dao.Lamda::alpha = (env, compiler) ->
   new_env = env.extend()
-  for p in @params then new_env.bindings[p] = compiler.new_var(p)
-  @params = (new_env[p] for p in @params)
-  @body = @body.alpha(new_env, compiler)
-  @variables = new_env.bindings.values()
-  @
+  params = []
+  for p in @params
+    new_var = compiler.new_var(p)
+    new_env.set p, new_var
+    params.push(new_var)
+  new @constructor(params, @body.alpha(new_env, compiler))
 
 dao.Macro::alpha = (env, compiler) ->
+  # macro means don't eval the args before eval the macro's body,
+  # instead, eval in place the args in the body .
   new_env = env.extend()
   for p in @params
     new_env.bindings[p] = compiler.new_var(p)
   @params = new_env[p] for p in @params
   for vari, new_var in new_env.bindings.items()
-    new_env.bindings[vari] = eval_macro_args(new_var)
+    new_env.bindings[vari] = dao.eval_macro_args(new_var)
   @body = @body.alpha(new_env, compiler)
   @
 
@@ -329,6 +329,7 @@ dao.Letrec::alpha = (env, compiler) ->
     new_env.bindings[vari] = new_var
   return begin((Assign(new_env[vari], value.alpha(new_env, compiler))  for vari, value in @bindings+[@body.alpha(new_env, compiler)])...)
 
+# Rules connot have different arities in rule's head. MacroRules too.
 dao.Rules::alpha = (env, compiler) ->
   rules = []
   for head, body in @rules
@@ -347,7 +348,7 @@ dao.MacroRules::alpha = (env, compiler) ->
     result.push([head, body])
   return MacroRules(result)
 
-dao.Atom::subst = (bindings) -> @
+dao.Element::subst = (bindings) -> @
 dao.Var::subst = (bindings) -> if bindings.hasOwnProperty(@) then bindings[@] else @
 dao.Apply::subst = (bindings) -> new @constructor(@caller.subst(bindings), (arg.subst(bindings) for arg in @args))
 dao.Command::subst = (bindings) -> new @constructor(@fun,  (arg.subst(bindings) for arg in @args))
