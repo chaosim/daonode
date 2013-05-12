@@ -34,12 +34,15 @@ faildone =(v, solver) ->
   if result instanceof dao.Atom then result.item
   else result
 
+dao.element = (exp) ->
+  if _.isNumber(exp) then dao.number(exp)
+  else if _.isString(exp) then dao.string(exp)
+  else if  not _.isObject(exp)  then dao.atom(exp)
+  else if not exp instanceof dao.Element then dao.atom(exp)
+  else exp
+
 dao.solve = (exp, env = new dao.Bindings(), cont = done, failcont = faildone) ->
-  if _.isNumber(exp) then exp = dao.number(exp)
-  else if _.isString(exp) then exp = dao.string(exp)
-  else if  not _.isObject(exp)  then exp = dao.atom(exp)
-  else if not exp instanceof dao.Element then exp = dao.atom(exp)
-  new dao.Solver(env, failcont).solve(exp)
+  new dao.Solver(env, failcont).solve(dao.element(exp))
 
 class dao.Solver
   constructor: (@env, @failcont, @state) ->
@@ -50,9 +53,12 @@ class dao.Solver
 class dao.Element
 class dao.Var extends dao.Element
   constructor: (@name) ->
+
 class dao.Atom extends dao.Element
   constructor: (@item) ->
 class dao.Number extends dao.Atom
+class dao.String extends dao.Atom
+
 class dao.Print extends dao.Element
   constructor: (@args...) ->
 class dao.Succeed extends dao.Element
@@ -70,9 +76,22 @@ class dao.Parse extends dao.Element
 class dao.Char extends dao.Element
   constructor: (@x) ->
 
+class dao.Apply extends dao.Element
+  constructor: (@caller, @args) ->
+class dao.Command extends dao.Element
+class dao.Fun extends dao.Command
+  constructor: (@fun) ->
+class dao.BuiltinFun extends dao.Fun
+class dao.JSFun extends dao.Fun
+class dao.Macro extends dao.Command
+  constructor: (@fun) ->
+class dao.BuiltinMacro extends dao.Macro
+class dao.JSMacro extends dao.Macro
+
 dao.vari = (name) -> new dao.Var(name)
 dao.atom = (x) -> new dao.Atom(x)
 dao.number = (x) -> new dao.Number(x)
+dao.string = (x) -> new dao.String(x)
 dao.print_ = (x...) -> new dao.Print(x...)
 dao.succeed = new dao.Succeed()
 dao.fail = new dao.Fail()
@@ -82,21 +101,29 @@ dao.not_ = (x, y) -> new dao.Not(x)
 dao.unify = (x, y) -> new dao.Unify(x, y)
 dao.parse = (exp, data) -> new dao.Parse(exp, data)
 dao.char = (x) -> new dao.Char(x)
+dao.apply = (caller, args) -> new dao.Apply(caller, args)
+dao.fun = (fun) -> new dao.BuiltinFun(fun)
+dao.jsfun = (fun) -> new dao.JSFun(fun)
 
-dao.Var::toString = "dao.vari(#{@name})"
-dao.Atom::toString = "dao.atom(#{@item})"
-dao.Number::toString = "dao.number(#{@item})"
-dao.Succeed::toString = "dao.succeed"
-dao.Number::toString = "dao.fail"
 dao.TRUE = dao.atom(true)
 dao.FALSE = dao.atom(false)
 dao.NULL = dao.atom(null)
-dao.And::toString = "dao.and_(#{@x}, #{@y})"
-dao.Or::toString = "dao.or_(#{@x}, #{@y})"
-dao.Not::toString = "dao.not_(#{@x})"
-dao.Unify::toString = "dao.unify_(#{@x}, #{@y})"
-dao.Parse::toString = "dao.parse(#{@exp}, #{@data})"
-dao.Char::toString = "dao.char(#{@x})"
+
+dao.Var::toString = -> "dao.vari(#{@name})"
+dao.Atom::toString = -> "dao.atom(#{@item})"
+dao.Number::toString = -> "dao.number(#{@item})"
+dao.String::toString = -> "dao.string(#{@item})"
+dao.Succeed::toString = -> "dao.succeed"
+dao.Number::toString = -> "dao.fail"
+dao.And::toString = -> "dao.and_(#{@x}, #{@y})"
+dao.Or::toString = -> "dao.or_(#{@x}, #{@y})"
+dao.Not::toString = -> "dao.not_(#{@x})"
+dao.Unify::toString = -> "dao.unify_(#{@x}, #{@y})"
+dao.Parse::toString = -> "dao.parse(#{@exp}, #{@data})"
+dao.Char::toString = -> "dao.char(#{@x})"
+dao.Apply::toString = -> "dao.apply(#{@caller}, [#{@args.join(', ')}])"
+dao.BuiltinFun::toString = -> "dao.builtinFunction(#{@fun}"
+dao.JSFun::toString = -> "dao.javascriptFunction(#{fun})"
 
 dao.Element::deref = (env) -> @
 dao.Var::deref = (env) -> env.get(@)
@@ -153,3 +180,29 @@ dao.Char::cont = (solver, cont) -> (v, solver) =>
     solver.env.set(x, c)
     cont(dao.TRUE, solver)
   else throw new dao.TypeError(@)
+
+dao.Apply::cont = (solver, cont) -> (v, solver) => @caller.apply_cont(solver, cont, @args)
+
+dao.Command::cont = (solver, cont) -> (v, solver) => cont(@, solver)
+dao.BuiltinFun::cont = (solver, cont) -> (v, solver) => cont(@, solver)
+dao.JSFun::cont = (solver, cont) -> (v, solver) => cont(@, solver)
+
+dao.Fun::apply_cont = (solver, cont, args) ->
+  length = args.length
+  params = (i for i in [0...length])
+  cont = do (cont=cont) => @cont(solver, (caller, solver) -> caller.call(solver, cont, params...))
+  for i in [length-1..0] by -1
+    cont = do (i=i, cont=cont) =>
+      args[i].cont(solver, (v, solver) ->  (params[i] = v; cont(dao.NULL, solver)))
+  cont(dao.NULL, solver)
+
+dao.BuiltinFun::call = (solver, cont, args...) -> cont(@fun(args...), solver)
+
+dao.JSFun::call = (solver, cont, args...) ->
+  args = (arg.getvalue(solver) for arg in args)
+  args = ((if (arg instanceof dao.Atom) then arg.item else arg) for arg in args)
+  cont(dao.element(@fun(args...)), solver)
+
+dao.Macro.call = (solver, cont, args...) ->
+  args = (dao.eval(arg) for arg in args)
+  cont(@fun(args...), solver)

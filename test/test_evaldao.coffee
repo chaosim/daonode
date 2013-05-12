@@ -6,7 +6,8 @@ xexports = {}
 
 exports.Test =
   setUp: (callback) ->
-    @global = I.set_global dao, "solve number vari print_, and_, or_, not_, succeed, fail, unify"
+    @global = I.set_global dao, "solve number vari print_, and_, or_, not_, succeed, fail, unify,
+                                    parse, char, jsfun apply"
     callback()
   tearDown:(callback) ->
     I.set_global  @global
@@ -19,51 +20,58 @@ exports.Test =
     test.deepEqual  solve(vari('a')), vari('a')
     test.done()
   "test print": (test) ->
-    test.deepEqual  solve(print_('a')), null
+    test.equal  solve(print_('a')), null
     test.done()
   "test and print": (test) ->
-    test.deepEqual  solve(and_(print_(1), print_(2))), null
+    test.equal  solve(and_(print_(1), print_(2))), null
     test.done()
   "test or print": (test) ->
-    test.deepEqual  solve(or_(print_(1), print_(2))), null
+    test.equal  solve(or_(print_(1), print_(2))), null
     test.done()
   "test not print": (test) ->
-    test.deepEqual  solve(not_(print_(1))), null
+    test.equal  solve(not_(print_(1))), null
     test.done()
   "test not succeed": (test) ->
-    test.deepEqual  solve(not_(succeed)), false
+    test.equal  solve(not_(succeed)), false
     test.done()
   "test not fail": (test) ->
-    test.deepEqual  solve(not_(fail)), false
+    test.equal  solve(not_(fail)), false
     test.done()
   "test unify 1 1": (test) ->
-    test.deepEqual  solve(unify(1, 1)), true
+    test.equal  solve(unify(1, 1)), true
     test.done()
   "test unify 1 2": (test) ->
-    test.deepEqual  solve(unify(1, 2)), false
+    test.equal  solve(unify(1, 2)), false
     test.done()
   "test unify a 1": (test) ->
     a = vari('a')
-    test.deepEqual  solve(unify(a, 1)), true
-    test.deepEqual  solve(and_(unify(a, 1), unify(a, 2))), false
-    test.deepEqual  solve(or_(and_(unify(a, 1), unify(a, 2)), unify(a, 2))), true
+    test.equal  solve(unify(a, 1)), true
+    test.equal  solve(and_(unify(a, 1), unify(a, 2))), false
+    test.equal  solve(or_(and_(unify(a, 1), unify(a, 2)), unify(a, 2))), true
     test.done()
 
   "test char": (test) ->
-    test.deepEqual  solve(parse(char('a'), 'a')), true
-    test.deepEqual  solve(parse(and_(char('a'), char('b')), 'ab')), true
+    test.equal  solve(parse(char('a'), 'a')), true
+    test.equal  solve(parse(and_(char('a'), char('b')), 'ab')), true
+    test.done()
+
+  "test builtin function": (test) ->
+    same = jsfun((x)->x)
+    test.equal  solve(apply(same, [number(1)])), 1
+    add = jsfun((x, y) -> x+y)
+    test.equal  solve(apply(add, [number(1), number(2)])), 3
     test.done()
 
 exports.Test =
   setUp: (callback) ->
     @global = I.set_global dao, '''solve number vari print_, and_, or_, not_, succeed, fail, unify, vari,
-                                parse, char'''
+                                parse, char, jsfun apply'''
     callback()
   tearDown:(callback) ->
     I.set_global  @global
     callback()
 
   "test 1": (test) ->
-    a = vari('a')
-    test.deepEqual  solve(parse(and_(char('a'), char('b')), 'ab')), true
+    same = jsfun((x)->x)
+    test.equal  solve(apply(same, [number(1)])), 1
     test.done()
