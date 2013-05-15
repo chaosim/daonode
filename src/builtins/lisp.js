@@ -17,7 +17,14 @@
 
   exports.eval_ = special(function(solver, cont, exp) {
     return solver.cont(exp, function(v, solver) {
-      return solver.cont(v, cont)(null, solver);
+      return [solver.cont(v, cont), null, solver];
+    });
+  });
+
+  exports.assign = special(function(solver, cont, vari, exp) {
+    return solver.cont(exp, function(v, solver) {
+      vari.binding = v;
+      return [cont, v, solver];
     });
   });
 
@@ -35,9 +42,9 @@
     else_cont = solver.cont(else_, cont);
     return solver.cont(test, function(v, solver) {
       if (v) {
-        return then_cont(v, solver);
+        return [then_cont, v, solver];
       } else {
-        return else_cont(v, solver);
+        return [else_cont, v, solver];
       }
     });
   };
@@ -59,9 +66,9 @@
       iff_else_cont = iff_fun(solver, cont, clauses.slice(1), else_);
       return solver.cont(test, function(v, solver) {
         if (v) {
-          return then_cont(v, solver);
+          return [then_cont, v, solver];
         } else {
-          return iff_else_cont(v, solver);
+          return [iff_else_cont, v, solver];
         }
       });
     }
@@ -80,34 +87,65 @@
   */
 
 
-  exports.block = block = special(function(solver, cont, label, body) {
-    var fun;
+  exports.block = block = special(function() {
+    var body, cont, continues, exits, fun, holder, label, solver, _base, _base1, _ref, _ref1;
 
-    solver.exits[label] = cont;
-    solver.continues[label] = fun = solver.cont(body, cont);
+    solver = arguments[0], cont = arguments[1], label = arguments[2], body = 4 <= arguments.length ? __slice.call(arguments, 3) : [];
+    exits = (_ref = (_base = solver.exits)[label]) != null ? _ref : _base[label] = [];
+    exits.push(cont);
+    continues = (_ref1 = (_base1 = solver.continues)[label]) != null ? _ref1 : _base1[label] = [];
+    holder = [null];
+    continues.push(holder);
+    holder[0] = fun = solver.expsCont(body, cont);
+    exits.pop();
+    continues.pop();
     return fun;
   });
 
   exports.break_ = break_ = special(function(solver, cont, label, value) {
+    var exitCont, exits;
+
     if (label == null) {
       label = null;
     }
     if (value == null) {
       value = null;
     }
+    exits = solver.exits[label];
+    if (!exits || exits === []) {
+      throw Error(label);
+    }
+    exitCont = exits[exits.length - 1];
     return solver.cont(value, function(v, solver) {
-      solver.protects(null, solver);
-      return slover.exits[label](v, solver);
+      var protect;
+
+      protect = solver.protect;
+      if (typeof protect === "function") {
+        protect(null, solver);
+      }
+      return exitCont(v, solver);
     });
   });
 
   exports.continue_ = continue_ = special(function(solver, cont, label) {
+    var continueCont, continues;
+
     if (label == null) {
       label = null;
     }
+    continues = solver.continues[label];
+    if (!continues || continues === []) {
+      throw Error(label);
+    }
+    continueCont = continues[continues.length - 1];
     return function(v, solver) {
-      solver.protects(null, solver);
-      return slover.continues[label](v, solver);
+      var protect;
+
+      protect = solver.protect;
+      if (typeof protect === "function") {
+        protect(null, solver);
+      }
+      return continueCont[0](v, solver);
     };
   });
 

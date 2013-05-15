@@ -120,18 +120,5 @@ exports.Test =
 
 xexports.Test =
   "test may char": (test) ->
-    test.equal  solve(parsetext(may(char('a')), 'a')), 1
-    test.equal  solve(parsetext(may(char('a')), 'b')), false
-    test.done()
-
-  "test may any": (test) ->
-    test.equal  solve(parsetext(any(char('a')), 'a')), false
-    test.equal  solve(parsetext(any(char('a')), 'aa')), false
-    test.equal  solve(parsetext(any(char('a')), 'b')), false
-    test.done()
-
-  "test char": (test) ->
-    test.equal  solve(parsetext(char('a'), 'a')), 1
-    test.equal  solve(parsetext(andp(char('a'), char('b')), 'ab')), 2
     test.done()
 

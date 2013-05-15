@@ -9,12 +9,14 @@
 
   done = function(v, solver) {
     console.log("succeed!");
-    return solver.trail.getvalue(v);
+    solver.done = true;
+    return [null, solver.trail.getvalue(v), solver];
   };
 
   faildone = function(v, solver) {
     console.log("fail!");
-    return solver.trail.getvalue(v);
+    solver.done = true;
+    return [null, solver.trail.getvalue(v), solver];
   };
 
   exports.solve = function(exp, trail, cont, failcont) {
@@ -47,13 +49,17 @@
       this.state = state;
       this.cutCont = this.failcont;
       this.catchs = {};
+      this.exits = {};
+      this.continues = {};
+      this.protect = null;
+      this.done = false;
     }
 
     Solver.prototype.cont = function(exp, cont) {
       if (cont == null) {
         cont = done;
       }
-      return (typeof exp.cont === "function" ? exp.cont(this, cont) : void 0) || (function(v, solver) {
+      return (exp != null ? typeof exp.cont === "function" ? exp.cont(this, cont) : void 0 : void 0) || (function(v, solver) {
         return cont(exp, solver);
       });
     };
@@ -72,10 +78,18 @@
     };
 
     Solver.prototype.solve = function(exp, cont) {
+      var solver, value, _ref;
+
       if (cont == null) {
         cont = done;
       }
-      return this.cont(exp, cont || done)(null, this);
+      cont = this.cont(exp, cont || done);
+      value = null;
+      solver = this;
+      while (!solver.done) {
+        _ref = cont(value, solver), cont = _ref[0], value = _ref[1], solver = _ref[2];
+      }
+      return value;
     };
 
     return Solver;
@@ -315,7 +329,7 @@
         cont = (function(i, cont) {
           return solver.cont(args[i], function(v, solver) {
             params[i] = v;
-            return cont(exports.NULL, solver);
+            return cont(null, solver);
           });
         })(i, cont);
       }

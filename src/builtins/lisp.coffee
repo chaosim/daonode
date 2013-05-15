@@ -7,7 +7,10 @@ exports.quote = special((solver, cont, exp) ->
     (v, solver) -> cont(exp, solver))
 
 exports.eval_ = special((solver, cont, exp) ->
-  solver.cont(exp, (v, solver) -> solver.cont(v, cont)(null, solver)))
+  solver.cont(exp, (v, solver) -> [solver.cont(v, cont), null, solver]))
+
+exports.assign = special((solver, cont, vari, exp) ->
+  solver.cont(exp, (v, solver) -> (vari.binding = v; [cont, v, solver])))
 
 exports.begin = special((solver, cont, exps...) -> solver.expsCont(exps, cont))
 
@@ -15,8 +18,8 @@ if_fun = (solver, cont, test, then_, else_) ->
   then_cont = solver.cont(then_, cont)
   else_cont = solver.cont(else_, cont)
   solver.cont(test, (v, solver) ->
-    if (v) then then_cont(v, solver)
-    else else_cont(v, solver))
+    if (v) then [then_cont, v, solver]
+    else [else_cont, v, solver])
 
 exports.if_ = special(if_fun)
 
@@ -31,8 +34,8 @@ iff_fun = (solver, cont, clauses, else_) ->
     then_cont = solver.cont(then_, cont)
     iff_else_cont = iff_fun(solver, cont, clauses[1...], else_)
     solver.cont(test, (v, solver) ->
-      if (v) then then_cont(v, solver)
-      else iff_else_cont(v, solver))
+      if (v) then [then_cont, v, solver]
+      else [iff_else_cont, v, solver])
 
 exports.iff = special(iff_fun)
 
@@ -46,20 +49,39 @@ iff = macro (clauses_, else_) ->
      exports.if_(clauses[0][0], clauses[0][1], iff(clauses[1...], else_)
 ###
 
-exports.block = block = special((solver, cont, label, body) ->
-  solver.exits[label] = cont
-  solver.continues[label] = fun = solver.cont(body, cont)
+exports.block = block = special((solver, cont, label, body...) ->
+  exits = solver.exits[label] ?= []
+  exits.push(cont)
+#  console.log label, exits
+  continues = solver.continues[label] ?= []
+  holder = [null]
+  continues.push(holder)
+  holder[0] = fun = solver.expsCont(body, cont)
+#  console.log 'block', holder
+  exits.pop()
+  continues.pop()
   fun)
 
 exports.break_ = break_ = special((solver, cont, label=null, value=null) ->
+  exits = solver.exits[label]
+#  console.log label, exits
+  if not exits or exits==[] then throw Error(label)
+  exitCont = exits[exits.length-1]
   solver.cont(value, (v, solver) ->
-    solver.protects(null, solver)
-    slover.exits[label](v, solver)))
+    protect = solver.protect
+    protect?(null, solver)
+    exitCont(v, solver)))
 
 exports.continue_ = continue_ = special((solver, cont, label=null) ->
+  continues = solver.continues[label]
+#  console.log 'continue', continues
+#  console.log label, exits
+  if not continues or continues==[] then throw Error(label)
+  continueCont = continues[continues.length-1]
   (v, solver) ->
-    solver.protects(null, solver)
-    slover.continues[label](v, solver))
+    protect = solver.protect
+    protect?(null, solver)
+    continueCont[0](v, solver))
 
 exports.loop = macro((label, body) ->
   block(label, body.concat([continue_(label)])...))

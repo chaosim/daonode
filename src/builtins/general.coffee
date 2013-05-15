@@ -1,5 +1,6 @@
 solve = require "../../src/solve"
 fun = solve.fun
+special = solve.special
 
 exports.print_ = fun( (args...) -> console.log(args...))
 exports.add = fun((x, y) -> x+y)
@@ -23,6 +24,18 @@ exports.eq = fun((x, y) -> x is y)
 exports.ne = fun((x, y) -> x isnt y)
 exports.ge = fun((x, y) -> x>=y)
 exports.gt = fun((x, y) -> x>y)
+
+exports.inc = special((solver, cont, vari) ->
+  (v, solver) -> (vari.binding = vari.binding+1; cont(vari.binding, solver)))
+
+exports.inc2 = special((solver, cont, vari) ->
+  (v, solver) -> (vari.binding = vari.binding+2; cont(vari.binding, solver)))
+
+exports.dec = special((solver, cont, vari) ->
+  (v, solver) -> (vari.binding = vari.binding-1; cont(vari.binding, solver)))
+
+exports.dec2 = special((solver, cont, vari) ->
+  (v, solver) -> (vari.binding = vari.binding-2; cont(vari.binding, solver)))
 
 ###
 exports.format = new exports.BuiltinFunction('format', il.Format)

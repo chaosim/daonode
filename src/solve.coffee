@@ -1,7 +1,7 @@
 _ = require('underscore')
 
-done =(v, solver) -> console.log("succeed!"); solver.trail.getvalue(v)
-faildone =(v, solver) -> console.log("fail!"); solver.trail.getvalue(v)
+done =(v, solver) -> console.log("succeed!"); solver.done = true; [null, solver.trail.getvalue(v), solver]
+faildone =(v, solver) -> console.log("fail!"); solver.done = true;  [null, solver.trail.getvalue(v), solver]
 
 exports.solve = (exp, trail=new exports.Trail, cont = done, failcont = faildone) ->
   new exports.Solver(trail, failcont).solve(exp)
@@ -12,8 +12,12 @@ class exports.Solver
   constructor: (@trail=new exports.Trail, @failcont = faildone, @state) ->
     @cutCont = @failcont
     @catchs = {}
+    @exits = {}
+    @continues = {}
+    @protect = null
+    @done = false
 
-  cont: (exp, cont = done) -> exp.cont?(@, cont) or ((v, solver) -> cont(exp, solver))
+  cont: (exp, cont = done) -> exp?.cont?(@, cont) or ((v, solver) -> cont(exp, solver))
 
   expsCont: (exps, cont) ->
     length = exps.length
@@ -21,7 +25,13 @@ class exports.Solver
     else if length is 1 then @cont(exps[0], cont)
     else @cont(exps[0], @expsCont(exps[1...], cont))
 
-  solve: (exp, cont = done) -> @cont(exp, cont or done)(null, @)
+  solve: (exp, cont = done) ->
+    cont = @cont(exp, cont or done)
+    value = null
+    solver = @
+    while not solver.done
+      [cont, value, solver] = cont(value, solver)
+    value
 
 class exports.Trail
   constructor: (@data={}) ->
@@ -104,7 +114,7 @@ class exports.Fun extends exports.Command
     cont = do (cont=cont) => (caller, solver) => cont(@fun(params...), solver)
     for i in [length-1..0] by -1
       cont = do (i=i, cont=cont) ->
-        solver.cont(args[i], (v, solver) ->  (params[i] = v; cont(exports.NULL, solver)))
+        solver.cont(args[i], (v, solver) ->  (params[i] = v; cont(null, solver)))
     cont
 
 exports.fun = maker(exports.Fun)
