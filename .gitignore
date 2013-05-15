@@ -13,3 +13,4 @@ examples/beautiful_code/parse.coffee
 /src/compile.js
 /src/interlang.js
 *.map
+*.bak

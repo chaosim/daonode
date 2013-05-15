@@ -1,78 +1,29 @@
-global._ =  require("underscore")
-parser = require('../src/parser')
+I = require("f:/node-utils/src/importer")
 
-I = require('../src/utils')
+base = "f:/daonode/src/"
+I.use base+"solve: Trail, solve, fun, macro vari"
+I.use base+"builtins/lisp: begin"
+I.use base+"builtins/logic: andp orp notp succeed fail unify findall once"
+I.use base+"builtins/parser: char parsetext settext may any"
 
 xexports = {}
 
-I.with_ parser, ->
-  global.a = char('a')
-  global.b = char('b')
-  [global.x, global.y, global.z] = vars('x, y, z')
-
-exports.ParserTest =
-  setUp: (callback) ->
-    @global = I.set_global parser
-    callback()
-
-  tearDown:(callback) ->
-    I.set_global  @global
-    callback()
-
-  test_Char: (test) ->
-    solve(a, 'a')
-    solve(char(x), 'a')
-    solve(and_(char(x), char(x)), 'aa')
-    test.throws (-> solve(and_(char(x), char(x)), 'ab')), ParseError
-    solve(and_(char(x), or_(char(x), char(y))), 'aa')
+exports.Test =
+  "test may char": (test) ->
+    test.equal  solve(parsetext(may(char('a')), 'a')), 1
+#    test.equal  solve(parsetext(may(char('a')), 'b')), false
     test.done()
 
-  test_Or: (test) ->
-    solve(or_(a, b), 'b')
+  "test may any": (test) ->
+    test.equal  solve(parsetext(any(char('a')), 'a')), false
+    test.equal  solve(parsetext(any(char('a')), 'aa')), false
+    test.equal  solve(parsetext(any(char('a')), 'b')), false
     test.done()
 
-  test_and: (test) ->
-    solve and_(a, b), 'ab'
+exports.Test =
+  "test char": (test) ->
+    test.equal  solve(parsetext(char('a'), 'a')), 1
+#    test.equal  solve(begin(settext('a'), char('a'))), 1
+#    test.equal  solve(parsetext(andp(char('a'), char('b')), 'ab')), 2
     test.done()
 
-  test_and2: (test) ->
-    test.throws (-> solve and_(a, b),'ac'), ParseError
-    test.done()
-
-  test_unify: (test) ->
-    solve(unify(1,1))
-    test.throws (-> solve(unify(1,2)))
-    solve(or_(unify(1,2), unify(1,1)))
-    solve(unify(x,1))
-    solve(and_(unify(x,1), unify(x,1)))
-    test.throws (-> solve(and_(unify(x,1), unify(x,2))))
-    solve(and_(unify(x,1), or_(unify(x, 2), unify(x,1))))
-    solve(or_(and_(unify(x,1), unify(x, 2)),
-              unify(x,1)))
-    test.done()
-
-  test_not: (test) ->
-    solve(not_(a), 'b')
-    test.throws (-> solve(not_(a), 'a')), ParseError
-    test.done()
-
-  test_print_: (test) ->
-    solve(print_(1))
-    solve(or_(print_(1), print_(2)))
-    test.done()
-
-xexports.ParserTest2 =
-  setUp: (callback) ->
-    @globals = I.set_global parser
-    callback()
-
-  tearDown:(callback) ->
-    I.set_global  @globals
-    callback()
-
-  test: (test) ->
-#    test.throws (-> solve(not_(a), 'a')), ParseError
-#    solve(not_(a), 'b')
-#    solve(print_(1))
-    solve(or_(print_(1), print_(2)))
-    test.done()
