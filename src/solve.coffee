@@ -1,6 +1,15 @@
 _ = require('underscore')
 
+exports.debug = debug = (items...) ->
+  console.log((
+      (for x in items
+              if (x not instanceof Function)
+                s = x.toString()
+                if s=='[object Object]' then JSON.stringify(x) else s
+              else '[Function]') )...)
+
 done =(v, solver) -> console.log("succeed!"); solver.done = true; [null, solver.trail.getvalue(v), solver]
+
 faildone =(v, solver) -> console.log("fail!"); solver.done = true;  [null, solver.trail.getvalue(v), solver]
 
 exports.solve = (exp, trail=new exports.Trail, cont = done, failcont = faildone) ->
@@ -11,11 +20,23 @@ exports.solver = (trail = {}, failcont = faildone, state) -> new exports.Solver(
 class exports.Solver
   constructor: (@trail=new exports.Trail, @failcont = faildone, @state) ->
     @cutCont = @failcont
-    @catchs = {}
+    @catches = {}
     @exits = {}
     @continues = {}
-    @protect = null
     @done = false
+
+  pushCatch: (value, cont) ->
+    catches = @catches[value] ?= []
+    catches.push(cont)
+
+  popCatch: (value) -> catches = @catches[value]; catches.pop(); if catches.length is 0 then delete @catches[value]
+
+  findCatch: (value) ->
+    catches = @catches[value]
+    if not catches? or catches.length is 0 then throw new NotCatched
+    catches[catches.length-1]
+
+  protect: (fun) -> (v, solver) -> [fun, v, solver]
 
   cont: (exp, cont = done) -> exp?.cont?(@, cont) or ((v, solver) -> cont(exp, solver))
 
@@ -64,9 +85,11 @@ class exports.Var
             x.binding = next
             trail.set(x, chains[i+1])
           return next
+
   bind: (value, trail) ->
     trail.set(@, @binding)
     @binding = value
+
   unify: (y, trail) ->
     x = @deref(trail)
     y = trail.deref(y)
@@ -83,22 +106,37 @@ class exports.Var
 
   cont: (solver, cont) -> (v, solver) => cont(@deref(solver.trail), solver)
 
-  toString:() -> "exports.vari(#{@name})"
+  toString:() -> "vari(#{@name})"
 
 exports.vari = (name) -> new exports.Var(name)
 
 class exports.Apply
   constructor: (@caller, @args) ->
 
-  toString: -> "exports.apply(#{@caller}, [#{@args.join(', ')}])"
+  toString: -> "#{@caller}(#{@args.join(', ')})"
   cont: (solver, cont) -> @caller.apply_cont(solver, cont, @args)
 
 exports.apply = (caller, args) -> new exports.Apply(caller, args)
 
-class exports.Command
+Command = class exports.Command
+  @directRun = false
+  @done = (v, solver) -> (solver.done = true; [null, solver.trail.getvalue(v), solver])
+  @faildone = (v, solver) -> (solver.done = true; [null, solver.trail.getvalue(v), solver])
   constructor: (@fun, @name) ->
-    @callable = (args...) => exports.apply(@, args)
+#    debug 'enter command constructor a321455665'
+    @callable = (args...) =>
+      if @name is 'a' then debug 'enter command callable'
+      applied = exports.apply(@, args)
+      if Command.directRun
+        fc = solver.failcont
+        folver.failcont = command.faildone
+        [cont, reuslt, solver] = Command.globalSolver.solve(applied, done)
+        solver.failcont = fc
+        solver.done = false
+      else applied
+
   register: (exports) -> exports[@name] = @callable
+  toString: () -> @name
 
 maker = (klass) -> (name_or_fun, fun) -> (if fun? then new klass(fun, name_or_fun) else new klass(name_or_fun)).callable
 
@@ -123,3 +161,19 @@ class exports.Macro extends exports.Command
   apply_cont: (solver, cont, args) -> solver.cont(@fun(args...), cont)
 
 exports.macro = maker(exports.Macro)
+
+class exports.Rule extends exports.Command
+  apply_cont:  (solver, cont, args) =>
+    debug 'enter rule apply_con'
+    throw 'dasffa'
+    (v, solver) ->
+      debug 'enter rule apply_cont run'
+      savedSolver = Command.globalSolver
+      Command.globalSolver = solver
+      throw 'dasffa'
+      result = @fun(args...)
+      Command.globalSolver = savedSolver
+      throw 'dasffa'
+      [cont, result, solver]
+
+exports.rule = maker(exports.Rule)

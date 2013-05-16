@@ -2,39 +2,39 @@ solve = require "../../src/solve"
 fun = solve.fun
 special = solve.special
 
-exports.print_ = fun( (args...) -> console.log(args...))
-exports.add = fun((x, y) -> x+y)
-exports.sub = fun((x, y) -> x-y)
-exports.mul = fun((x, y) -> x*y)
-exports.div = fun((x, y) -> x/y)
-exports.mod = fun((x, y) -> x%y)
+exports.print_ = fun('print_', (args...) -> console.log(args...))
+exports.add = fun('add', (x, y) -> x+y)
+exports.sub = fun('sub', (x, y) -> x-y)
+exports.mul = fun('mul', (x, y) -> x*y)
+exports.div = fun('div', (x, y) -> x/y)
+exports.mod = fun('mod', (x, y) -> x%y)
 
-exports.and_ = fun((x, y) -> x and y)
-exports.or_ = fun((x, y) -> x or y)
-exports.not_ = fun((x) -> not x)
-exports.lshift = fun((x, y) -> x<<y)
-exports.rshift = fun((x, y) -> x>>y)
-exports.bitand = fun((x, y) -> x&y)
-exports.bitor = fun((x, y) -> x|y)
-exports.bitnot = fun((x) -> ~x)
+exports.and_ = fun('and_', (x, y) -> x and y)
+exports.or_ = fun('or_', (x, y) -> x or y)
+exports.not_ = fun('not_', (x) -> not x)
+exports.lshift = fun('lshift', (x, y) -> x<<y)
+exports.rshift = fun('rshift', (x, y) -> x>>y)
+exports.bitand = fun('bitand', (x, y) -> x&y)
+exports.bitor = fun('bitor', (x, y) -> x|y)
+exports.bitnot = fun('bitnot', (x) -> ~x)
 
-exports.lt = fun((x, y) -> x<y)
-exports.le = fun((x, y) -> x<=y)
-exports.eq = fun((x, y) -> x is y)
-exports.ne = fun((x, y) -> x isnt y)
-exports.ge = fun((x, y) -> x>=y)
-exports.gt = fun((x, y) -> x>y)
+exports.lt = fun('lt', (x, y) -> x<y)
+exports.le = fun('le', (x, y) -> x<=y)
+exports.eq = fun('eq', (x, y) -> x is y)
+exports.ne = fun('ne', (x, y) -> x isnt y)
+exports.ge = fun('ge', (x, y) -> x>=y)
+exports.gt = fun('gt', (x, y) -> x>y)
 
-exports.inc = special((solver, cont, vari) ->
+exports.inc = special('inc', (solver, cont, vari) ->
   (v, solver) -> (vari.binding = vari.binding+1; cont(vari.binding, solver)))
 
-exports.inc2 = special((solver, cont, vari) ->
+exports.inc2 = special('inc2', (solver, cont, vari) ->
   (v, solver) -> (vari.binding = vari.binding+2; cont(vari.binding, solver)))
 
-exports.dec = special((solver, cont, vari) ->
+exports.dec = special('dec', (solver, cont, vari) ->
   (v, solver) -> (vari.binding = vari.binding-1; cont(vari.binding, solver)))
 
-exports.dec2 = special((solver, cont, vari) ->
+exports.dec2 = special('dec2', (solver, cont, vari) ->
   (v, solver) -> (vari.binding = vari.binding-2; cont(vari.binding, solver)))
 
 ###

@@ -33,13 +33,13 @@ exports.Test =
       test.done()
 
   "test succeed fail": (test) ->
-    test.equal solve(succeed), true
-    test.equal solve(fail), false
+    test.equal solve(succeed), null
+    test.equal solve(fail), null
     test.done()
 
   "test not succeed fail": (test) ->
-    test.equal  solve(notp(succeed)), true
-    test.equal  solve(notp(fail)), false
+    test.equal  solve(notp(succeed)), null
+    test.equal  solve(notp(fail)), null
     test.done()
 
   "test not print": (test) ->
@@ -118,7 +118,9 @@ exports.Test =
     test.equal  solve(findall(once(orp(print_(1), print_(2))))), null
     test.done()
 
-xexports.Test =
-  "test may char": (test) ->
+exports.Test =
+  "test findall once": (test) ->
+    test.equal  solve(findall(orp(print_(1), print_(2)))), null
+    test.equal  solve(findall(once(orp(print_(1), print_(2))))), null
     test.done()
 

@@ -9,111 +9,111 @@
 
   special = solve.special;
 
-  exports.print_ = fun(function() {
+  exports.print_ = fun('print_', function() {
     var args;
 
     args = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
     return console.log.apply(console, args);
   });
 
-  exports.add = fun(function(x, y) {
+  exports.add = fun('add', function(x, y) {
     return x + y;
   });
 
-  exports.sub = fun(function(x, y) {
+  exports.sub = fun('sub', function(x, y) {
     return x - y;
   });
 
-  exports.mul = fun(function(x, y) {
+  exports.mul = fun('mul', function(x, y) {
     return x * y;
   });
 
-  exports.div = fun(function(x, y) {
+  exports.div = fun('div', function(x, y) {
     return x / y;
   });
 
-  exports.mod = fun(function(x, y) {
+  exports.mod = fun('mod', function(x, y) {
     return x % y;
   });
 
-  exports.and_ = fun(function(x, y) {
+  exports.and_ = fun('and_', function(x, y) {
     return x && y;
   });
 
-  exports.or_ = fun(function(x, y) {
+  exports.or_ = fun('or_', function(x, y) {
     return x || y;
   });
 
-  exports.not_ = fun(function(x) {
+  exports.not_ = fun('not_', function(x) {
     return !x;
   });
 
-  exports.lshift = fun(function(x, y) {
+  exports.lshift = fun('lshift', function(x, y) {
     return x << y;
   });
 
-  exports.rshift = fun(function(x, y) {
+  exports.rshift = fun('rshift', function(x, y) {
     return x >> y;
   });
 
-  exports.bitand = fun(function(x, y) {
+  exports.bitand = fun('bitand', function(x, y) {
     return x & y;
   });
 
-  exports.bitor = fun(function(x, y) {
+  exports.bitor = fun('bitor', function(x, y) {
     return x | y;
   });
 
-  exports.bitnot = fun(function(x) {
+  exports.bitnot = fun('bitnot', function(x) {
     return ~x;
   });
 
-  exports.lt = fun(function(x, y) {
+  exports.lt = fun('lt', function(x, y) {
     return x < y;
   });
 
-  exports.le = fun(function(x, y) {
+  exports.le = fun('le', function(x, y) {
     return x <= y;
   });
 
-  exports.eq = fun(function(x, y) {
+  exports.eq = fun('eq', function(x, y) {
     return x === y;
   });
 
-  exports.ne = fun(function(x, y) {
+  exports.ne = fun('ne', function(x, y) {
     return x !== y;
   });
 
-  exports.ge = fun(function(x, y) {
+  exports.ge = fun('ge', function(x, y) {
     return x >= y;
   });
 
-  exports.gt = fun(function(x, y) {
+  exports.gt = fun('gt', function(x, y) {
     return x > y;
   });
 
-  exports.inc = special(function(solver, cont, vari) {
+  exports.inc = special('inc', function(solver, cont, vari) {
     return function(v, solver) {
       vari.binding = vari.binding + 1;
       return cont(vari.binding, solver);
     };
   });
 
-  exports.inc2 = special(function(solver, cont, vari) {
+  exports.inc2 = special('inc2', function(solver, cont, vari) {
     return function(v, solver) {
       vari.binding = vari.binding + 2;
       return cont(vari.binding, solver);
     };
   });
 
-  exports.dec = special(function(solver, cont, vari) {
+  exports.dec = special('dec', function(solver, cont, vari) {
     return function(v, solver) {
       vari.binding = vari.binding - 1;
       return cont(vari.binding, solver);
     };
   });
 
-  exports.dec2 = special(function(solver, cont, vari) {
+  exports.dec2 = special('dec2', function(solver, cont, vari) {
     return function(v, solver) {
       vari.binding = vari.binding - 2;
       return cont(vari.binding, solver);

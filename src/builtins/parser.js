@@ -11,7 +11,7 @@
 
   I.use(base + "solve: Trail, solve, Var,  ExpressionError, TypeError, special");
 
-  exports.parse = special(function(solver, cont, exp, state) {
+  exports.parse = special('parse', function(solver, cont, exp, state) {
     return function(v, solver) {
       var old_state;
 
@@ -19,16 +19,27 @@
       solver.state = state;
       return solver.cont(exp, function(v, solver) {
         solver.state = old_state;
-        return cont(v, solver);
+        return [cont, v, solver];
       })(true, solver);
     };
+  });
+
+  exports.parse = special('parse', function(solver, cont, exp, state) {
+    var old_state;
+
+    old_state = solver.state;
+    solver.state = state;
+    return solver.cont(exp, function(v, solver) {
+      solver.state = old_state;
+      return [cont, v, solver];
+    });
   });
 
   exports.parsetext = exports.parsesequence = function(exp, sequence) {
     return exports.parse(exp, [sequence, 0]);
   };
 
-  exports.setstate = special(function(solver, cont, state) {
+  exports.setstate = special('setstate', function(solver, cont, state) {
     return function(v, solver) {
       solver.state = state;
       return cont(v, solver);
@@ -39,25 +50,25 @@
     return exports.setstate([sequence, 0]);
   };
 
-  exports.getstate = special(function(solver, cont) {
+  exports.getstate = special('getstate', function(solver, cont) {
     return function(v, solver) {
       return cont(solver.state, solver);
     };
   });
 
-  exports.gettext = exports.getsequence = special(function(solver, cont) {
+  exports.gettext = exports.getsequence = special('gettext', function(solver, cont) {
     return function(v, solver) {
       return cont(solver.state[0], solver);
     };
   });
 
-  exports.getpos = special(function(solver, cont) {
+  exports.getpos = special('getpos', function(solver, cont) {
     return function(v, solver) {
       return cont(solver.state[1], solver);
     };
   });
 
-  exports.eoi = special(function(solver, cont) {
+  exports.eoi = special('eoi', function(solver, cont) {
     return function(v, solver) {
       var data, pos, _ref;
 
@@ -70,7 +81,7 @@
     };
   })();
 
-  exports.boi = special(function(solver, cont) {
+  exports.boi = special('boi', function(solver, cont) {
     return function(v, solver) {
       if (solver.state[1] === 0) {
         return cont(true, solver);
@@ -80,7 +91,7 @@
     };
   })();
 
-  exports.step = special(function(solver, cont, n) {
+  exports.step = special('step', function(solver, cont, n) {
     if (n == null) {
       n = 1;
     }
@@ -93,7 +104,7 @@
     };
   });
 
-  exports.lefttext = special(function(solver, cont) {
+  exports.lefttext = special('lefttext', function(solver, cont) {
     return function(v, solver) {
       var pos, text, _ref;
 
@@ -102,7 +113,7 @@
     };
   });
 
-  exports.subtext = exports.subsequence = special(function(solver, cont, start, end) {
+  exports.subtext = exports.subsequence = special('subtext', function(solver, cont, start, end) {
     return function(v, solver) {
       var pos, text, _ref;
 
@@ -111,7 +122,7 @@
     };
   });
 
-  exports.nextchar = special(function(solver, cont) {
+  exports.nextchar = special('nextchar', function(solver, cont) {
     return function(v, solver) {
       var pos, text, _ref;
 
@@ -120,7 +131,7 @@
     };
   });
 
-  exports.may = special(function(solver, cont, exp) {
+  exports.may = special('may', function(solver, cont, exp) {
     return function(v, solver) {
       var exp_cont, fc;
 
@@ -134,7 +145,19 @@
     };
   });
 
-  exports.lazymay = special(function(solver, cont, exp) {
+  exports.may = special('may', function(solver, cont, exp) {
+    var exp_cont, fc;
+
+    fc = solver.failcont;
+    exp_cont = solver.cont(exp, cont);
+    solver.failcont = function(v, solver) {
+      solver.failcont = fc;
+      return cont(v, solver);
+    };
+    return exp_cont;
+  });
+
+  exports.lazymay = special('lazymay', function(solver, cont, exp) {
     return function(v, solver) {
       var fc;
 
@@ -147,7 +170,7 @@
     };
   });
 
-  exports.greedymay = special(function(solver, cont, exp) {
+  exports.greedymay = special('greedymay', function(solver, cont, exp) {
     return function(v, solver) {
       var fc;
 
@@ -162,10 +185,10 @@
     };
   });
 
-  exports.any = special(function(solver, cont, exp) {
+  exports.any = special('any', function(solver, cont, exp) {
     var anyCont;
 
-    return anyCont = function(v, solver) {
+    anyCont = function(v, solver) {
       var fc;
 
       fc = solver.failcont;
@@ -175,9 +198,26 @@
       };
       return solver.cont(exp, anyCont)(v, solver);
     };
+    return anyCont;
   });
 
-  exports.lazyany = special(function(solver, cont, exp) {
+  exports.any = special('any', function(solver, cont, exp) {
+    var anyCont;
+
+    anyCont = function(v, solver) {
+      var fc;
+
+      fc = solver.failcont;
+      solver.failcont = function(v, solver) {
+        solver.failcont = fc;
+        return cont(v, solver);
+      };
+      return solver.cont(exp, anyCont)(v, solver);
+    };
+    return anyCont;
+  });
+
+  exports.lazyany = special('lazyany', function(solver, cont, exp) {
     return function(v, solver) {
       var anyCont, anyFcont, fc;
 
@@ -194,7 +234,23 @@
     };
   });
 
-  exports.greedyany = special(function(solver, cont, exp) {
+  exports.lazyany = special('lazyany', function(solver, cont, exp) {
+    var anyCont, anyFcont, expcont, fc;
+
+    fc = solver.failcont;
+    anyCont = function(v, solver) {
+      solver.failcont = anyFcont;
+      return cont(v, solver);
+    };
+    expcont = solver.cont(exp, anyCont);
+    anyFcont = function(v, solver) {
+      solver.failcont = fc;
+      return expcont(v, solver);
+    };
+    return anyCont;
+  });
+
+  exports.greedyany = special('greedyany', function(solver, cont, exp) {
     return function(v, solver) {
       var anyCont, fc;
 
@@ -210,7 +266,50 @@
     };
   });
 
-  exports.char = special(function(solver, cont, x) {
+  exports.xgreedyany = special('greedyany', function(solver, cont, exp) {
+    var anyCont, fc;
+
+    fc = solver.failcont;
+    anyCont = function(v, solver) {
+      solver.failcont = function(v, solver) {
+        solver.failcont = fc;
+        return cont(v, solver);
+      };
+      return solver.cont(exp, anyCont);
+    };
+    return anyCont;
+  });
+
+  exports.char = special('char', function(solver, cont, x) {
+    var c, data, pos, trail, _ref;
+
+    _ref = solver.state, data = _ref[0], pos = _ref[1];
+    if (pos === data.length) {
+      return solver.failcont;
+    }
+    trail = solver.trail;
+    x = trail.deref(x);
+    c = data[pos];
+    if (x instanceof Var) {
+      trail.set(x, c);
+      return function(v, solver) {
+        return [cont, pos + 1, solver];
+      };
+    } else if (x === c) {
+      solver.state = [data, pos + 1];
+      return cont;
+    } else if (_.isString(x)) {
+      if (x.length === 1) {
+        return solver.failcont;
+      } else {
+        throw new ExpressionError(x);
+      }
+    } else {
+      throw new TypeError(x);
+    }
+  });
+
+  exports.xchar = special('char', function(solver, cont, x) {
     return function(v, solver) {
       var c, data, pos, trail, _ref;
 
@@ -239,7 +338,7 @@
     };
   });
 
-  exports.charWhen = special(function(solver, cont, test) {
+  exports.charWhen = special('charWhen', function(solver, cont, test) {
     return function(v, solver) {
       var c, data, pos, _ref;
 
@@ -302,7 +401,7 @@
 
   exports.newline = exports.charIn('\r\n');
 
-  exports.stringWhile = special(function(solver, cont, test) {
+  exports.stringWhile = special('stringWhile', function(solver, cont, test) {
     return function(v, solver) {
       var c, data, length, p, pos, _ref;
 
@@ -369,7 +468,7 @@
 
   exports.newlinespaces = exports.stringIn('\r\n');
 
-  exports.stringWhile0 = special(function(solver, cont, test) {
+  exports.stringWhile0 = special('stringWhile0', function(solver, cont, test) {
     return function(v, solver) {
       var c, data, length, p, pos, _ref;
 
@@ -436,7 +535,7 @@
 
   exports.newlines0 = exports.stringIn0('\r\n');
 
-  exports.float = special(function(solver, cont, arg) {
+  exports.float = special('float', function(solver, cont, arg) {
     return function(v, solver) {
       var length, p, pos, text, val, value, _ref, _ref1, _ref2, _ref3, _ref4, _ref5;
 
@@ -492,7 +591,7 @@
     };
   });
 
-  exports.literal = special(function(solver, cont, arg) {
+  exports.literal = special('literal', function(solver, cont, arg) {
     return function(v, solver) {
       var length, pos, text, _ref;
 
@@ -515,7 +614,7 @@
     };
   });
 
-  exports.quoteString = special(function(solver, cont, quote) {
+  exports.quoteString = special('quoteString', function(solver, cont, quote) {
     return function(v, solver) {
       var char, length, p, pos, string, text, _ref;
 

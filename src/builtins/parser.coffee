@@ -3,55 +3,62 @@ I = require("f:/node-utils/src/importer")
 base = "f:/daonode/src/"
 I.use base+"solve: Trail, solve, Var,  ExpressionError, TypeError, special"
 
-exports.parse = special((solver, cont, exp, state) -> (v, solver) ->
+exports.parse = special('parse', (solver, cont, exp, state) -> (v, solver) ->
   old_state = solver.state
   solver.state = state
   solver.cont(exp, (v, solver) ->
-              solver.state = old_state
-              cont(v, solver))(true, solver))
+    solver.state = old_state
+    [cont, v, solver])(true, solver))
+
+exports.parse = special('parse', (solver, cont, exp, state) ->
+  old_state = solver.state
+  solver.state = state
+  solver.cont(exp, (v, solver) ->
+    solver.state = old_state
+    [cont, v, solver]))
 
 exports.parsetext = exports.parsesequence = (exp, sequence) -> exports.parse(exp, [sequence, 0])
 
-exports.setstate = special((solver, cont, state) -> (v, solver) ->
+exports.setstate = special('setstate', (solver, cont, state) -> (v, solver) ->
   solver.state = state
   cont(v, solver))
 
 exports.settext = exports.setsequence = (sequence) -> exports.setstate([sequence, 0])
 
-exports.getstate = special((solver, cont) -> (v, solver) ->
+exports.getstate = special('getstate', (solver, cont) -> (v, solver) ->
   cont(solver.state, solver))
 
-exports.gettext = exports.getsequence = special((solver, cont) -> (v, solver) ->
+exports.gettext = exports.getsequence = special('gettext', (solver, cont) -> (v, solver) ->
   cont(solver.state[0], solver))
 
-exports.getpos =special((solver, cont) -> (v, solver) ->
+exports.getpos =special('getpos', (solver, cont) -> (v, solver) ->
   cont(solver.state[1], solver))
 
-exports.eoi = special((solver, cont) -> (v, solver) ->
+exports.eoi = special('eoi', (solver, cont) -> (v, solver) ->
   [data, pos] = solver.state
   if pos is data.length then cont(true, solver) else solver.failcont(v, solver))()
 
-exports.boi = special((solver, cont) -> (v, solver) ->
+exports.boi = special('boi', (solver, cont) -> (v, solver) ->
   if solver.state[1] is 0 then cont(true, solver) else solver.failcont(v, solver))()
 
-exports.step = special((solver, cont, n=1) -> (v, solver) ->
+exports.step = special('step', (solver, cont, n=1) -> (v, solver) ->
   [text, pos] = solver.state
   solver.state = [text, pos+n]
   cont(pos+n, solver))
 
-exports.lefttext =  special((solver, cont) -> (v, solver) ->
+exports.lefttext =  special('lefttext', (solver, cont) -> (v, solver) ->
   [text, pos] = solver.state
   cont(text[pos...], solver))
 
-exports.subtext =  exports.subsequence =  special((solver, cont, start, end) -> (v, solver) ->
+exports.subtext =  exports.subsequence =  special('subtext', (solver, cont, start, end) -> (v, solver) ->
   [text, pos] = solver.state
   cont(text[(start or 0)...(end or text.length)], solver))
 
-exports.nextchar =  special((solver, cont) -> (v, solver) ->
+exports.nextchar =  special('nextchar', (solver, cont) -> (v, solver) ->
   [text, pos] = solver.state
   cont(text[pos], solver))
 
-exports.may = special((solver, cont, exp) -> (v, solver) ->
+exports.may = special('may', (solver, cont, exp) -> (v, solver) ->
   fc = solver.failcont
   exp_cont = solver.cont(exp, cont)
   solver.failcont = (v, solver) ->
@@ -59,14 +66,22 @@ exports.may = special((solver, cont, exp) -> (v, solver) ->
     cont(v, solver)
   exp_cont(v, solver))
 
-exports.lazymay = special((solver, cont, exp) -> (v, solver) ->
+exports.may = special('may', (solver, cont, exp) ->
+  fc = solver.failcont
+  exp_cont = solver.cont(exp, cont)
+  solver.failcont = (v, solver) ->
+    solver.failcont = fc
+    cont(v, solver)
+  exp_cont)
+
+exports.lazymay = special('lazymay', (solver, cont, exp) -> (v, solver) ->
   fc = solver.failcont
   solver.failcont = (v, solver) ->
     solver.failcont = fc
     solver.cont(exp, cont)(v, solver)
   cont(v, solver))
 
-exports.greedymay = special((solver, cont, exp) -> (v, solver) ->
+exports.greedymay = special('greedymay', (solver, cont, exp) -> (v, solver) ->
   fc = solver.failcont
   solver.failcont = (v, solver) ->
     solver.failcont = fc
@@ -75,13 +90,21 @@ exports.greedymay = special((solver, cont, exp) -> (v, solver) ->
      solver.failcont = fc
     cont(v, solver))(v, solver))
 
-exports.any = special((solver, cont, exp) ->
+exports.any = special('any', (solver, cont, exp) ->
   anyCont = (v, solver) ->
     fc = solver.failcont
     solver.failcont = (v, solver) -> solver.failcont = fc; cont(v, solver)
-    solver.cont(exp, anyCont)(v, solver))
+    solver.cont(exp, anyCont)(v, solver)
+  anyCont                               )
 
-exports.lazyany = special((solver, cont, exp) -> (v, solver) ->
+exports.any = special('any', (solver, cont, exp) ->
+  anyCont = (v, solver) ->
+    fc = solver.failcont
+    solver.failcont = (v, solver) -> solver.failcont = fc; cont(v, solver)
+    solver.cont(exp, anyCont)(v, solver)
+  anyCont                               )
+
+exports.lazyany = special('lazyany', (solver, cont, exp) -> (v, solver) ->
   fc = solver.failcont
   anyCont = (v, solver) ->
     solver.failcont = anyFcont
@@ -91,14 +114,47 @@ exports.lazyany = special((solver, cont, exp) -> (v, solver) ->
     solver.cont(exp, anyCont)
   anyCont(v, solver))
 
-exports.greedyany = special((solver, cont, exp) -> (v, solver) ->
+exports.lazyany = special('lazyany', (solver, cont, exp) ->
+  fc = solver.failcont
+  anyCont = (v, solver) ->
+    solver.failcont = anyFcont
+    cont(v, solver)
+  expcont = solver.cont(exp, anyCont)
+  anyFcont = (v, solver) ->
+    solver.failcont = fc
+    expcont(v, solver)
+  anyCont)
+
+exports.greedyany = special('greedyany', (solver, cont, exp) -> (v, solver) ->
   fc = solver.failcont
   anyCont = (v, solver) ->
     solver.failcont = (v, solver) ->  solver.failcont = fc; cont(v, solver)
     solver.cont(exp, anyCont)
   anyCont(v, solver))
 
-exports.char = special((solver, cont, x) -> (v, solver) ->
+exports.xgreedyany = special('greedyany', (solver, cont, exp) ->
+  fc = solver.failcont
+  anyCont = (v, solver) ->
+    solver.failcont = (v, solver) ->  solver.failcont = fc; cont(v, solver)
+    solver.cont(exp, anyCont)
+  anyCont)
+
+exports.char = special('char', (solver, cont, x) ->
+  [data, pos] = solver.state
+  if pos is data.length then return solver.failcont
+  trail = solver.trail
+  x = trail.deref(x)
+  c = data[pos]
+  if x instanceof Var
+    trail.set(x, c)
+    (v, solver) -> [cont, pos+1, solver]
+  else if x is c then (solver.state = [data, pos+1]; cont)
+  else if _.isString(x)
+    if x.length==1 then solver.failcont
+    else throw new ExpressionError(x)
+  else throw new TypeError(x))
+
+exports.xchar = special('char', (solver, cont, x) -> (v, solver) ->
   [data, pos] = solver.state
   if pos is data.length then return solver.failcont(false, solver)
   trail = solver.trail
@@ -113,7 +169,7 @@ exports.char = special((solver, cont, x) -> (v, solver) ->
     else throw new ExpressionError(x)
   else throw new TypeError(x))
 
-exports.charWhen = special((solver, cont, test) -> (v, solver) ->
+exports.charWhen = special('charWhen', (solver, cont, test) -> (v, solver) ->
   [data, pos] = solver.state
   if pos is data.length then return solver.failcont(false, solver)
   c = data[pos]
@@ -133,7 +189,7 @@ exports.tabspace = exports.charIn(' \t')
 exports.whitespace = exports.charIn(' \t\r\n')
 exports.newline = exports.charIn('\r\n')
 
-exports.stringWhile = special((solver, cont, test) -> (v, solver) ->
+exports.stringWhile = special('stringWhile', (solver, cont, test) -> (v, solver) ->
   [data, pos] = solver.state
   length = data.length
   if pos is length then return solver.failcont(false, solver)
@@ -156,7 +212,7 @@ exports.tabspaces = exports.stringIn(' \t')
 exports.whitespaces = exports.stringIn(' \t\r\n')
 exports.newlinespaces = exports.stringIn('\r\n')
 
-exports.stringWhile0 = special((solver, cont, test) -> (v, solver) ->
+exports.stringWhile0 = special('stringWhile0', (solver, cont, test) -> (v, solver) ->
   [data, pos] = solver.state
   length = data.length
   if pos is length then return cont('', solver)
@@ -179,7 +235,7 @@ exports.tabspaces0 = exports.stringIn0(' \t')
 exports.whitespaces0 = exports.stringIn0(' \t\r\n')
 exports.newlines0 = exports.stringIn0('\r\n')
 
-exports.float = special((solver, cont, arg) -> (v, solver) ->
+exports.float = special('float', (solver, cont, arg) -> (v, solver) ->
   [text, pos] = solver.parse_state
   length = text.length
   if pos>=length then return solver.failcont(v, solver)
@@ -204,7 +260,7 @@ exports.float = special((solver, cont, arg) -> (v, solver) ->
       else solver.failcont(v, solver)          s
     else throw new exports.TypeError(arg))
 
-exports.literal = special((solver, cont, arg) -> (v, solver) ->
+exports.literal = special('literal', (solver, cont, arg) -> (v, solver) ->
   [text, pos] = solver.parse_state
   length = text.length
   if pos>=length then return solver.failcont(v, solver)
@@ -217,7 +273,7 @@ exports.literal = special((solver, cont, arg) -> (v, solver) ->
     else solver.failcont(false, solver))
 
 
-exports.quoteString = special((solver, cont, quote) -> (v, solver) ->
+exports.quoteString = special('quoteString', (solver, cont, quote) -> (v, solver) ->
   string = ''
   [text, pos] = solver.parse_state
   length = text.length
