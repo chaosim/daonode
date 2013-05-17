@@ -10,14 +10,14 @@ exports.debug = debug = (items...) ->
                 if s=='[object Object]' then JSON.stringify(x) else s
               else '[Function]') )...)
 
-done =(v, solver) -> console.log("succeed!"); solver.done = true; [null, solver.trail.getvalue(v), solver]
+exports.done = done =(v, solver) -> console.log("succeed!"); solver.done = true; [null, solver.trail.getvalue(v), solver]
 
-faildone =(v, solver) -> console.log("fail!"); solver.done = true;  [null, solver.trail.getvalue(v), solver]
+exports.faildone = faildone =(v, solver) -> console.log("fail!"); solver.done = true;  [null, solver.trail.getvalue(v), solver]
 
-exports.solve = (exp, trail=new exports.Trail, cont = done, failcont = faildone) ->
-  new exports.Solver(trail, failcont).solve(exp)
+exports.solve = (exp, trail=new Trail, cont = done, failcont = faildone) ->
+  new exports.Solver(trail, failcont).solve(exp, cont)
 
-exports.solver = (trail = {}, failcont = faildone, state) -> new exports.Solver(trail, failcont, state)
+exports.solver = (trail=new Trail, failcont = faildone, state) -> new exports.Solver(trail, failcont, state)
 
 class exports.Solver
   constructor: (@trail=new exports.Trail, @failcont = faildone, @state) ->
@@ -56,7 +56,7 @@ class exports.Solver
       [cont, value, solver] = cont(value, solver)
     value
 
-class exports.Trail
+Trail = class exports.Trail
   constructor: (@data={}) ->
   set: (vari, value) ->  if not @data.hasOwnProperty(vari.name) then @data[vari.name] = [vari, value]
   undo: () -> for name, pair of @data then pair[0].binding = pair[1]
@@ -146,7 +146,7 @@ exports.special = special = maker(exports.Special)
 class exports.Fun extends exports.Command
   apply_cont: (solver, cont, args) ->
     params = [args.length-1..0]
-    argsCont(solver, ((v, solver) => cont(@fun(params...), solver)), args, (params))
+    argsCont(solver, ((v, solver) => [cont, @fun(params...), solver]), args, (params))
 
 argsCont = (solver, cont, args, params) ->
   for i in [args.length-1..0] by -1

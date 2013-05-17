@@ -240,7 +240,7 @@
       return function(v1, solver) {
         return solver.expsCont(cleanup, function(v2, solver) {
           solver.protect = oldprotect;
-          return [oldprotect(fun), v1, solver];
+          return oldprotect(fun)(v1, solver);
         })(v1, solver);
       };
     };
@@ -254,16 +254,27 @@
     return result;
   });
 
+  exports.callcc = special('callcc', function(solver, cont, fun) {
+    return function(v, solver) {
+      var result;
+
+      result = fun(cont)[1];
+      solver.done = false;
+      return cont(result, solver);
+    };
+  });
+
+  exports.callfc = special('callfc', function(solver, cont, fun) {
+    return function(v, solver) {
+      var result;
+
+      result = fun(solver.failcont)[1];
+      solver.done = false;
+      return cont(result, solver);
+    };
+  });
+
   /*
-  exports.calcc = special((solver, cont, fun) ->
-    body = fun.body.subst(dict(fun.params[0], LamdaVar(fun.params[0].name)))
-    k = compiler.new_var(new il.ConstLocalVar('cont'))
-    params = (x.interlang() for x in fun.params)
-    function1 = il.Lamda([k]+params, body.cps(compiler, k))
-    k1 = compiler.new_var(new il.ConstLocalVar('cont'))
-    v = compiler.new_var(new il.ConstLocalVar('v'))
-    function1(cont, il.Lamda([k1, v], cont(v)))
-  
     quasiquote_args: (args) ->
       if not args then pyield []
       else if args.length is 1
@@ -276,11 +287,6 @@
             try x = x.unquote_splice
             catch e then x = [x]
             pyield x+y
-  
-    #@special
-    callfc = (compiler, cont, fun) ->
-      Todo_callfc_need_tests
-      fun(il.failcont)
   */
 
 

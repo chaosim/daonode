@@ -1,13 +1,20 @@
 I = require("../test/importer")
 
 base = "../src/"
-I.use base+"solve: Trail, solve, fun, macro proc vari debug"
+I.use base+"solve: Trail, solve, solver, fun, macro proc vari debug done faildone"
 I.use base+"builtins/general: add print_ inc dec eq le"
 I.use base+"""builtins/lisp: quote begin if_ iff eval_ block break_ continue_ assign loop_ while_ until_
-          catch_ throw_ protect
+          catch_ throw_ protect callcc callfc
           """
 
 xexports = {}
+
+xexports.Test =
+  "test assign inc dec": (test) ->
+    a = vari('a')
+    # 1.992s
+    test.equal  solve(begin(assign(a, 1),  block('a', if_(eq(a, 10000000), break_('a', a)), inc(a), continue_('a')))), 10000000
+    test.done()
 
 exports.Test =
   "test if_ iff begin": (test) ->
@@ -79,10 +86,33 @@ exports.Test =
     test.equal  solve(begin(assign(a, 1),  until_('a', print_(a), inc(a), eq(a, 5)))), null
     test.done()
 
-exports.Test =
-  "test assign inc dec": (test) ->
-    a = vari('a')
-    # 1.992s
-    test.equal  solve(begin(assign(a, 1),  block('a', if_(eq(a, 10000000), break_('a', a)), inc(a), continue_('a')))), 10000000
+  "test callcc": (test) ->
+    a = 0
+    solver1 = solver()
+    result = solver1.solve(callcc((k) ->
+      a = k;
+      test.equal(a, done);
+      test.equal(1,1);
+      k(2, solver1)))
+    test.equal result, 2
+    test.equal a(2, solver1)[1], 2
+    test.deepEqual  a(2, solver1), done(2, solver1)
     test.done()
 
+  "test callfc": (test) ->
+    a = 0
+    solver1 = solver()
+    result = solver1.solve(callfc((k) ->
+      a = k;
+      test.equal(a, faildone);
+      test.equal(1,1);
+      k(2, solver1)))
+    test.equal result, 2
+    test.equal a(2, solver1)[1], 2
+    test.deepEqual  a(2, solver1), faildone(2, solver1)
+    test.done()
+
+
+xexports.Test =
+  "test callfc": (test) ->
+    test.done()

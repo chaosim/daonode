@@ -1,6 +1,8 @@
+# lispt.coffee don't know trail, failcont, state and like.
+# lisp know cont only.
+
 _ = require('underscore')
 solve = require "../../src/solve"
-
 general = require "../../src/builtins/general"
 
 special = solve.special
@@ -132,34 +134,29 @@ exports.throw_ = special('throw_', (solver, cont, tag, form) ->
   solver.cont(tag, formCont))
 
 exports.protect = special('protect', (solver, cont, form, cleanup...) ->
-#  debug('enter protect', solver.protect, form, 'cleanup...:', cleanup)
   oldprotect = solver.protect
   solver.protect = (fun) -> (v1, solver) ->
                                solver.expsCont(cleanup, (v2, solver) ->
                                  solver.protect = oldprotect;
-                                 [oldprotect(fun), v1, solver])(v1, solver)
-#  debug('protect:', solver.protect)
-#  debug 'before cleanup'
+                                 oldprotect(fun)(v1, solver))(v1, solver)
   cleanupCont = (v1, solver) ->
-#    debug 'cleanup', v1
     solver.expsCont(cleanup, (v2, solver) ->
-#                    debug 'cont', v2
                     solver.protect = oldprotect
                     cont(v1, solver))(v1, solver)
-#  debug 'exits', solver.exits
   result = solver.cont(form, cleanupCont)
   result)
 
-###
-exports.calcc = special((solver, cont, fun) ->
-  body = fun.body.subst(dict(fun.params[0], LamdaVar(fun.params[0].name)))
-  k = compiler.new_var(new il.ConstLocalVar('cont'))
-  params = (x.interlang() for x in fun.params)
-  function1 = il.Lamda([k]+params, body.cps(compiler, k))
-  k1 = compiler.new_var(new il.ConstLocalVar('cont'))
-  v = compiler.new_var(new il.ConstLocalVar('v'))
-  function1(cont, il.Lamda([k1, v], cont(v)))
+exports.callcc = special('callcc', (solver, cont, fun) -> (v, solver) ->
+  result = fun(cont)[1]
+  solver.done = false
+  cont(result, solver))
 
+exports.callfc = special('callfc', (solver, cont, fun) -> (v, solver) ->
+  result = fun(solver.failcont)[1]
+  solver.done = false
+  cont(result, solver))
+
+###
   quasiquote_args: (args) ->
     if not args then pyield []
     else if args.length is 1
@@ -172,10 +169,4 @@ exports.calcc = special((solver, cont, fun) ->
           try x = x.unquote_splice
           catch e then x = [x]
           pyield x+y
-
-  #@special
-  callfc = (compiler, cont, fun) ->
-    Todo_callfc_need_tests
-    fun(il.failcont)
-
   ###
