@@ -1,7 +1,9 @@
 _ = require('underscore')
-I = require("f:/node-utils/src/importer")
-base = "f:/daonode/src/"
-I.use base+"solve: Trail, solve, Var,  ExpressionError, TypeError, special"
+
+solve = require "../../src/solve"
+
+[Trail, solve, Var,  ExpressionError, TypeError, special] = (solve[name]  for name in\
+"Trail, solve, Var,  ExpressionError, TypeError, special".split(", "))
 
 exports.parse = special('parse', (solver, cont, exp, state) -> (v, solver) ->
   old_state = solver.state

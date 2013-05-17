@@ -2,10 +2,9 @@
 *.html
 .DS_Store
 .git*
-Cakefile
-documentation/
+.idea
+doc/
 examples/
-extras/coffee-script.js
 raw/
 src/
 test/

@@ -1,5 +1,7 @@
 _ = require('underscore')
 
+exports.x = x = 1
+
 exports.debug = debug = (items...) ->
   console.log((
       (for x in items
@@ -36,7 +38,7 @@ class exports.Solver
     if not catches? or catches.length is 0 then throw new NotCatched
     catches[catches.length-1]
 
-  protect: (fun) -> (v, solver) -> [fun, v, solver]
+  protect: (fun) -> fun #(v, solver) -> [fun, v, solver]
 
   cont: (exp, cont = done) -> exp?.cont?(@, cont) or ((v, solver) -> cont(exp, solver))
 
@@ -123,16 +125,12 @@ Command = class exports.Command
   @done = (v, solver) -> (solver.done = true; [null, solver.trail.getvalue(v), solver])
   @faildone = (v, solver) -> (solver.done = true; [null, solver.trail.getvalue(v), solver])
   constructor: (@fun, @name) ->
-#    debug 'enter command constructor a321455665'
     @callable = (args...) =>
-      if @name is 'a' then debug 'enter command callable'
       applied = exports.apply(@, args)
       if Command.directRun
-        fc = solver.failcont
-        folver.failcont = command.faildone
-        [cont, reuslt, solver] = Command.globalSolver.solve(applied, done)
-        solver.failcont = fc
-        solver.done = false
+        result = Command.globalSolver.solve(applied, Command.done)
+        Command.globalSolver.done = false
+        result
       else applied
 
   register: (exports) -> exports[@name] = @callable
@@ -143,17 +141,18 @@ maker = (klass) -> (name_or_fun, fun) -> (if fun? then new klass(fun, name_or_fu
 class exports.Special extends exports.Command
   apply_cont: (solver, cont, args) -> @fun(solver, cont, args...)
 
-exports.special = maker(exports.Special)
+exports.special = special = maker(exports.Special)
 
 class exports.Fun extends exports.Command
   apply_cont: (solver, cont, args) ->
-    length = args.length
-    params = (i for i in [0...length])
-    cont = do (cont=cont) => (caller, solver) => cont(@fun(params...), solver)
-    for i in [length-1..0] by -1
-      cont = do (i=i, cont=cont) ->
-        solver.cont(args[i], (v, solver) ->  (params[i] = v; cont(null, solver)))
-    cont
+    params = [args.length-1..0]
+    argsCont(solver, ((v, solver) => cont(@fun(params...), solver)), args, (params))
+
+argsCont = (solver, cont, args, params) ->
+  for i in [args.length-1..0] by -1
+    cont = do (i=i, cont=cont) ->
+      solver.cont(args[i], (v, solver) ->  (params[i] = v; cont(null, solver)))
+  cont
 
 exports.fun = maker(exports.Fun)
 
@@ -162,18 +161,21 @@ class exports.Macro extends exports.Command
 
 exports.macro = maker(exports.Macro)
 
-class exports.Rule extends exports.Command
-  apply_cont:  (solver, cont, args) =>
-    debug 'enter rule apply_con'
-    throw 'dasffa'
-    (v, solver) ->
-      debug 'enter rule apply_cont run'
+class exports.Proc extends exports.Command
+  apply_cont:  (solver, cont, args) ->
+    (v, solver) =>
+      Command.directRun = true
       savedSolver = Command.globalSolver
       Command.globalSolver = solver
-      throw 'dasffa'
       result = @fun(args...)
       Command.globalSolver = savedSolver
-      throw 'dasffa'
+      Command.directRun = false
       [cont, result, solver]
 
-exports.rule = maker(exports.Rule)
+exports.proc = maker(exports.Proc)
+
+exports.tofun = (name, macro) ->
+  unless macro? then (macro = name; name = 'unnameFun')
+  special(name, (solver, cont, args...) ->
+    params = []
+    argsCont(solver,((v, solver) -> [solver.cont(macro(params...), cont), v, solver]), args, params))

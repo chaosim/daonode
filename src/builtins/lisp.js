@@ -48,9 +48,9 @@
     else_cont = solver.cont(else_, cont);
     return solver.cont(test, function(v, solver) {
       if (v) {
-        return [then_cont, v, solver];
+        return then_cont(v, solver);
       } else {
-        return [else_cont, v, solver];
+        return else_cont(v, solver);
       }
     });
   };
@@ -146,7 +146,7 @@
     }
     exitCont = exits[exits.length - 1];
     return solver.cont(value, function(v, solver) {
-      return [solver.protect(exitCont), v, solver];
+      return solver.protect(exitCont)(v, solver);
     });
   });
 

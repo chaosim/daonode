@@ -1,5 +1,6 @@
 _ = require('underscore')
 solve = require "../../src/solve"
+
 general = require "../../src/builtins/general"
 
 special = solve.special
@@ -21,8 +22,8 @@ if_fun = (solver, cont, test, then_, else_) ->
   then_cont = solver.cont(then_, cont)
   else_cont = solver.cont(else_, cont)
   solver.cont(test, (v, solver) ->
-    if (v) then [then_cont, v, solver]
-    else [else_cont, v, solver])
+    if (v) then then_cont(v, solver)
+    else else_cont(v, solver))
 
 exports.if_ = special('if_', if_fun)
 
@@ -85,7 +86,9 @@ exports.break_ = break_ = special('break_', (solver, cont, label='', value=null)
   if not exits or exits==[] then throw Error(label)
   exitCont = exits[exits.length-1]
   solver.cont(value, (v, solver) ->
-    [solver.protect(exitCont), v, solver]))
+#    [solver.protect(exitCont), v, solver]))
+    solver.protect(exitCont)(v, solver)))
+#    exitCont(v, solver)))
 
 exports.continue_ = continue_ = special('continue_', (solver, cont, label='') ->
   continues = solver.continues[label]
@@ -95,6 +98,9 @@ exports.continue_ = continue_ = special('continue_', (solver, cont, label='') ->
   continueCont = continues[continues.length-1]
   (v, solver) ->
     [solver.protect(continueCont[0]), v, solver])
+#    [continueCont[0], v, solver])
+#    solver.protect(continueCont[0])(v, solver))
+#    continueCont[0](v, solver))
 
 not_ = general.not_
 

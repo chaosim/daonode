@@ -1,6 +1,6 @@
-I = require("f:/node-utils/src/importer")
+I = require "../test/importer"
 
-base = "f:/daonode/src/"
+base = "../src/"
 I.use base+"solve: Trail, solve, fun, macro vari debug"
 I.use base+"builtins/lisp: begin"
 I.use base+"builtins/logic: andp orp notp succeed fail unify findall once"
@@ -10,13 +10,12 @@ xexports = {}
 
 #debug 4555454
 
-xexports.Test =
+exports.Test =
   "test may char": (test) ->
     test.equal  solve(parsetext(may(char('a')), 'a')), null
 #    test.equal  solve(parsetext(may(char('a')), 'b')), false
     test.done()
 
-xexports.Test2 =
   "test greedyany": (test) ->
     test.equal  solve(parsetext(greedyany(char('a')), 'a')), false
     test.equal  solve(parsetext(greedyany(char('a')), 'aa')), false
@@ -30,7 +29,6 @@ xexports.Test2 =
 #    test.equal  solve(parsetext(andp(char('a'), char('b')), 'ab')), 2
     test.done()
 
-xexports.Test2 =
   "test any": (test) ->
 #    test.equal  solve(parsetext(any(char('a')), 'a')), false
 #    test.equal  solve(parsetext(any(char('a')), 'aa')), false
@@ -43,10 +41,4 @@ xexports.Test2 =
 #    test.equal  solve(parsetext(any(char('a')), 'aa')), false
     test.equal  solve(parsetext(lazyany(char('a')), 'b')), null
     test.equal  solve(parsetext(begin(lazyany(char('a')), eoi), 'b')), null
-    test.done()
-
-exports.Test2 =
-  "test lazyany": (test) ->
-    m = macro('a', ->)
-    m()
     test.done()
