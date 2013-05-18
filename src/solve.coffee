@@ -42,6 +42,8 @@ class exports.Solver
 
   cont: (exp, cont = done) -> exp?.cont?(@, cont) or ((v, solver) -> cont(exp, solver))
 
+  quasiquote: (exp, cont) -> exp?.quasiquote?(@, cont) or ((v, solver) -> cont(exp, solver))
+
   expsCont: (exps, cont) ->
     length = exps.length
     if length is 0 then throw exports.TypeError(exps)
@@ -116,7 +118,28 @@ class exports.Apply
   constructor: (@caller, @args) ->
 
   toString: -> "#{@caller}(#{@args.join(', ')})"
+
   cont: (solver, cont) -> @caller.apply_cont(solver, cont, @args)
+
+  quasiquote:  (solver, cont) ->
+    if @caller.name is "unquote"
+      return  solver.cont(@args[0], (v, solver) -> cont(v, solver))
+    else if @caller.name is "unquoteSlice"
+      return solver.cont(@args[0], (v, solver) -> cont(new UnquoteSliceValue(v), solver))
+    params = []
+    cont = do (cont=cont) => ((v, solver) => [cont, new @constructor(@caller, params), solver])
+    args = @args
+    for i in [args.length-1..0] by -1
+      cont = do (i=i, cont=cont) ->
+        solver.quasiquote(args[i], (v, solver) ->
+          if v instanceof UnquoteSliceValue
+            for x in v.value then params.push x
+          else params.push(v);
+          cont(null, solver))
+    cont
+
+UnquoteSliceValue = class exports.UnquoteSliceValue
+  constructor: (@value) ->
 
 exports.apply = (caller, args) -> new exports.Apply(caller, args)
 

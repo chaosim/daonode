@@ -274,21 +274,17 @@
     };
   });
 
-  /*
-    quasiquote_args: (args) ->
-      if not args then pyield []
-      else if args.length is 1
-        for x in @quasiquote(args[0])
-          try pyield x.unquote_splice
-          catch e then pyield [x]
-      else
-        for x in @quasiquote(args[0])
-          for y in @quasiquote_args(args[1..])
-            try x = x.unquote_splice
-            catch e then x = [x]
-            pyield x+y
-  */
+  exports.quasiquote = exports.qq = special('quasiquote', function(solver, cont, item) {
+    return typeof solver.quasiquote === "function" ? solver.quasiquote(item, cont) : void 0;
+  });
 
+  exports.unquote = exports.uq = special('unquote', function(solver, cont, item) {
+    throw "unquote: too many unquote and unquoteSlice";
+  });
+
+  exports.unquoteSlice = exports.uqs = special('unquoteSlice', function(solver, cont, item) {
+    throw "unquoteSlice: too many unquote and unquoteSlice";
+  });
 
 }).call(this);
 

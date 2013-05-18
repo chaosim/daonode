@@ -156,17 +156,11 @@ exports.callfc = special('callfc', (solver, cont, fun) -> (v, solver) ->
   solver.done = false
   cont(result, solver))
 
-###
-  quasiquote_args: (args) ->
-    if not args then pyield []
-    else if args.length is 1
-      for x in @quasiquote(args[0])
-        try pyield x.unquote_splice
-        catch e then pyield [x]
-    else
-      for x in @quasiquote(args[0])
-        for y in @quasiquote_args(args[1..])
-          try x = x.unquote_splice
-          catch e then x = [x]
-          pyield x+y
-  ###
+exports.quasiquote = exports.qq = special('quasiquote', (solver, cont, item) ->
+  solver.quasiquote?(item, cont))
+
+exports.unquote = exports.uq = special('unquote', (solver, cont, item) ->
+  throw "unquote: too many unquote and unquoteSlice" )
+
+exports.unquoteSlice = exports.uqs = special('unquoteSlice', (solver, cont, item) ->
+  throw "unquoteSlice: too many unquote and unquoteSlice")
