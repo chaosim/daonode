@@ -69,75 +69,82 @@
   });
 
   exports.eq = special('eq', function(solver, cont, x, y) {
-    var ycont;
+    var xcont, ycont, _ycont;
 
-    ycont = solver.cont(y, function(v, solver) {
+    _ycont = function(v, solver) {
       return cont(x === v, solver);
-    });
-    return solver.cont(x, function(v, solver) {
+    };
+    ycont = solver.cont(y, _ycont);
+    xcont = function(v, solver) {
       x = v;
       return ycont(null, solver);
-    });
+    };
+    return solver.cont(x, xcont);
   });
 
   exports.ne = special('ne', function(solver, cont, x, y) {
-    var ycont;
+    var xcont, ycont;
 
     ycont = solver.cont(y, function(v, solver) {
       return cont(x !== v, solver);
     });
-    return solver.cont(x, function(v, solver) {
+    xcont = function(v, solver) {
       x = v;
       return ycont(null, solver);
-    });
+    };
+    return solver.cont(x, xcont);
   });
 
   exports.lt = special('lt', function(solver, cont, x, y) {
-    var ycont;
-
-    ycont = solver.cont(y, function(v, solver) {
-      return cont(x < v, solver);
-    });
-    return solver.cont(x, function(v, solver) {
-      x = v;
-      return ycont(null, solver);
-    });
-  });
-
-  exports.le = special('le', function(solver, cont, x, y) {
-    var ycont;
+    var xcont, ycont;
 
     ycont = solver.cont(y, function(v, solver) {
       return cont(x <= v, solver);
     });
-    return solver.cont(x, function(v, solver) {
+    xcont = function(v, solver) {
       x = v;
       return ycont(null, solver);
+    };
+    return solver.cont(x, xcont);
+  });
+
+  exports.le = special('le', function(solver, cont, x, y) {
+    var xcont, ycont;
+
+    ycont = solver.cont(y, function(v, solver) {
+      return cont(x <= v, solver);
     });
+    xcont = function(v, solver) {
+      x = v;
+      return ycont(null, solver);
+    };
+    return solver.cont(x, xcont);
   });
 
   exports.gt = special('gt', function(solver, cont, x, y) {
-    var ycont;
+    var xcont, ycont;
 
     ycont = solver.cont(y, function(v, solver) {
       return cont(x > v, solver);
     });
-    return solver.cont(x, function(v, solver) {
+    xcont = function(v, solver) {
       x = v;
       return ycont(null, solver);
-    });
+    };
+    return solver.cont(x, xcont);
   });
 
   exports.ge = special('ge', function(solver, cont, x, y) {
-    var ycont;
+    var xcont, ycont;
 
     ycont = solver.cont(y, function(v, solver) {
       return cont(x >= v, solver);
     });
-    return solver.cont(x, function(v, solver) {
+    xcont = function(v, solver) {
       x = v;
       return ycont(null, solver);
-    });
+    };
+    return solver.cont(x, xcont);
   });
 
   exports.inc = special('inc', function(solver, cont, vari) {

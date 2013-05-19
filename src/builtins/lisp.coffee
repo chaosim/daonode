@@ -94,7 +94,7 @@ exports.break_ = break_ = special('break_', (solver, cont, label='', value=null)
   if not exits or exits==[] then throw Error(label)
   exitCont = exits[exits.length-1]
   valCont = (v, solver) -> solver.protect(exitCont)(v, solver)
-  solver.cont(value, valCont)
+  solver.cont(value, valCont))
 
 exports.continue_ = continue_ = special('continue_', (solver, cont, label='') ->
   continues = solver.continues[label]
@@ -118,17 +118,16 @@ exports.until_ = macro('until_', (label,body..., test) ->
    block(label, body...))
 
 exports.catch_ = special('catch_', (solver, cont, tag, forms...) ->
-  solver.cont(tag, (v, solver) ->
+  tagCont = (v, solver) ->
     solver.pushCatch(v, cont)
-#    debug 'catch', v
     formsCont = solver.expsCont(forms, (v2, solver) -> solver.popCatch(v); [cont, v2, solver])
-    [formsCont, v, solver]))
+    [formsCont, v, solver]
+  solver.cont(tag, tagCont))
 
 exports.throw_ = special('throw_', (solver, cont, tag, form) ->
-#  debug  1233
-  formCont =  (v, solver) -> solver.cont(form, (v2, solver) ->
-#    debug 'throw', v, v2
-    solver.protect(solver.findCatch(v))(v2, solver))(v, solver)
+  formCont =  (v, solver) ->
+    solver.cont(form, (v2, solver) ->
+      solver.protect(solver.findCatch(v))(v2, solver))(v, solver)
   solver.cont(tag, formCont))
 
 exports.protect = special('protect', (solver, cont, form, cleanup...) ->

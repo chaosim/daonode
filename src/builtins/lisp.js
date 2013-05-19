@@ -158,9 +158,10 @@
       throw Error(label);
     }
     exitCont = exits[exits.length - 1];
-    return valCont = solver.cont(value, function(v, solver) {
+    valCont = function(v, solver) {
       return solver.protect(exitCont)(v, solver);
-    });
+    };
+    return solver.cont(value, valCont);
   });
 
   exports.continue_ = continue_ = special('continue_', function(solver, cont, label) {
@@ -218,10 +219,10 @@
   });
 
   exports.catch_ = special('catch_', function() {
-    var cont, forms, solver, tag;
+    var cont, forms, solver, tag, tagCont;
 
     solver = arguments[0], cont = arguments[1], tag = arguments[2], forms = 4 <= arguments.length ? __slice.call(arguments, 3) : [];
-    return solver.cont(tag, function(v, solver) {
+    tagCont = function(v, solver) {
       var formsCont;
 
       solver.pushCatch(v, cont);
@@ -230,7 +231,8 @@
         return [cont, v2, solver];
       });
       return [formsCont, v, solver];
-    });
+    };
+    return solver.cont(tag, tagCont);
   });
 
   exports.throw_ = special('throw_', function(solver, cont, tag, form) {

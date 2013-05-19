@@ -136,7 +136,7 @@
     };
 
     Solver.prototype.argsCont = function(args, cont) {
-      var i, length, params, solver, _i, _ref;
+      var arg0, arg1, arg2, arg3, arg4, arg5, cont0, cont1, cont2, cont3, cont4, cont5, cont6, i, length, params, solver, _cont1, _cont2, _cont3, _cont4, _cont5, _cont6, _i, _ref;
 
       length = args.length;
       solver = this;
@@ -146,83 +146,177 @@
             return cont([], solver);
           };
         case 1:
-          return solver.cont(args[0], function(arg0, solver) {
-            return cont([arg0], solver);
-          });
+          cont0 = function(v, solver) {
+            return cont([v], solver);
+          };
+          return solver.cont(args[0], cont0);
         case 2:
-          return solver.cont(args[0], function(arg0, solver) {
-            return solver.cont(args[1], function(arg1, solver) {
-              return cont([arg0, arg1], solver);
-            })(null, solver);
-          });
+          arg0 = null;
+          _cont1 = function(arg1, solver) {
+            return cont([arg0, arg1], solver);
+          };
+          cont1 = solver.cont(args[1], _cont1);
+          cont0 = function(v, solver) {
+            arg0 = v;
+            return cont1(null, solver);
+          };
+          return solver.cont(args[0], cont0);
         case 3:
-          return solver.cont(args[0], function(arg0, solver) {
-            return solver.cont(args[1], function(arg1, solver) {
-              return solver.cont(args[2], function(arg2, solver) {
-                return [cont, [arg0, arg1, arg2], solver];
-              })(null, solver);
-            })(null, solver);
-          });
+          arg0 = null;
+          arg1 = null;
+          _cont2 = function(arg2, solver) {
+            return cont([arg0, arg1, arg2], solver);
+          };
+          cont2 = solver.cont(args[2], _cont2);
+          _cont1 = function(v, solver) {
+            arg1 = v;
+            return cont2(null, solver);
+          };
+          cont1 = solver.cont(args[1], _cont1);
+          cont0 = function(v, solver) {
+            arg0 = v;
+            return cont1(null, solver);
+          };
+          return solver.cont(args[0], cont0);
         case 4:
-          return solver.cont(args[0], function(arg0, solver) {
-            return solver.cont(args[1], function(arg1, solver) {
-              return solver.cont(args[2], function(arg2, solver) {
-                return solver.cont(args[3], function(arg3, solver) {
-                  return [cont, [arg0, arg1, arg2, arg3], solver];
-                })(null, solver);
-              })(null, solver);
-            })(null, solver);
-          });
+          arg0 = null;
+          arg1 = null;
+          arg2 = null;
+          _cont3 = function(arg3, solver) {
+            return cont([arg0, arg1, arg2, arg3], solver);
+          };
+          cont3 = solver.cont(args[3], _cont3);
+          _cont2 = function(v, solver) {
+            arg2 = v;
+            return cont3(null, solver);
+          };
+          cont2 = solver.cont(args[2], _cont2);
+          _cont1 = function(v, solver) {
+            arg1 = v;
+            return cont2(null, solver);
+          };
+          cont1 = solver.cont(args[1], _cont1);
+          cont0 = function(v, solver) {
+            arg0 = v;
+            return cont1(null, solver);
+          };
+          return solver.cont(args[0], cont0);
         case 5:
-          return solver.cont(args[0], function(arg0, solver) {
-            return solver.cont(args[1], function(arg1, solver) {
-              return solver.cont(args[2], function(arg2, solver) {
-                return solver.cont(args[3], function(arg3, solver) {
-                  return solver.cont(args[4], function(arg4, solver) {
-                    return [cont, [arg0, arg1, arg2, arg3, arg4], solver];
-                  })(null, solver);
-                })(null, solver);
-              })(null, solver);
-            })(null, solver);
-          });
+          arg0 = null;
+          arg1 = null;
+          arg2 = null;
+          arg3 = null;
+          _cont4 = function(arg4, solver) {
+            return cont([arg0, arg1, arg2, arg3, arg4], solver);
+          };
+          cont4 = solver.cont(args[4], _cont4);
+          _cont3 = function(v, solver) {
+            arg3 = v;
+            return cont4(null, solver);
+          };
+          cont3 = solver.cont(args[3], _cont3);
+          _cont2 = function(v, solver) {
+            arg2 = v;
+            return cont3(null, solver);
+          };
+          cont2 = solver.cont(args[2], _cont2);
+          _cont1 = function(v, solver) {
+            arg1 = v;
+            return cont2(null, solver);
+          };
+          cont1 = solver.cont(args[1], _cont1);
+          cont0 = function(v, solver) {
+            arg0 = v;
+            return cont1(null, solver);
+          };
+          return solver.cont(args[0], cont0);
         case 6:
-          return solver.cont(args[0], function(arg0, solver) {
-            return solver.cont(args[1], function(arg1, solver) {
-              return solver.cont(args[2], function(arg2, solver) {
-                return solver.cont(args[3], function(arg3, solver) {
-                  return solver.cont(args[4], function(arg4, solver) {
-                    return solver.cont(args[5], function(arg5, solver) {
-                      return [cont, [arg0, arg1, arg2, arg3, arg4, arg5], solver];
-                    })(null, solver);
-                  })(null, solver);
-                })(null, solver);
-              })(null, solver);
-            })(null, solver);
-          });
+          arg0 = null;
+          arg1 = null;
+          arg2 = null;
+          arg3 = null;
+          arg4 = null;
+          _cont5 = function(arg5, solver) {
+            return cont([arg0, arg1, arg2, arg3, arg4, arg5], solver);
+          };
+          cont5 = solver.cont(args[5], _cont5);
+          _cont4 = function(v, solver) {
+            arg4 = v;
+            return cont5(null, solver);
+          };
+          cont4 = solver.cont(args[4], _cont4);
+          _cont3 = function(v, solver) {
+            arg3 = v;
+            return cont4(null, solver);
+          };
+          cont3 = solver.cont(args[3], _cont3);
+          _cont2 = function(v, solver) {
+            arg2 = v;
+            return cont3(null, solver);
+          };
+          cont2 = solver.cont(args[2], _cont2);
+          _cont1 = function(v, solver) {
+            arg1 = v;
+            return cont2(null, solver);
+          };
+          cont1 = solver.cont(args[1], _cont1);
+          cont0 = function(v, solver) {
+            arg0 = v;
+            return cont1(null, solver);
+          };
+          return solver.cont(args[0], cont0);
         case 7:
-          return solver.cont(args[0], function(arg0, solver) {
-            return solver.cont(args[1], function(arg1, solver) {
-              return solver.cont(args[2], function(arg2, solver) {
-                return solver.cont(args[3], function(arg3, solver) {
-                  return solver.cont(args[4], function(arg4, solver) {
-                    return solver.cont(args[5], function(arg5, solver) {
-                      return solver.cont(args[6], function(arg6, solver) {
-                        return [cont, [arg0, arg1, arg2, arg3, arg4, arg5, arg6], solver];
-                      })(null, solver);
-                    })(null, solver);
-                  })(null, solver);
-                })(null, solver);
-              })(null, solver);
-            })(null, solver);
-          });
+          arg0 = null;
+          arg1 = null;
+          arg2 = null;
+          arg3 = null;
+          arg4 = null;
+          arg5 = null;
+          _cont6 = function(arg6, solver) {
+            return cont([arg0, arg1, arg2, arg3, arg4, arg5, arg6], solver);
+          };
+          cont6 = solver.cont(args[6], _cont6);
+          _cont5 = function(v, solver) {
+            arg5 = v;
+            return cont6(null, solver);
+          };
+          cont5 = solver.cont(args[5], _cont5);
+          _cont4 = function(v, solver) {
+            arg4 = v;
+            return cont5(null, solver);
+          };
+          cont4 = solver.cont(args[4], _cont4);
+          _cont3 = function(v, solver) {
+            arg3 = v;
+            return cont4(null, solver);
+          };
+          cont3 = solver.cont(args[3], _cont3);
+          _cont2 = function(v, solver) {
+            arg2 = v;
+            return cont3(null, solver);
+          };
+          cont2 = solver.cont(args[2], _cont2);
+          _cont1 = function(v, solver) {
+            arg1 = v;
+            return cont2(null, solver);
+          };
+          cont1 = solver.cont(args[1], _cont1);
+          cont0 = function(v, solver) {
+            arg0 = v;
+            return cont1(null, solver);
+          };
+          return solver.cont(args[0], cont0);
         default:
           params = [];
           for (i = _i = _ref = args.length - 1; _i >= 0; i = _i += -1) {
             cont = (function(i, cont) {
-              return solver.cont(args[i], function(argi, solver) {
+              var _cont;
+
+              _cont = function(argi, solver) {
                 params.push(argi);
                 return cont(params, solver);
-              });
+              };
+              return solver.cont(args[i], _cont);
             })(i, cont);
           }
           return cont;

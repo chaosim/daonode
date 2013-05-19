@@ -36,7 +36,7 @@ class exports.Solver
     if not catches? or catches.length is 0 then throw new NotCatched
     catches[catches.length-1]
 
-  protect: (fun) -> fun #(v, solver) -> [fun, v, solver]
+  protect: (fun) -> fun
 
   cont: (exp, cont) -> exp?.cont?(@, cont) or ((v, solver) -> cont(exp, solver))
 
@@ -55,51 +55,80 @@ class exports.Solver
       when 0
         (v, solver) -> cont([], solver)
       when 1
-        solver.cont(args[0], (arg0, solver) -> cont([arg0], solver))
+        cont0 = (v, solver) -> cont([v], solver)
+        solver.cont(args[0],cont0)
       when 2
-        solver.cont(args[0], (arg0, solver) ->
-          solver.cont(args[1], (arg1, solver) -> cont([arg0, arg1], solver))(
-            null, solver))
+        arg0 = null
+        _cont1 = (arg1, solver) -> cont([arg0, arg1], solver)
+        cont1 = solver.cont(args[1], _cont1)
+        cont0 = (v, solver) -> arg0 = v; cont1(null, solver)
+        solver.cont(args[0], cont0)
       when 3
-        solver.cont(args[0], (arg0, solver) ->
-          solver.cont(args[1], (arg1, solver) ->
-            solver.cont(args[2], (arg2, solver) -> [cont, [arg0, arg1, arg2], solver])(
-              null, solver))(null, solver))
+        arg0 = null; arg1 = null
+        _cont2 = (arg2, solver) -> cont([arg0, arg1, arg2], solver)
+        cont2 = solver.cont(args[2], _cont2)
+        _cont1 = (v, solver) -> arg1 = v; cont2(null, solver)
+        cont1 = solver.cont(args[1], _cont1)
+        cont0 = (v, solver) -> arg0 = v; cont1(null, solver)
+        solver.cont(args[0], cont0)
       when 4
-        solver.cont(args[0], (arg0, solver) ->
-          solver.cont(args[1], (arg1, solver) ->
-            solver.cont(args[2], (arg2, solver) ->
-              solver.cont(args[3], (arg3, solver) -> [cont, [arg0, arg1, arg2, arg3], solver])(
-                null, solver))(null, solver))(null, solver))
+        arg0 = null; arg1 = null; arg2 = null
+        _cont3 = (arg3, solver) -> cont([arg0, arg1, arg2, arg3], solver)
+        cont3 = solver.cont(args[3], _cont3)
+        _cont2 = (v, solver) -> arg2 = v; cont3(null, solver)
+        cont2 = solver.cont(args[2], _cont2)
+        _cont1 = (v, solver) -> arg1 = v; cont2(null, solver)
+        cont1 = solver.cont(args[1], _cont1)
+        cont0 = (v, solver) -> arg0 = v; cont1(null, solver)
+        solver.cont(args[0], cont0)
       when 5
-        solver.cont(args[0], (arg0, solver) ->
-          solver.cont(args[1], (arg1, solver) ->
-            solver.cont(args[2], (arg2, solver) ->
-              solver.cont(args[3], (arg3, solver) ->
-                solver.cont(args[4], (arg4, solver) -> [cont, [arg0, arg1, arg2, arg3, arg4], solver])(
-                  null, solver))(null, solver))(null, solver))(null, solver))
+        arg0 = null; arg1 = null; arg2 = null; arg3 = null
+        _cont4 = (arg4, solver) -> cont([arg0, arg1, arg2, arg3, arg4], solver)
+        cont4 = solver.cont(args[4], _cont4)
+        _cont3 = (v, solver) -> arg3 = v; cont4(null, solver)
+        cont3 = solver.cont(args[3], _cont3)
+        _cont2 = (v, solver) -> arg2 = v; cont3(null, solver)
+        cont2 = solver.cont(args[2], _cont2)
+        _cont1 = (v, solver) -> arg1 = v; cont2(null, solver)
+        cont1 = solver.cont(args[1], _cont1)
+        cont0 = (v, solver) -> arg0 = v; cont1(null, solver)
+        solver.cont(args[0], cont0)
       when 6
-        solver.cont(args[0], (arg0, solver) ->
-          solver.cont(args[1], (arg1, solver) ->
-            solver.cont(args[2], (arg2, solver) ->
-              solver.cont(args[3], (arg3, solver) ->
-                solver.cont(args[4], (arg4, solver) ->
-                  solver.cont(args[5], (arg5, solver) -> [cont, [arg0, arg1, arg2, arg3, arg4, arg5], solver])(
-                    null, solver))(null, solver))(null, solver))(null, solver))(null, solver))
+        arg0 = null; arg1 = null; arg2 = null; arg3 = null; arg4 = null
+        _cont5 = (arg5, solver) -> cont([arg0, arg1, arg2, arg3, arg4, arg5], solver)
+        cont5 = solver.cont(args[5], _cont5)
+        _cont4 = (v, solver) -> arg4 = v; cont5(null, solver)
+        cont4 = solver.cont(args[4], _cont4)
+        _cont3 = (v, solver) -> arg3 = v; cont4(null, solver)
+        cont3 = solver.cont(args[3], _cont3)
+        _cont2 = (v, solver) -> arg2 = v; cont3(null, solver)
+        cont2 = solver.cont(args[2], _cont2)
+        _cont1 = (v, solver) -> arg1 = v; cont2(null, solver)
+        cont1 = solver.cont(args[1], _cont1)
+        cont0 = (v, solver) -> arg0 = v; cont1(null, solver)
+        solver.cont(args[0], cont0)
       when 7
-        solver.cont(args[0], (arg0, solver) ->
-          solver.cont(args[1], (arg1, solver) ->
-            solver.cont(args[2], (arg2, solver) ->
-              solver.cont(args[3], (arg3, solver) ->
-                solver.cont(args[4], (arg4, solver) ->
-                  solver.cont(args[5], (arg5, solver) ->
-                    solver.cont(args[6], (arg6, solver) -> [cont, [arg0, arg1, arg2, arg3, arg4, arg5, arg6], solver])(
-                      null, solver))(null, solver))(null, solver))(null, solver))(null, solver))(null, solver))
+        arg0 = null; arg1 = null; arg2 = null; arg3 = null; arg4 = null; arg5 = null
+        _cont6 = (arg6, solver) -> cont([arg0, arg1, arg2, arg3, arg4, arg5, arg6], solver)
+        cont6 = solver.cont(args[6], _cont6)
+        _cont5 = (v, solver) -> arg5 = v; cont6(null, solver)
+        cont5 = solver.cont(args[5], _cont5)
+        _cont4 = (v, solver) -> arg4 = v; cont5(null, solver)
+        cont4 = solver.cont(args[4], _cont4)
+        _cont3 = (v, solver) -> arg3 = v; cont4(null, solver)
+        cont3 = solver.cont(args[3], _cont3)
+        _cont2 = (v, solver) -> arg2 = v; cont3(null, solver)
+        cont2 = solver.cont(args[2], _cont2)
+        _cont1 = (v, solver) -> arg1 = v; cont2(null, solver)
+        cont1 = solver.cont(args[1], _cont1)
+        cont0 = (v, solver) -> arg0 = v; cont1(null, solver)
+        solver.cont(args[0], cont0)
       else
         params = []
         for i in [args.length-1..0] by -1
           cont = do (i=i, cont=cont) ->
-            solver.cont(args[i], (argi, solver) ->  (params.push(argi); cont(params, solver)))
+            _cont = (argi, solver) ->  (params.push(argi); cont(params, solver))
+            solver.cont(args[i], _cont)
         cont
 
   solve: (exp, cont = done) ->

@@ -1,3 +1,5 @@
+_ = require "underscore"
+
 I = require("../test/importer")
 
 base = "../src/"
@@ -12,11 +14,11 @@ xexports = {}
 exports.Test =
   "test assign inc dec": (test) ->
     a = vari('a')
-    #3.772s    ---> 1.274s: see git log
+    #3.772s    ---> 1.274s: see git log  -> 1.242s
     test.equal  solve(begin(assign(a, 1),  block('a', if_(eq(a, 10000000), break_('a', a)), inc(a), continue_('a')))), 10000000
     test.done()
 
-xexports.Test =
+exports.Test =
   "test if_ iff begin": (test) ->
     test.equal  solve(begin(1)), 1
     test.equal  solve(begin(1, 2)), 2
@@ -119,4 +121,18 @@ xexports.Test =
     test.deepEqual solve(qq(uq(a))), 3
     test.deepEqual solve(qq(uqs([1,2]))), new UnquoteSliceValue([1,2])
     test.deepEqual solve(qq(add(uqs([1,2])))), a
+    test.done()
+
+  "test argsCont": (test) ->
+    f = (args...) ->_.map(args, (x) -> x+1)
+    df = fun(f)
+    test.deepEqual  solve(df(1)), [2]
+    test.deepEqual  solve(df(1, 2)), [2, 3]
+    test.deepEqual  solve(df(1, 2, 3)), [2, 3, 4]
+    test.deepEqual  solve(df(1, 2, 3, 4)), [2, 3, 4, 5]
+    test.deepEqual  solve(df(1, 2, 3, 4, 5)), [2, 3, 4, 5, 6]
+    test.deepEqual  solve(df(1, 2, 3, 4, 5, 6)), [2, 3, 4, 5, 6, 7]
+    test.deepEqual  solve(df(1, 2, 3, 4, 5, 6, 7)), [2, 3, 4, 5, 6, 7, 8]
+    test.deepEqual  solve(df(1, 2, 3, 4, 5, 6, 7, 8)), [2, 3, 4, 5, 6, 7, 8, 9]
+    test.deepEqual  solve(df(1, 2, 3, 4, 5, 6, 7, 8, 9)), [2, 3, 4, 5, 6, 7, 8, 9, 10]
     test.done()
