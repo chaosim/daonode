@@ -42,33 +42,35 @@
   });
 
   if_fun = function(solver, cont, test, then_, else_) {
-    var else_cont, then_cont;
+    var action, else_cont, then_cont;
 
     then_cont = solver.cont(then_, cont);
     if (else_ != null) {
       else_cont = solver.cont(else_, cont);
-      return solver.cont(test, function(v, solver) {
+      action = function(v, solver) {
         if (v) {
           return then_cont(v, solver);
         } else {
           return else_cont(v, solver);
         }
-      });
+      };
+      return solver.cont(test, action);
     } else {
-      return solver.cont(test, function(v, solver) {
+      action = function(v, solver) {
         if (v) {
           return then_cont(null, solver);
         } else {
           return cont(null, solver);
         }
-      });
+      };
+      return solver.cont(test, action);
     }
   };
 
   exports.if_ = special('if_', if_fun);
 
   iff_fun = function(solver, cont, clauses, else_) {
-    var iff_else_cont, length, test, then_, then_cont, _ref, _ref1;
+    var action, iff_else_cont, length, test, then_, then_cont, _ref, _ref1;
 
     length = clauses.length;
     if (length === 0) {
@@ -80,13 +82,14 @@
       _ref1 = clauses[0], test = _ref1[0], then_ = _ref1[1];
       then_cont = solver.cont(then_, cont);
       iff_else_cont = iff_fun(solver, cont, clauses.slice(1), else_);
-      return solver.cont(test, function(v, solver) {
+      action = function(v, solver) {
         if (v) {
           return [then_cont, v, solver];
         } else {
           return [iff_else_cont, v, solver];
         }
-      });
+      };
+      return solver.cont(test, action);
     }
   };
 
@@ -135,7 +138,7 @@
   });
 
   exports.break_ = break_ = special('break_', function(solver, cont, label, value) {
-    var exitCont, exits;
+    var exitCont, exits, valCont;
 
     if (label == null) {
       label = '';
@@ -155,7 +158,7 @@
       throw Error(label);
     }
     exitCont = exits[exits.length - 1];
-    return solver.cont(value, function(v, solver) {
+    return valCont = solver.cont(value, function(v, solver) {
       return solver.protect(exitCont)(v, solver);
     });
   });

@@ -27,13 +27,15 @@ if_fun = (solver, cont, test, then_, else_) ->
   then_cont = solver.cont(then_, cont)
   if else_?
     else_cont = solver.cont(else_, cont)
-    solver.cont(test, (v, solver) ->
+    action = (v, solver) ->
       if (v) then then_cont(v, solver)
-      else else_cont(v, solver))
+      else else_cont(v, solver)
+    solver.cont(test, action)
   else
-    solver.cont(test, (v, solver) ->
+    action =  (v, solver) ->
       if (v) then then_cont(null, solver)
-      else cont(null, solver))
+      else cont(null, solver)
+    solver.cont(test, action)
 
 exports.if_ = special('if_', if_fun)
 
@@ -47,9 +49,10 @@ iff_fun = (solver, cont, clauses, else_) ->
     [test, then_] = clauses[0]
     then_cont = solver.cont(then_, cont)
     iff_else_cont = iff_fun(solver, cont, clauses[1...], else_)
-    solver.cont(test, (v, solver) ->
+    action = (v, solver) ->
       if (v) then [then_cont, v, solver]
-      else [iff_else_cont, v, solver])
+      else [iff_else_cont, v, solver]
+    solver.cont(test, action)
 
 exports.iff = special('iff', iff_fun)
 
@@ -90,8 +93,8 @@ exports.break_ = break_ = special('break_', (solver, cont, label='', value=null)
   exits = solver.exits[label]
   if not exits or exits==[] then throw Error(label)
   exitCont = exits[exits.length-1]
-  solver.cont(value, (v, solver) ->
-    solver.protect(exitCont)(v, solver)))
+  valCont = (v, solver) -> solver.protect(exitCont)(v, solver)
+  solver.cont(value, valCont)
 
 exports.continue_ = continue_ = special('continue_', (solver, cont, label='') ->
   continues = solver.continues[label]
