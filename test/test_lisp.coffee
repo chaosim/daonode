@@ -9,14 +9,14 @@ I.use base+"""builtins/lisp: quote begin if_ iff eval_ block break_ continue_ as
 
 xexports = {}
 
-xexports.Test =
+exports.Test =
   "test assign inc dec": (test) ->
     a = vari('a')
     # 1.992s
     test.equal  solve(begin(assign(a, 1),  block('a', if_(eq(a, 10000000), break_('a', a)), inc(a), continue_('a')))), 10000000
     test.done()
 
-exports.Test =
+xexports.Test =
   "test if_ iff begin": (test) ->
     test.equal  solve(begin(1)), 1
     test.equal  solve(begin(1, 2)), 2
