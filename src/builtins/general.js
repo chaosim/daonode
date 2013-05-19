@@ -68,54 +68,80 @@
     return ~x;
   });
 
-  exports.lt = fun('lt', function(x, y) {
-    return x < y;
+  exports.eq = special('eq', function(solver, cont, x, y) {
+    return solver.cont(x, function(x1, solver) {
+      return solver.cont(y, function(y1, solver) {
+        return cont(x1 === y1, solver);
+      })(null, solver);
+    });
   });
 
-  exports.le = fun('le', function(x, y) {
-    return x <= y;
+  exports.ne = special('ne', function(solver, cont, x, y) {
+    return solver.cont(x, function(x1, solver) {
+      return solver.cont(y, function(y1, solver) {
+        return cont(x1 !== y1, solver);
+      })(null, solver);
+    });
   });
 
-  exports.eq = fun('eq', function(x, y) {
-    return x === y;
+  exports.lt = special('lt', function(solver, cont, x, y) {
+    return solver.cont(x, function(x1, solver) {
+      return solver.cont(y, function(y1, solver) {
+        return cont(x1 < y1, solver);
+      })(null, solver);
+    });
   });
 
-  exports.ne = fun('ne', function(x, y) {
-    return x !== y;
+  exports.le = special('le', function(solver, cont, x, y) {
+    return solver.cont(x, function(x1, solver) {
+      return solver.cont(y, function(y1, solver) {
+        return cont(x1 <= y1, solver);
+      })(null, solver);
+    });
   });
 
-  exports.ge = fun('ge', function(x, y) {
-    return x >= y;
+  exports.gt = special('gt', function(solver, cont, x, y) {
+    return solver.cont(x, function(x1, solver) {
+      return solver.cont(y, function(y1, solver) {
+        return cont(x1 > y1, solver);
+      })(null, solver);
+    });
   });
 
-  exports.gt = fun('gt', function(x, y) {
-    return x > y;
+  exports.ge = special('ge', function(solver, cont, x, y) {
+    return solver.cont(x, function(x1, solver) {
+      return solver.cont(y, function(y1, solver) {
+        return cont(x1 >= y1, solver);
+      })(null, solver);
+    });
   });
 
   exports.inc = special('inc', function(solver, cont, vari) {
     return function(v, solver) {
-      vari.binding = vari.binding + 1;
+      vari.binding++;
       return cont(vari.binding, solver);
     };
   });
 
   exports.inc2 = special('inc2', function(solver, cont, vari) {
     return function(v, solver) {
-      vari.binding = vari.binding + 2;
+      vari.binding++;
+      vari.binding++;
       return cont(vari.binding, solver);
     };
   });
 
   exports.dec = special('dec', function(solver, cont, vari) {
     return function(v, solver) {
-      vari.binding = vari.binding - 1;
+      vari.binding--;
       return cont(vari.binding, solver);
     };
   });
 
   exports.dec2 = special('dec2', function(solver, cont, vari) {
     return function(v, solver) {
-      vari.binding = vari.binding - 2;
+      vari.binding--;
+      vari.binding--;
       return cont(vari.binding, solver);
     };
   });

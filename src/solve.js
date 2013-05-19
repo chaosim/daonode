@@ -111,9 +111,6 @@
     };
 
     Solver.prototype.cont = function(exp, cont) {
-      if (cont == null) {
-        cont = done;
-      }
       return (exp != null ? typeof exp.cont === "function" ? exp.cont(this, cont) : void 0 : void 0) || (function(v, solver) {
         return cont(exp, solver);
       });
@@ -146,16 +143,16 @@
       switch (length) {
         case 0:
           return function(v, solver) {
-            return [cont, [], solver];
+            return cont([], solver);
           };
         case 1:
           return solver.cont(args[0], function(arg0, solver) {
-            return [cont, [arg0], solver];
+            return cont([arg0], solver);
           });
         case 2:
           return solver.cont(args[0], function(arg0, solver) {
             return solver.cont(args[1], function(arg1, solver) {
-              return [cont, [arg0, arg1], solver];
+              return cont([arg0, arg1], solver);
             })(null, solver);
           });
         case 3:

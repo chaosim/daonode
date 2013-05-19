@@ -12,8 +12,9 @@ xexports = {}
 exports.Test =
   "test assign inc dec": (test) ->
     a = vari('a')
-    # 1.992s
-    test.equal  solve(begin(assign(a, 1),  block('a', if_(eq(a, 10000000), break_('a', a)), inc(a), continue_('a')))), 10000000
+    #3.772s
+#    test.equal  solve(begin(assign(a, 1),  block('a', if_(eq(a, 10000000), break_('a', a)), inc(a), continue_('a')))), 10000000
+    test.equal  solve(begin(assign(a, 1),  block('a', if_(eq(a, 10000000), break_('a', a), begin(inc(a), continue_('a')))))), 10000000
     test.done()
 
 xexports.Test =

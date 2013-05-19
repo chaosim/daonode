@@ -18,26 +18,48 @@ exports.bitand = fun('bitand', (x, y) -> x&y)
 exports.bitor = fun('bitor', (x, y) -> x|y)
 exports.bitnot = fun('bitnot', (x) -> ~x)
 
-exports.lt = fun('lt', (x, y) -> x<y)
-exports.le = fun('le', (x, y) -> x<=y)
-exports.eq = fun('eq', (x, y) -> x is y)
-exports.ne = fun('ne', (x, y) -> x isnt y)
-exports.ge = fun('ge', (x, y) -> x>=y)
-exports.gt = fun('gt', (x, y) -> x>y)
+#exports.eq = fun('eq', (x, y) -> x==y)
+#exports.ne = fun('ne', (x, y) -> x!=y)
+#exports.lt = fun('lt', (x, y) -> x<y)
+#exports.le = fun('le', (x, y) -> x<=y)
+#exports.ge = fun('ge', (x, y) -> x>=y)
+#exports.gt = fun('gt', (x, y) -> x>y)
+
+# more optimized version
+exports.eq = special('eq', (solver, cont, x, y) ->
+  solver.cont(x, (x1, solver) ->
+    solver.cont(y, (y1, solver) -> cont(x1==y1, solver))(null, solver)))
+
+exports.ne = special('ne', (solver, cont, x, y) ->
+  solver.cont(x, (x1, solver) -> solver.cont(y, (y1, solver) -> cont(x1!=y1, solver))(null, solver)))
+
+exports.lt = special('lt', (solver, cont, x, y) ->
+  solver.cont(x, (x1, solver) ->
+    solver.cont(y, (y1, solver) -> cont(x1<y1, solver))(null, solver)))
+
+exports.le = special('le', (solver, cont, x, y) ->
+  solver.cont(x, (x1, solver) -> solver.cont(y, (y1, solver) -> cont(x1<=y1, solver))(null, solver)))
+
+exports.gt = special('gt', (solver, cont, x, y) ->
+  solver.cont(x, (x1, solver) ->
+    solver.cont(y, (y1, solver) -> cont(x1>y1, solver))(null, solver)))
+
+exports.ge = special('ge', (solver, cont, x, y) ->
+  solver.cont(x, (x1, solver) -> solver.cont(y, (y1, solver) -> cont(x1>=y1, solver))(null, solver)))
 
 # Because not using vari.bind, these are not saved in solver.trail and so it can NOT be restored in solver.failcont
 # EXCEPT the vari has been in solver.trail in the logic branch before.
 exports.inc = special('inc', (solver, cont, vari) ->
-  (v, solver) -> (vari.binding = vari.binding+1; cont(vari.binding, solver)))
+  (v, solver) -> (vari.binding++; cont(vari.binding, solver)))
 
 exports.inc2 = special('inc2', (solver, cont, vari) ->
-  (v, solver) -> (vari.binding = vari.binding+2; cont(vari.binding, solver)))
+  (v, solver) -> (vari.binding++; vari.binding++; cont(vari.binding, solver)))
 
 exports.dec = special('dec', (solver, cont, vari) ->
-  (v, solver) -> (vari.binding = vari.binding-1; cont(vari.binding, solver)))
+  (v, solver) -> (vari.binding--; cont(vari.binding, solver)))
 
 exports.dec2 = special('dec2', (solver, cont, vari) ->
-  (v, solver) -> (vari.binding = vari.binding-2; cont(vari.binding, solver)))
+  (v, solver) -> (vari.binding--; vari.binding--; cont(vari.binding, solver)))
 
 ###
 exports.format = new exports.BuiltinFunction('format', il.Format)

@@ -38,7 +38,7 @@ class exports.Solver
 
   protect: (fun) -> fun #(v, solver) -> [fun, v, solver]
 
-  cont: (exp, cont = done) -> exp?.cont?(@, cont) or ((v, solver) -> cont(exp, solver))
+  cont: (exp, cont) -> exp?.cont?(@, cont) or ((v, solver) -> cont(exp, solver))
 
   quasiquote: (exp, cont) -> exp?.quasiquote?(@, cont) or ((v, solver) -> cont(exp, solver))
 
@@ -53,12 +53,12 @@ class exports.Solver
     solver = @
     switch length
       when 0
-        (v, solver) -> [cont, [], solver]
+        (v, solver) -> cont([], solver)
       when 1
-        solver.cont(args[0], (arg0, solver) -> [cont, [arg0], solver])
+        solver.cont(args[0], (arg0, solver) -> cont([arg0], solver))
       when 2
         solver.cont(args[0], (arg0, solver) ->
-          solver.cont(args[1], (arg1, solver) -> [cont, [arg0, arg1], solver])(
+          solver.cont(args[1], (arg1, solver) -> cont([arg0, arg1], solver))(
             null, solver))
       when 3
         solver.cont(args[0], (arg0, solver) ->

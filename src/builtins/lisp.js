@@ -17,7 +17,7 @@
 
   exports.quote = special('quote', function(solver, cont, exp) {
     return function(v, solver) {
-      return [cont, exp, solver];
+      return cont(exp, solver);
     };
   });
 
@@ -45,14 +45,24 @@
     var else_cont, then_cont;
 
     then_cont = solver.cont(then_, cont);
-    else_cont = solver.cont(else_, cont);
-    return solver.cont(test, function(v, solver) {
-      if (v) {
-        return then_cont(v, solver);
-      } else {
-        return else_cont(v, solver);
-      }
-    });
+    if (else_ != null) {
+      else_cont = solver.cont(else_, cont);
+      return solver.cont(test, function(v, solver) {
+        if (v) {
+          return then_cont(v, solver);
+        } else {
+          return else_cont(v, solver);
+        }
+      });
+    } else {
+      return solver.cont(test, function(v, solver) {
+        if (v) {
+          return then_cont(null, solver);
+        } else {
+          return cont(null, solver);
+        }
+      });
+    }
   };
 
   exports.if_ = special('if_', if_fun);

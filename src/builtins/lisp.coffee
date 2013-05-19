@@ -10,7 +10,7 @@ macro = solve.macro
 debug = solve.debug
 
 exports.quote = special('quote', (solver, cont, exp) ->
-    (v, solver) -> [cont, exp, solver])
+    (v, solver) -> cont(exp, solver))
 
 exports.eval_ = special('eval', (solver, cont, exp) ->
   solver.cont(exp, (v, solver) -> [solver.cont(v, cont), null, solver]))
@@ -25,10 +25,15 @@ exports.begin = special('begin', (solver, cont, exps...) -> solver.expsCont(exps
 
 if_fun = (solver, cont, test, then_, else_) ->
   then_cont = solver.cont(then_, cont)
-  else_cont = solver.cont(else_, cont)
-  solver.cont(test, (v, solver) ->
-    if (v) then then_cont(v, solver)
-    else else_cont(v, solver))
+  if else_?
+    else_cont = solver.cont(else_, cont)
+    solver.cont(test, (v, solver) ->
+      if (v) then then_cont(v, solver)
+      else else_cont(v, solver))
+  else
+    solver.cont(test, (v, solver) ->
+      if (v) then then_cont(null, solver)
+      else cont(null, solver))
 
 exports.if_ = special('if_', if_fun)
 
@@ -65,16 +70,12 @@ exports.block = block = special('block', (solver, cont, label, body...) ->
   exits.push(cont)
   defaultExits = solver.exits[''] ?= []  # if no label, go here
   defaultExits.push(cont)
-#  debug 'enter block:', label, exits
-#  debug 'default exits:',defaultExits
   holder = [null]
   continues = solver.continues[label] ?= []
   continues.push(holder)
   defaultContinues = solver.continues[''] ?= []   # if no label, go here
   defaultContinues.push(holder)
-#  debug 'body:', body
   holder[0] = fun = solver.expsCont(body, cont)
-#  debug 'leave block, holder:', holder
   exits.pop()
   if exits.length is 0 then delete solver.exits[label]
   continues.pop()
@@ -87,25 +88,16 @@ exports.break_ = break_ = special('break_', (solver, cont, label='', value=null)
   if value != null and not _.isString label then throw new TypeError([label, value])
   if value is null and not _.isString label then (value = label; label = '')
   exits = solver.exits[label]
-#  debug label, exits
   if not exits or exits==[] then throw Error(label)
   exitCont = exits[exits.length-1]
   solver.cont(value, (v, solver) ->
-#    [solver.protect(exitCont), v, solver]))
     solver.protect(exitCont)(v, solver)))
-#    exitCont(v, solver)))
 
 exports.continue_ = continue_ = special('continue_', (solver, cont, label='') ->
   continues = solver.continues[label]
-#  debug 'continue', continues
-#  debug label, exits
   if not continues or continues==[] then throw Error(label)
   continueCont = continues[continues.length-1]
-  (v, solver) ->
-    [solver.protect(continueCont[0]), v, solver])
-#    [continueCont[0], v, solver])
-#    solver.protect(continueCont[0])(v, solver))
-#    continueCont[0](v, solver))
+  (v, solver) -> [solver.protect(continueCont[0]), v, solver])
 
 not_ = general.not_
 
