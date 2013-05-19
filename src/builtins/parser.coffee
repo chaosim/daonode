@@ -1,8 +1,8 @@
 _ = require('underscore')
 
-solve = require "../../src/solve"
+dao = require "../../src/solve"
 
-[Trail, solve, Var,  ExpressionError, TypeError, special] = (solve[name]  for name in\
+[Trail, solve, Var,  ExpressionError, TypeError, special] = (dao[name]  for name in\
 "Trail, solve, Var,  ExpressionError, TypeError, special".split(", "))
 
 exports.parse = special('parse', (solver, cont, exp, state) -> (v, solver) ->
@@ -52,13 +52,21 @@ exports.lefttext =  special('lefttext', (solver, cont) -> (v, solver) ->
   [text, pos] = solver.state
   cont(text[pos...], solver))
 
-exports.subtext =  exports.subsequence =  special('subtext', (solver, cont, start, end) -> (v, solver) ->
+exports.subtext =  exports.subsequence =  special('subtext', (solver, cont, length, start) -> (v, solver) ->
   [text, pos] = solver.state
-  cont(text[(start or 0)...(end or text.length)], solver))
+  start = start? or pos
+  length = length? or text.length
+  cont(text[start...start+length], solver))
 
 exports.nextchar =  special('nextchar', (solver, cont) -> (v, solver) ->
   [text, pos] = solver.state
   cont(text[pos], solver))
+
+exports.follow = special('follow', (solver, cont, item) -> (v, solver) ->
+  state = solver.state
+  solver.cont(item, (v, solver) ->
+    solver.state = state;
+    cont(v, solver))(v, solver))
 
 exports.may = special('may', (solver, cont, exp) -> (v, solver) ->
   fc = solver.failcont
@@ -97,14 +105,22 @@ exports.any = special('any', (solver, cont, exp) ->
     fc = solver.failcont
     solver.failcont = (v, solver) -> solver.failcont = fc; cont(v, solver)
     solver.cont(exp, anyCont)(v, solver)
-  anyCont                               )
+  anyCont)
 
 exports.any = special('any', (solver, cont, exp) ->
   anyCont = (v, solver) ->
     fc = solver.failcont
-    solver.failcont = (v, solver) -> solver.failcont = fc; cont(v, solver)
+    trail = solver.trail
+    solver.trail = new dao.Trail
+    state = solver.state
+    solver.failcont = (v, solver) ->
+      solver.trail.undo()
+      solver.trail = trail
+      solver.state = state
+      solver.failcont = fc
+      cont(v, solver)
     solver.cont(exp, anyCont)(v, solver)
-  anyCont                               )
+  anyCont)
 
 exports.lazyany = special('lazyany', (solver, cont, exp) -> (v, solver) ->
   fc = solver.failcont
@@ -131,28 +147,22 @@ exports.greedyany = special('greedyany', (solver, cont, exp) -> (v, solver) ->
   fc = solver.failcont
   anyCont = (v, solver) ->
     solver.failcont = (v, solver) ->  solver.failcont = fc; cont(v, solver)
-    solver.cont(exp, anyCont)
+    [solver.cont(exp, anyCont), v, solver]
   anyCont(v, solver))
 
-exports.xgreedyany = special('greedyany', (solver, cont, exp) ->
-  fc = solver.failcont
-  anyCont = (v, solver) ->
-    solver.failcont = (v, solver) ->  solver.failcont = fc; cont(v, solver)
-    solver.cont(exp, anyCont)
-  anyCont)
-
-exports.char = special('char', (solver, cont, x) ->
+exports.char = special('char', (solver, cont, x) ->  (v, solver) ->
   [data, pos] = solver.state
-  if pos is data.length then return solver.failcont
+  if pos is data.length then return solver.failcont(v, solver)
   trail = solver.trail
   x = trail.deref(x)
   c = data[pos]
   if x instanceof Var
-    trail.set(x, c)
-    (v, solver) -> [cont, pos+1, solver]
-  else if x is c then (solver.state = [data, pos+1]; cont)
+    x.bind(c, solver.trail)
+    solver.state = [data, pos+1]
+    cont(pos+1, solver)
+  else if x is c then (solver.state = [data, pos+1]; cont(v, solver))
   else if _.isString(x)
-    if x.length==1 then solver.failcont
+    if x.length==1 then solver.failcont(v, solver)
     else throw new ExpressionError(x)
   else throw new TypeError(x))
 
@@ -273,7 +283,6 @@ exports.literal = special('literal', (solver, cont, arg) -> (v, solver) ->
       solver.state = [text, pos+arg.length]
       cont(pos+arg.length, solver)
     else solver.failcont(false, solver))
-
 
 exports.quoteString = special('quoteString', (solver, cont, quote) -> (v, solver) ->
   string = ''

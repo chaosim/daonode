@@ -16,6 +16,9 @@ exports.eval_ = special('eval', (solver, cont, exp) ->
   solver.cont(exp, (v, solver) -> [solver.cont(v, cont), null, solver]))
 
 exports.assign = special('assign', (solver, cont, vari, exp) ->
+  # different from is_ in logic.coffee:
+  # Because not using vari.bind, this is not saved in solver.trail and so it can NOT be restored in solver.failcont
+  # EXCEPT the vari has been in solver.trail in the logic branch before.
   solver.cont(exp, (v, solver) -> (vari.binding = v; [cont, v, solver])))
 
 exports.begin = special('begin', (solver, cont, exps...) -> solver.expsCont(exps, cont))

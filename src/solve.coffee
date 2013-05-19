@@ -1,7 +1,5 @@
 _ = require('underscore')
 
-exports.x = x = 1
-
 exports.debug = debug = (items...) ->
   console.log((
       (for x in items
@@ -50,6 +48,60 @@ class exports.Solver
     else if length is 1 then @cont(exps[0], cont)
     else @cont(exps[0], @expsCont(exps[1...], cont))
 
+  argsCont: (args, cont) ->
+    length = args.length
+    solver = @
+    switch length
+      when 0
+        (v, solver) -> [cont, [], solver]
+      when 1
+        solver.cont(args[0], (arg0, solver) -> [cont, [arg0], solver])
+      when 2
+        solver.cont(args[0], (arg0, solver) ->
+          solver.cont(args[1], (arg1, solver) -> [cont, [arg0, arg1], solver])(
+            null, solver))
+      when 3
+        solver.cont(args[0], (arg0, solver) ->
+          solver.cont(args[1], (arg1, solver) ->
+            solver.cont(args[2], (arg2, solver) -> [cont, [arg0, arg1, arg2], solver])(
+              null, solver))(null, solver))
+      when 4
+        solver.cont(args[0], (arg0, solver) ->
+          solver.cont(args[1], (arg1, solver) ->
+            solver.cont(args[2], (arg2, solver) ->
+              solver.cont(args[3], (arg3, solver) -> [cont, [arg0, arg1, arg2, arg3], solver])(
+                null, solver))(null, solver))(null, solver))
+      when 5
+        solver.cont(args[0], (arg0, solver) ->
+          solver.cont(args[1], (arg1, solver) ->
+            solver.cont(args[2], (arg2, solver) ->
+              solver.cont(args[3], (arg3, solver) ->
+                solver.cont(args[4], (arg4, solver) -> [cont, [arg0, arg1, arg2, arg3, arg4], solver])(
+                  null, solver))(null, solver))(null, solver))(null, solver))
+      when 6
+        solver.cont(args[0], (arg0, solver) ->
+          solver.cont(args[1], (arg1, solver) ->
+            solver.cont(args[2], (arg2, solver) ->
+              solver.cont(args[3], (arg3, solver) ->
+                solver.cont(args[4], (arg4, solver) ->
+                  solver.cont(args[5], (arg5, solver) -> [cont, [arg0, arg1, arg2, arg3, arg4, arg5], solver])(
+                    null, solver))(null, solver))(null, solver))(null, solver))(null, solver))
+      when 7
+        solver.cont(args[0], (arg0, solver) ->
+          solver.cont(args[1], (arg1, solver) ->
+            solver.cont(args[2], (arg2, solver) ->
+              solver.cont(args[3], (arg3, solver) ->
+                solver.cont(args[4], (arg4, solver) ->
+                  solver.cont(args[5], (arg5, solver) ->
+                    solver.cont(args[6], (arg6, solver) -> [cont, [arg0, arg1, arg2, arg3, arg4, arg5, arg6], solver])(
+                      null, solver))(null, solver))(null, solver))(null, solver))(null, solver))(null, solver))
+      else
+        params = []
+        for i in [args.length-1..0] by -1
+          cont = do (i=i, cont=cont) ->
+            solver.cont(args[i], (argi, solver) ->  (params.push(argi); cont(params, solver)))
+        cont
+
   solve: (exp, cont = done) ->
     cont = @cont(exp, cont or done)
     value = null
@@ -66,7 +118,7 @@ Trail = class exports.Trail
   getvalue: (x) -> x?.getvalue?(@) or x
   unify: (x, y) -> x?.unify?(y, @) or y?.unify?(x, @) or (x is y)
 
-class exports.Var
+Var = class exports.Var
   constructor: (@name, @binding = @) ->
   deref: (trail) ->
     v = @
@@ -112,7 +164,22 @@ class exports.Var
 
   toString:() -> "vari(#{@name})"
 
+reElements = /\s*,\s*|\s+/
+
 exports.vari = (name) -> new exports.Var(name)
+exports.vars = (names) -> new Var(name) for name in split names,  reElements
+
+exports.DummyVar = class DummyVar extends Var
+  deref: (trail) -> @
+  bind: (value, trail) -> @binding = value
+  _unify: (y, trail) -> @binding = y; true
+  getvalue: (trail) ->
+    result = @binding
+    if result is @ then result
+    else getvalue(result)
+
+exports.dummy = (name) -> new exports.DummyVar(name)
+exports.dummies = (names) -> new DummyVar(name) for name in split names,  reElements
 
 class exports.Apply
   constructor: (@caller, @args) ->
@@ -167,15 +234,7 @@ class exports.Special extends exports.Command
 exports.special = special = maker(exports.Special)
 
 class exports.Fun extends exports.Command
-  apply_cont: (solver, cont, args) ->
-    params = [args.length-1..0]
-    argsCont(solver, ((v, solver) => [cont, @fun(params...), solver]), args, (params))
-
-argsCont = (solver, cont, args, params) ->
-  for i in [args.length-1..0] by -1
-    cont = do (i=i, cont=cont) ->
-      solver.cont(args[i], (v, solver) ->  (params[i] = v; cont(null, solver)))
-  cont
+  apply_cont: (solver, cont, args) ->  solver.argsCont(args, (params, solver) => [cont, @fun(params...), solver])
 
 exports.fun = maker(exports.Fun)
 
@@ -197,8 +256,9 @@ class exports.Proc extends exports.Command
 
 exports.proc = maker(exports.Proc)
 
-exports.tofun = (name, macro) ->
-  unless macro? then (macro = name; name = 'unnameFun')
+exports.tofun = (name, cmd) ->
+  # cmd can be an instance of subclass of Command, especially macro(macro don't eval its arguments)
+  # and specials that don't eval their arguments.
+  unless cmd? then (cmd = name; name = 'noname')
   special(name, (solver, cont, args...) ->
-    params = []
-    argsCont(solver,((v, solver) -> [solver.cont(macro(params...), cont), v, solver]), args, params))
+          solver.argsCont(args, (params, solver) -> [solver.cont(cmd(params...), cont), params, solver]))

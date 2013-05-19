@@ -164,25 +164,6 @@
   @binary('add', '+', is_global=True)
   def add(x, y): return operator.add(x, y)  
   
-  @binary('floordiv', '/')
-  def floordiv(x, y): return operator.floordiv(x,y)  
-  @binary('truediv', '//')
-  def truediv(x, y): return operator.truediv(x, y)  
-  @binary('mod', '%')
-  def mod(x, y): return operator.mod(x, y)  
-  @binary('pow', '**')
-  def pow(x, y): return operator.pow(x, y)  
-  @binary('lshift', '<<')
-  def lshift(x, y): return operator.lshift(x, y)
-  @binary('rshift', '>>')
-  def rshift(x, y): return operator.rshift(x, y)  
-  @binary('and_', '&')
-  def and_(x, y): return operator.and_(x, y)  
-  @binary('xor', '^')
-  def xor(x, y): return operator.xor(x, y)  
-  @binary('or_', '|')
-  def or_(x, y): return operator.or_(x, y)
-  
   @builtin.function('iter')
   def iter(x): return operator.iter(x) 
   @unary('neg', 'neg')
@@ -191,29 +172,6 @@
   def pos(x): return operator.pos(x)  
   @builtin.function('abs')
   def abs(x): return operator.abs(x)  
-  @binary('invert', '~')
-  def invert(x): return operator.invert(x)
-  
-  @builtin.predicate('equal', '=!')
-  def equal(solver, left, right):
-    if deref(left, solver.env)==deref(right, solver.env): 
-      return True
-    else:
-      solver.scont = solver.fcont
-  
-  def arith_predicate(binary, name, symbol):
-    @builtin.predicate(name, symbol)
-    def pred(solver, value0, value1):
-      if binary(value0, value1): return True
-      else: solver.scont = solver.fcont
-    return pred
-  
-  eq_p = arith_predicate(operator.eq, 'eq_p', '==!')
-  ne_p = arith_predicate(operator.ne, 'ne_p', '!=!')
-  lt_p = arith_predicate(operator.lt, 'lt_p', '<!')
-  le_p = arith_predicate(operator.le, 'le_p', '<=!')
-  gt_p = arith_predicate(operator.gt, 'gt_p', '>!')
-  ge_p = arith_predicate(operator.ge, 'ge_p', '>=!')
   
   format = BuiltinFunction('format', il.Format)
   concat = BuiltinFunction('concat', il.Concat)
@@ -253,11 +211,6 @@
   def write(file, *args):
     return write_(file, concat(*args))
   # analysing and construction sequences
-  
-  from exports.compilebase import CompileTypeError
-  from exports.command import special, Command, SpecialCall, BuiltinFunction
-  import exports.interlang as il
-  from exports.interlang import TRUE, FALSE, NONE
   
   @special
   def contain(compiler, cont, container, member):
@@ -512,84 +465,7 @@
   
   #items = BuiltinFunction('items', il.Items) #dict.items
   
-  from exports.command import CommandCall, element
-  from exports import interlang as il
   
-  # quasiquote and backquote
-  
-  def quasiquote(item):
-    return Quasiquote(element(item))
-  
-  class Quasiquote(CommandCall):
-    def __init__(self, item):
-      self.item = item
-      
-    def alpha(self, env, compiler):
-      return Quasiquote(self.item.alpha(env, compiler))
-    
-    def cps(self, compiler, cont):
-      return self.item.quasiquote(compiler, cont)
-        
-    def quasiquote(self, compiler, cont):
-      return cont(self)
-     
-    def __repr__(self):
-      return ',@%s'%repr(self.item)
-  
-  class exportsSyntaxError: pass
-  
-  def unquote(item):
-    return Unquote(element(item))
-  
-  class Unquote(CommandCall):
-    def __init__(self, item):
-      self.item = item
-      
-    def alpha(self, env, compiler):
-      return Unquote(self.item.alpha(env, compiler))
-    
-    def cps(compiler, cont, arg):
-      raise exportsSyntaxError
-  
-    def quasiquote(self, compiler, cont):
-      return self.item.cps(compiler, cont)
-    
-    def analyse(self, compiler):  
-      return  
-    
-    def to_code(self, compiler):
-      return ''
-    
-    def __repr__(self):
-      return ',@%s'%repr(self.item)
-    
-  def unquote_splice(item):
-    return UnquoteSplice(element(item))
-  
-  class UnquoteSplice(CommandCall):
-    def __init__(self, item):
-      self.item = item
-      
-    def alpha(self, env, compiler):
-      return UnquoteSplice(self.item.alpha(env, compiler))
-    
-    def cps(compiler, cont, arg):
-      raise exportsSyntaxError
-  
-    def quasiquote(self, compiler, cont):
-      v = compiler.new_var(il.ConstLocalVar('v'))
-      return self.item.cps(compiler, il.clamda(v, cont(il.UnquoteSplice(v))))
-    
-    def __repr__(self):
-      return ',@%s'%repr(self.item)
-    
-    from exports.compilebase import CompileTypeError
-    from exports.command import special, Command, SpecialCall,NONE, Var, Cons
-    from exports.command import cps_convert_unify
-    import exports.interlang as il
-    
-    # analysing and construction terms
-    
     @special
     def unify(compiler, cont, x, y):
       return cps_convert_unify(x, y, compiler, cont)
@@ -693,135 +569,6 @@
       solver.scont = solver.cont(value, setvalue_cont)
       return True
     
-    @builtin.macro()
-    def define(solver, var, value):
-      if isinstance(var, ClosureVar): var = var.var
-      value = deref(value, solver.env)
-      cont = solver.scont
-      @mycont(cont)
-      def define_cont(value, solver):
-        bindings = solver.env.bindings
-        try:
-          old = bindings[var]
-          old_fcon = solver.fcont
-          @mycont(old_fcon)
-          def fcont(value, solver):
-            bindings[var] = old
-            solver.fcont = old_fcon
-          solver.fcont = fcont
-          solver.scont = cont
-          return value
-        except KeyError:
-          bindings[var] = value
-          old_fcon = solver.fcont
-          @mycont(old_fcon)
-          def fcont(value, solver):
-            del bindings[old]
-            solver.fcont = old_fcon
-          solver.fcont = fcont
-          solver.scont = cont
-          return value
-      solver.scont = solver.cont(value, define_cont)
-      return True
-    
-    @builtin.macro()
-    def define_outer(solver, var, value):
-      if isinstance(var, ClosureVar): var = var.var
-      value = deref(value, solver.env)
-      @mycont(cont)
-      def define_cont(value, solver):
-        bindings = solver.env.outer.bindings
-        try:
-          old = bindings[var]
-          old_fcon = solver.fcont
-          @mycont(old_fcon)
-          def fcont(value, solver):
-            bindings[var] = old
-            solver.fcont = old_fcon
-          solver.fcont = fcont
-          solver.scont = cont
-          return value
-        except:
-          old_fcon = solver.fcont
-          @mycont(old_fcon)
-          def fcont(value, solver):
-            del bindings[old]
-            solver.fcont = old_fcon
-          solver.fcont = fcont
-          solver.scont = cont
-          return value
-      yield solver.cont(value, define_cont), True
-    
-    @builtin.macro()
-    def define_global(solver, var, value):
-      if isinstance(var, ClosureVar): var = var.var
-      value = deref(value, solver.env)
-      @mycont(cont)
-      def define_cont(value, solver):
-        bindings = solver.global_env.bindings
-        try:
-          old = bindings[var]
-          old_fcon = solver.fcont
-          @mycont(old_fcon)
-          def fcont(value, solver):
-            bindings[var] = old
-            solver.fcont = old_fcon
-          solver.fcont = fcont
-          solver.scont = cont
-          return value
-        except:
-          old_fcon = solver.fcont
-          @mycont(old_fcon)
-          def fcont(value, solver):
-            del bindings[old]
-            solver.fcont = old_fcon
-          solver.fcont = fcont
-          solver.scont = cont
-          return value
-      solver.scont = solver.cont(value, define_cont)
-      return True
-    
-    # comparison and unification of terms
-    
-    @builtin.macro('unify_with_occurs_check')
-    def unify_with_occurs_check(solver, v0, v1):
-      return term.unify(v0, v1, solver.env, occurs_check=True)
-    
-    @builtin.macro('notunify', '=\=')
-    def notunify(solver, var0, var1):
-      fcont = solver.fcont
-      scont = solver.scont
-      if term.unify(var0, var1, solver.env): 
-        solver.scont = fcont
-        return False
-      else: 
-        solver.scont = scont
-        return True
-      
-    # type verifications
-    
-    @builtin.macro('var')
-    def isvar(solver, arg):
-      return isinstance(arg, Var)
-    
-    @builtin.macro('var', 'var!')
-    def isvar_p(solver, arg):
-      if isinstance(arg, Var): return True
-      else: solver.scont = solver.fcont
-    
-    @builtin.macro('nonvar')
-    def nonvar(solver, arg):  
-      return not isinstance(arg, Var)
-    
-    @builtin.macro('nonvar', 'nonvar!')
-    def nonvar_p(solver, arg):  
-      if not isinstance(arg, Var): return True
-      else: solver.scont = solver.fcont
-      
-    def is_free(var, env):
-      if isinstance(var, ClosureVar): var = var.var
-      return isinstance(deref(var, env), Var)
-      
     @builtin.macro('free')
     def free(solver, arg):
       return is_free(arg, solver.env)
@@ -1707,66 +1454,6 @@
         il.SetParseState(parse_state), 
         cont(v))))
   
-  @special
-  def integer(compiler, cont, arg):
-    '''integer'''
-    text = compiler.new_var(il.ConstLocalVar('text'))
-    pos = compiler.new_var(il.ConstLocalVar('pos'))
-    p = compiler.new_var(il.LocalVar('p'))
-    length = compiler.new_var(il.ConstLocalVar('length'))
-    if isinstance(arg, Var):
-      arg = arg.interlang()
-      x = compiler.new_var(il.ConstLocalVar('x'))
-      return il.Begin((
-        il.AssignFromList(text, pos, il.parse_state),
-        il.Assign(length, il.Len(text)),
-        il.If(il.Ge(pos, length), 
-          il.failcont(il.FALSE),
-            il.If(il.Not(il.Cle(il.String('0'), il.GetItem(text, pos), il.String('9'))),
-              il.failcont(il.FALSE),
-              il.Begin((
-                il.Assign(p, il.add(pos, il.Integer(1))),
-                il.while_(il.And(il.Lt(p, length), 
-                                il.Cle(il.String('0'),il.GetItem(text, p),il.String('9'))), 
-                         il.AddAssign(p, il.Integer(1))),
-                il.Assign(x, il.Deref(arg)),
-                il.If(il.IsLogicVar(x),
-                      il.begin(il.SetParseState(il.Tuple(text, p)),
-                                     il.SetBinding(x, il.GetItem(text, il.Slice2(pos, p))),
-                                     il.append_failcont(compiler, 
-                                        il.SetParseState(il.Tuple(text, pos)),
-                                        il.DelBinding(x)),
-                                     cont(il.GetItem(text, pos))),
-                      il.If(il.Isinstance(x, il.String('str')),
-                            il.If(il.Eq(x, il.GetItem(text, il.Slice2(pos, p))),
-                                  il.begin(il.append_failcont(compiler, 
-                                    il.SetParseState(il.Tuple(text, pos))),
-                                    il.SetParseState(il.Tuple(text, p)),
-                                    cont(il.GetItem(text, pos))),
-                                  il.failcont(il.NONE)),
-                            il.RaiseTypeError(x)))))))))
-    elif isinstance(arg, il.String):
-      return il.Begin((
-        il.AssignFromList(text, pos, il.parse_state),
-        il.Assign(length, il.Len(text)),
-        il.If(il.Ge(pos, length), 
-          il.failcont(il.FALSE),
-            il.If(il.Not(il.Cle(il.String('0'), il.GetItem(text, pos), il.String('9'))),
-              il.failcont(il.FALSE),
-              il.Begin((
-                il.Assign(p, il.add(pos, il.Integer(1))),
-                il.while_(il.And(il.Lt(p, length), 
-                                il.Cle(il.String('0'),il.GetItem(text, p),il.String('9'))), 
-                         il.AddAssign(p, il.Integer(1))),
-                il.If(il.Eq(arg, il.GetItem(text, il.Slice2(pos, p))),
-                      il.begin(il.append_failcont(compiler, 
-                        il.SetParseState(il.Tuple(text, pos))),
-                        il.SetParseState(il.Tuple(text, p)),
-                        cont(arg)),
-                      il.failcont(il.NONE))))))))
-    else:
-      raise CompileTypeError
-    
   @matcher()
   def lead_chars(solver, chars):
     chars = deref(chars, solver.env)

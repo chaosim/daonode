@@ -112,8 +112,6 @@ exports.Test =
     test.deepEqual  a(2, solver1), faildone(2, solver1)
     test.done()
 
-
-exports.Test =
   "test quasiquote": (test) ->
     test.equal solve(qq(1)), 1
     a = add(1, 2)
