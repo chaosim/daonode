@@ -1,4 +1,5 @@
 solve = require "../../src/solve"
+solver = solve.solver
 fun = solve.fun
 special = solve.special
 
@@ -27,17 +28,17 @@ exports.gt = fun('gt', (x, y) -> x>y)
 
 # Because not using vari.bind, these are not saved in solver.trail and so it can NOT be restored in solver.failcont
 # EXCEPT the vari has been in solver.trail in the logic branch before.
-exports.inc = special('inc', (solver, cont, vari) ->
-  (v, solver) -> (vari.binding = vari.binding+1; cont(vari.binding, solver)))
+exports.inc = special('inc', (cont, vari) ->
+  -> (vari.binding = vari.binding+1; cont()))
 
-exports.inc2 = special('inc2', (solver, cont, vari) ->
-  (v, solver) -> (vari.binding = vari.binding+2; cont(vari.binding, solver)))
+exports.inc2 = special('inc2', (cont, vari) ->
+  -> (vari.binding = vari.binding+2; cont()))
 
-exports.dec = special('dec', (solver, cont, vari) ->
-  (v, solver) -> (vari.binding = vari.binding-1; cont(vari.binding, solver)))
+exports.dec = special('dec', (cont, vari) ->
+  -> (vari.binding = vari.binding-1; cont()))
 
-exports.dec2 = special('dec2', (solver, cont, vari) ->
-  (v, solver) -> (vari.binding = vari.binding-2; cont(vari.binding, solver)))
+exports.dec2 = special('dec2', (cont, vari) ->
+  -> (vari.binding = vari.binding-2; cont()))
 
 ###
 exports.format = new exports.BuiltinFunction('format', il.Format)
@@ -172,26 +173,26 @@ def concat(compiler, cont, sequence1, sequence2, result):
       old_fcont = solver.fcont
       index_list =  (index for index in range(1, len(result)))
       @mycont(cont)
-      def concat_cont(value, solver):
+      def concat_cont(value):
         try: index = index_list.next()
         except StopIteration: 
           solver.scont = old_fcont
           return
-        if sequence1.unify(result[:index], solver) and\
-               sequence2.unify(result[index:], solver):
+        if sequence1.unify(result[:index]) and\
+               sequence2.unify(result[index:]):
           solver.scont = cont
           return result
       solver.scont = solver.fcont = concat_cont
       return True
     else:
       if endswith(result, sequence2):
-        return sequence1.unify(result[:len(sequence2)], solver)
+        return sequence1.unify(result[:len(sequence2)])
   else:
     if isinstance(sequence2, Var):
       if startswith(result, sequence1):
-        return sequence2.unify(result[len(sequence1):], solver)
+        return sequence2.unify(result[len(sequence1):])
     else:
-      return unify(result, sequence1+sequence2, solver)
+      return unify(result, sequence1+sequence2)
 
 @special
 def subsequence(compiler, cont, sequence, before, length, after, sub):
@@ -219,18 +220,18 @@ def subsequence(compiler, cont, sequence, before, length, after, sub):
   if not isinstance(sub, Var):
     if isinstance(before, Var): startbefore, stopbefore = 0, len(sequence)+1
     else: startbefore, stopbefore = before, before+1
-    if unify(length, len(sub), solver):
+    if unify(length, len(sub)):
       start  = [startbefore]
       @mycont(cont)
-      def fcont(value, solver):
+      def fcont(value):
         if start[0]<stopbefore:
           start[0] = sequence.find(sub, start[0])
           if start[0]<0: 
             solver.scont = old_fcont
             return
           start[0] += 1
-          if unify(before, start[0]-1, solver) and\
-               unify(after, start[0]-1+len(sub), solver):
+          if unify(before, start[0]-1) and\
+               unify(after, start[0]-1+len(sub)):
             solver.scont = cont
             return length
         else:
@@ -245,35 +246,35 @@ def subsequence(compiler, cont, sequence, before, length, after, sub):
       if start+length!=after: 
         solver.scont = old_fcont
         return
-      if sub.unify(sequence[before:after], solver):
+      if sub.unify(sequence[before:after]):
         return sequence[before:after]
     elif not isinstance(before, Var) and  not isinstance(length, Var):
       if before+length>len(sequence): 
         solver.scont = old_fcont
         return
-      if sub.unify(sequence[before:after], solver) and\
-         after.unify(before+length, solver):
+      if sub.unify(sequence[before:after]) and\
+         after.unify(before+length):
           return sequence[before:before+length]
     elif not isinstance(length, Var) and  not isinstance(after, Var):
       if after-length<0: 
         solver.scont = old_fcont
         return
-      if sub.unify(sequence[after-length:after], solver) and\
-         length.unify(length, solver):
+      if sub.unify(sequence[after-length:after]) and\
+         length.unify(length):
         return sequence[after-length:after:after]
     elif not isinstance(before, Var) and  not isinstance(after, Var):
-      if sub.unify(sequence[before:after], solver) and\
-         length.unify(length, solver):
+      if sub.unify(sequence[before:after]) and\
+         length.unify(length):
         return sequence[after-length:after:after]
     elif not isinstance(before, Var):
       leng_list = (leng for leng in range(1, len(sequence)-before+1))
       @mycont(old_fcont)
-      def cont1(value, solver):
+      def cont1(value):
         try:
           leng = leng_list.next()
-          if sub.unify(sequence[before:before+leng], solver) and\
-             length.unify(leng, solver) and\
-             after.unify(before+leng, solver):
+          if sub.unify(sequence[before:before+leng]) and\
+             length.unify(leng) and\
+             after.unify(before+leng):
             solver.scont = cont
             return sequence[before:before+leng]
         except StopIteration:
@@ -282,12 +283,12 @@ def subsequence(compiler, cont, sequence, before, length, after, sub):
     elif not isinstance(after, Var):
       leng_list = (leng for leng in range(1, after))
       @mycont(old_fcont)
-      def cont1(value, solver):
+      def cont1(value):
         try:
           leng = leng_list.next()
-          if sub.unify(sequence[after-leng+1:after], solver) and\
-           length.unify(leng, solver) and\
-           before.unify(after-leng+1, solver):
+          if sub.unify(sequence[after-leng+1:after]) and\
+           length.unify(leng) and\
+           before.unify(after-leng+1):
             solver.scont = cont
             return sequence[before:after]
         except StopIteration:
@@ -296,12 +297,12 @@ def subsequence(compiler, cont, sequence, before, length, after, sub):
     elif not isinstance(length, Var):
       start_list = (start for start in range(len(sequence)-length))
       @mycont(old_fcont)
-      def cont1(value, solver):
+      def cont1(value):
         try:
           start = start_list.next()
-          if sub.unify(sequence[start:start+length], solver) and\
-             before.unify(start, solver) and\
-             after.unify(start+length, solver):
+          if sub.unify(sequence[start:start+length]) and\
+             before.unify(start) and\
+             after.unify(start+length):
             solver.scont = cont
             return sequence[start:start+length]
         except StopIteration:
@@ -311,13 +312,13 @@ def subsequence(compiler, cont, sequence, before, length, after, sub):
       start_leng_list = ((start, leng) for start in range(len(sequence))
                                    for leng in range(1, len(sequence)-start+1))
       @mycont(old_fcont)
-      def cont1(value, solver):
+      def cont1(value):
         try:
           start, leng = start_leng_list.next()
-          if sub.unify(sequence[start:start+leng], solver) and\
-             before.unify(start, solver) and\
-             length.unify(leng, solver) and\
-             after.unify(start+leng, solver):
+          if sub.unify(sequence[start:start+leng]) and\
+             before.unify(start) and\
+             length.unify(leng) and\
+             after.unify(start+leng):
             solver.scont = cont
             return sequence[start:start+leng]
         except StopIteration:
@@ -474,13 +475,13 @@ def to_list(item):
     var = deref(var, solver.env)
     assert isinstance(var, Var)
     @mycont(cont)
-    def setvalue_cont(value, solver):
+    def setvalue_cont(value):
       old = var.getvalue(solver.env, {})
       var.setvalue(value, solver.env)
       solver.scont = cont
       old_fcont = solver.fcont
       @mycont(old_fcont)
-      def fcont(value, solver):
+      def fcont(value):
         var.setvalue(old, solver.env)
         solver.scont = old_fcont
       solver.fcont = fcont
@@ -524,7 +525,7 @@ def to_list(item):
       del b[var]
     old_fcont = solver.fcont
     @mycont(old_fcont)
-    def fcont(value, solver):
+    def fcont(value):
       for b, v in bindings:
         b[var] = v
       solver.scont = old_fcont

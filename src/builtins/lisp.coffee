@@ -5,46 +5,46 @@ _ = require('underscore')
 solve = require "../../src/solve"
 general = require "../../src/builtins/general"
 
+solver = solve.solver
 special = solve.special
 macro = solve.macro
 debug = solve.debug
 
-exports.quote = special('quote', (solver, cont, exp) ->
-    (v, solver) -> [cont, exp, solver])
+exports.quote = special('quote', (cont, exp) ->  -> solver.value = exp; cont())
 
-exports.eval_ = special('eval', (solver, cont, exp) ->
-  solver.cont(exp, (v, solver) -> [solver.cont(v, cont), null, solver]))
+exports.eval_ = special('eval', (cont, exp) ->
+  solver.cont(exp, -> solver.cont(solver.value, cont)))
 
-exports.assign = special('assign', (solver, cont, vari, exp) ->
+exports.assign = special('assign', (cont, vari, exp) ->
   # different from is_ in logic.coffee:
   # Because not using vari.bind, this is not saved in solver.trail and so it can NOT be restored in solver.failcont
   # EXCEPT the vari has been in solver.trail in the logic branch before.
-  solver.cont(exp, (v, solver) -> (vari.binding = v; [cont, v, solver])))
+  solver.cont(exp, -> (vari.binding = solver.value; cont)))
 
-exports.begin = special('begin', (solver, cont, exps...) -> solver.expsCont(exps, cont))
+exports.begin = special('begin', (cont, exps...) -> solver.expsCont(exps, cont))
 
-if_fun = (solver, cont, test, then_, else_) ->
+if_fun = (cont, test, then_, else_) ->
   then_cont = solver.cont(then_, cont)
   else_cont = solver.cont(else_, cont)
-  solver.cont(test, (v, solver) ->
-    if (v) then then_cont(v, solver)
-    else else_cont(v, solver))
+  solver.cont(test, ->
+    if (solver.value) then then_cont()
+    else else_cont())
 
 exports.if_ = special('if_', if_fun)
 
-iff_fun = (solver, cont, clauses, else_) ->
+iff_fun = (cont, clauses, else_) ->
   length = clauses.length
   if length is 0 then throw new exports.TypeError(clauses)
   else if length is 1
     [test, then_] = clauses[0]
-    if_fun(solver, cont, test, then_, else_)
+    if_fun(cont, test, then_, else_)
   else
     [test, then_] = clauses[0]
     then_cont = solver.cont(then_, cont)
-    iff_else_cont = iff_fun(solver, cont, clauses[1...], else_)
-    solver.cont(test, (v, solver) ->
-      if (v) then [then_cont, v, solver]
-      else [iff_else_cont, v, solver])
+    iff_else_cont = iff_fun(cont, clauses[1...], else_)
+    solver.cont(test, ->
+      if (solver.value) then then_cont()
+      else iff_else_cont())
 
 exports.iff = special('iff', iff_fun)
 
@@ -58,23 +58,19 @@ iff = macro (clauses_, else_) ->
      exports.if_(clauses[0][0], clauses[0][1], iff(clauses[1...], else_)
 ###
 
-exports.block = block = special('block', (solver, cont, label, body...) ->
+exports.block = block = special('block', (cont, label, body...) ->
   if not _.isString(label) then (label = ''; body = [label].concat(body))
 
   exits = solver.exits[label] ?= []
   exits.push(cont)
   defaultExits = solver.exits[''] ?= []  # if no label, go here
   defaultExits.push(cont)
-#  debug 'enter block:', label, exits
-#  debug 'default exits:',defaultExits
   holder = [null]
   continues = solver.continues[label] ?= []
   continues.push(holder)
   defaultContinues = solver.continues[''] ?= []   # if no label, go here
   defaultContinues.push(holder)
-#  debug 'body:', body
   holder[0] = fun = solver.expsCont(body, cont)
-#  debug 'leave block, holder:', holder
   exits.pop()
   if exits.length is 0 then delete solver.exits[label]
   continues.pop()
@@ -83,29 +79,21 @@ exports.block = block = special('block', (solver, cont, label, body...) ->
   defaultContinues.pop()
   fun)
 
-exports.break_ = break_ = special('break_', (solver, cont, label='', value=null) ->
+exports.break_ = break_ = special('break_', (cont, label='', value=null) ->
   if value != null and not _.isString label then throw new TypeError([label, value])
   if value is null and not _.isString label then (value = label; label = '')
   exits = solver.exits[label]
-#  debug label, exits
   if not exits or exits==[] then throw Error(label)
   exitCont = exits[exits.length-1]
-  solver.cont(value, (v, solver) ->
-#    [solver.protect(exitCont), v, solver]))
-    solver.protect(exitCont)(v, solver)))
-#    exitCont(v, solver)))
+#  solver.cont(value, -> solver.protect(exitCont)()))
+  solver.cont(value, -> exitCont()))
 
-exports.continue_ = continue_ = special('continue_', (solver, cont, label='') ->
+exports.continue_ = continue_ = special('continue_', (cont, label='') ->
   continues = solver.continues[label]
-#  debug 'continue', continues
-#  debug label, exits
   if not continues or continues==[] then throw Error(label)
   continueCont = continues[continues.length-1]
-  (v, solver) ->
-    [solver.protect(continueCont[0]), v, solver])
-#    [continueCont[0], v, solver])
-#    solver.protect(continueCont[0])(v, solver))
-#    continueCont[0](v, solver))
+#  ->  solver.protect(continueCont[0])())
+  ->  continueCont[0]())
 
 not_ = general.not_
 
@@ -122,48 +110,55 @@ exports.until_ = macro('until_', (label,body..., test) ->
    body = body.concat([if_(not_(test), continue_(label))])
    block(label, body...))
 
-exports.catch_ = special('catch_', (solver, cont, tag, forms...) ->
-  solver.cont(tag, (v, solver) ->
-    solver.pushCatch(v, cont)
-#    debug 'catch', v
-    formsCont = solver.expsCont(forms, (v2, solver) -> solver.popCatch(v); [cont, v2, solver])
-    [formsCont, v, solver]))
+exports.catch_ = special('catch_', (cont, tag, forms...) ->
+  solver.cont(tag, ->
+    v1 = solver.value
+    solver.pushCatch(v1, cont)
+    formsCont = solver.expsCont(forms, -> solver.popCatch(v1); cont())
+    formsCont()))
 
-exports.throw_ = special('throw_', (solver, cont, tag, form) ->
-#  debug  1233
-  formCont =  (v, solver) -> solver.cont(form, (v2, solver) ->
-#    debug 'throw', v, v2
-    solver.protect(solver.findCatch(v))(v2, solver))(v, solver)
-  solver.cont(tag, formCont))
+exports.throw_ = special('throw_', (cont, tag, form) ->
+  solver.cont(tag, ->
+    v = solver.value
+    solver.cont(form, -> solver.protect(solver.findCatch(v))())()))
 
-exports.protect = special('protect', (solver, cont, form, cleanup...) ->
+exports.protect = special('protect', (cont, form, cleanup...) ->
   oldprotect = solver.protect
-  solver.protect = (fun) -> (v1, solver) ->
-                               solver.expsCont(cleanup, (v2, solver) ->
-                                 solver.protect = oldprotect;
-                                 oldprotect(fun)(v1, solver))(v1, solver)
-  cleanupCont = (v1, solver) ->
-    solver.expsCont(cleanup, (v2, solver) ->
-                    solver.protect = oldprotect
-                    cont(v1, solver))(v1, solver)
-  result = solver.cont(form, cleanupCont)
-  result)
+  solver.protect = (fun) -> ->
+    value = solver.value
+    solver.expsCont(cleanup, ->
+      solver.protect = oldprotect;
+      solver.value = value
+      oldprotect(fun)())()
+  solver.cont(form, ->
+    formValue = solver.value
+    solver.expsCont(cleanup, ->
+      solver.protect = oldprotect
+      solver.value = formValue
+      cont())()))
 
-exports.callcc = special('callcc', (solver, cont, fun) -> (v, solver) ->
-  result = fun(cont)[1]
+runner = (cont) -> ->
+  d = solver.done
   solver.done = false
-  cont(result, solver))
+  while not solver.done then cont = cont()
+  solver.done = d
+  solver.value
 
-exports.callfc = special('callfc', (solver, cont, fun) -> (v, solver) ->
-  result = fun(solver.failcont)[1]
+exports.callcc = special('callcc', (cont, fun) -> ->
+  solver.value = fun(runner(cont))
   solver.done = false
-  cont(result, solver))
+  cont())
 
-exports.quasiquote = exports.qq = special('quasiquote', (solver, cont, item) ->
+exports.callfc = special('callfc', (cont, fun) -> ->
+  solver.value = fun(runner(solver.failcont))
+  solver.done = false
+  cont())
+
+exports.quasiquote = exports.qq = special('quasiquote', (cont, item) ->
   solver.quasiquote?(item, cont))
 
-exports.unquote = exports.uq = special('unquote', (solver, cont, item) ->
+exports.unquote = exports.uq = special('unquote', (cont, item) ->
   throw "unquote: too many unquote and unquoteSlice" )
 
-exports.unquoteSlice = exports.uqs = special('unquoteSlice', (solver, cont, item) ->
+exports.unquoteSlice = exports.uqs = special('unquoteSlice', (cont, item) ->
   throw "unquoteSlice: too many unquote and unquoteSlice")

@@ -15,7 +15,6 @@ exports.Test =
     test.equal  solve(1), 1
     test.done()
 
-
   "test vari": (test) ->
     a = vari('a')
     test.equal  solve(a), a
@@ -49,11 +48,6 @@ exports.Test =
     test.equal  solve(same(1)), 1
     test.equal  solve(same(print_(1))), null
     test.equal  solve(orpm(fail, print_(2))), null
-    test.done()
-
-  "test macro": (test) ->
-    m = macro('a', ->)
-    m()
     test.done()
 
   "test proc,aka online function in dao": (test) ->

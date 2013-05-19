@@ -8,16 +8,7 @@ exports.debug = debug = (items...) ->
                 if s=='[object Object]' then JSON.stringify(x) else s
               else '[Function]') )...)
 
-exports.done = done =(v, solver) -> console.log("succeed!"); solver.done = true; [null, solver.trail.getvalue(v), solver]
-
-exports.faildone = faildone =(v, solver) -> console.log("fail!"); solver.done = true;  [null, solver.trail.getvalue(v), solver]
-
-exports.solve = (exp, trail=new Trail, cont = done, failcont = faildone) ->
-  new exports.Solver(trail, failcont).solve(exp, cont)
-
-exports.solver = (trail=new Trail, failcont = faildone, state) -> new exports.Solver(trail, failcont, state)
-
-class exports.Solver
+Solver = class exports.Solver
   constructor: (@trail=new exports.Trail, @failcont = faildone, @state) ->
     @cutCont = @failcont
     @catches = {}
@@ -36,11 +27,11 @@ class exports.Solver
     if not catches? or catches.length is 0 then throw new NotCatched
     catches[catches.length-1]
 
-  protect: (fun) -> fun #(v, solver) -> [fun, v, solver]
+  protect: (fun) -> fun
 
-  cont: (exp, cont = done) -> exp?.cont?(@, cont) or ((v, solver) -> cont(exp, solver))
+  cont: (exp, cont = done) -> exp?.cont?(cont) or (-> solver.value = exp; cont())
 
-  quasiquote: (exp, cont) -> exp?.quasiquote?(@, cont) or ((v, solver) -> cont(exp, solver))
+  quasiquote: (exp, cont) -> exp?.quasiquote?(cont) or (-> solver.value = exp; cont())
 
   expsCont: (exps, cont) ->
     length = exps.length
@@ -53,62 +44,92 @@ class exports.Solver
     solver = @
     switch length
       when 0
-        (v, solver) -> [cont, [], solver]
+        -> solver.value = []; cont()
       when 1
-        solver.cont(args[0], (arg0, solver) -> [cont, [arg0], solver])
+        solver.cont(args[0],  -> solver.value = [solver.value];  cont())
       when 2
-        solver.cont(args[0], (arg0, solver) ->
-          solver.cont(args[1], (arg1, solver) -> [cont, [arg0, arg1], solver])(
-            null, solver))
+        solver.cont(args[0], ->
+          arg0 = solver.value
+          solver.cont(args[1], ->
+            arg1 = solver.value
+            solver.value = [arg0, arg1]
+            cont)())
       when 3
-        solver.cont(args[0], (arg0, solver) ->
-          solver.cont(args[1], (arg1, solver) ->
-            solver.cont(args[2], (arg2, solver) -> [cont, [arg0, arg1, arg2], solver])(
-              null, solver))(null, solver))
+        solver.cont(args[0], ->
+          arg0 = solver.value
+          solver.cont(args[1], ->
+            arg1 = solver.value
+            solver.cont(args[2], ->
+              solver.value = [arg0, arg1, solver.value];
+              cont)())())
       when 4
-        solver.cont(args[0], (arg0, solver) ->
-          solver.cont(args[1], (arg1, solver) ->
-            solver.cont(args[2], (arg2, solver) ->
-              solver.cont(args[3], (arg3, solver) -> [cont, [arg0, arg1, arg2, arg3], solver])(
-                null, solver))(null, solver))(null, solver))
+        solver.cont(args[0], ->
+          arg0 = solver.value
+          solver.cont(args[1], ->
+            arg1 = solver.value
+            solver.cont(args[2], ->
+              arg2 = solver.value
+              solver.cont(args[3], ->
+                solver.value = [arg0, arg1, arg2, solver.value]
+                cont)())())())
       when 5
-        solver.cont(args[0], (arg0, solver) ->
-          solver.cont(args[1], (arg1, solver) ->
-            solver.cont(args[2], (arg2, solver) ->
-              solver.cont(args[3], (arg3, solver) ->
-                solver.cont(args[4], (arg4, solver) -> [cont, [arg0, arg1, arg2, arg3, arg4], solver])(
-                  null, solver))(null, solver))(null, solver))(null, solver))
+        solver.cont(args[0], ->
+          arg0 = solver.value
+          solver.cont(args[1], ->
+            arg1 = solver.value
+            solver.cont(args[2], ->
+              arg2 = solver.value
+              solver.cont(args[3], ->
+                arg3 = solver.value
+                solver.cont(args[4], ->
+                  solver.value = [arg0, arg1, arg2, arg3, solver.value]
+                  cont)())())())())
       when 6
-        solver.cont(args[0], (arg0, solver) ->
-          solver.cont(args[1], (arg1, solver) ->
-            solver.cont(args[2], (arg2, solver) ->
-              solver.cont(args[3], (arg3, solver) ->
-                solver.cont(args[4], (arg4, solver) ->
-                  solver.cont(args[5], (arg5, solver) -> [cont, [arg0, arg1, arg2, arg3, arg4, arg5], solver])(
-                    null, solver))(null, solver))(null, solver))(null, solver))(null, solver))
+        solver.cont(args[0], ->
+          arg0 = solver.value
+          solver.cont(args[1], ->
+            arg1 = solver.value
+            solver.cont(args[2], ->
+              arg2 = solver.value
+              solver.cont(args[3], ->
+                arg3 = solver.value
+                solver.cont(args[4], ->
+                  arg4 = solver.value
+                  solver.cont(args[5], ->
+                    solver.value = [arg0, arg1, arg2, arg3, arg4, solver.value]
+                    cont)())())())())())
       when 7
-        solver.cont(args[0], (arg0, solver) ->
-          solver.cont(args[1], (arg1, solver) ->
-            solver.cont(args[2], (arg2, solver) ->
-              solver.cont(args[3], (arg3, solver) ->
-                solver.cont(args[4], (arg4, solver) ->
-                  solver.cont(args[5], (arg5, solver) ->
-                    solver.cont(args[6], (arg6, solver) -> [cont, [arg0, arg1, arg2, arg3, arg4, arg5, arg6], solver])(
-                      null, solver))(null, solver))(null, solver))(null, solver))(null, solver))(null, solver))
+        solver.cont(args[0], ->
+          arg0 = solver.value
+          solver.cont(args[1], ->
+            arg1 = solver.value
+            solver.cont(args[2], ->
+              arg2 = solver.value
+              solver.cont(args[3], ->
+                arg3 = solver.value
+                solver.cont(args[4], ->
+                  arg4 = solver.value
+                  solver.cont(args[5], ->
+                    arg5 = solver.value
+                    solver.cont(args[6], ->
+                      solver.value = [arg0, arg1, arg2, arg3, arg4, arg5, solver.value]
+                      cont)())())())())())())
       else
         params = []
-        for i in [args.length-1..0] by -1
+        cont = do (cont=cont) ->
+          solver.cont(args[length-1], ->
+            params.push(solver.value)
+            solver.value = params
+            cont)
+        for i in [args.length-2..0] by -1
           cont = do (i=i, cont=cont) ->
-            solver.cont(args[i], (argi, solver) ->  (params.push(argi); cont(params, solver)))
+            solver.cont(args[i], ->  (params.push(solver.value); cont()))
         cont
 
   solve: (exp, cont = done) ->
     cont = @cont(exp, cont or done)
-    value = null
-    solver = @
-    while not solver.done
-      [cont, value, solver] = cont(value, solver)
-    value
+    while not solver.done then cont = cont()
+    solver.value
 
 Trail = class exports.Trail
   constructor: (@data={}) ->
@@ -117,6 +138,32 @@ Trail = class exports.Trail
   deref: (x) -> x?.deref?(@) or x
   getvalue: (x) -> x?.getvalue?(@) or x
   unify: (x, y) -> x?.unify?(y, @) or y?.unify?(x, @) or (x is y)
+
+exports.done = done = ->
+  console.log("succeed!")
+  solver.done = true
+  solver.failed = false
+  solver.value = solver.trail.getvalue(solver.value)
+  solver.value
+
+exports.faildone = faildone = ->
+  console.log("fail!");
+  solver.done = true
+  solver.failed = true
+  solver.value = solver.trail.getvalue(solver.value)
+  solver.value
+
+solver = exports.solver = new exports.Solver(new Trail, faildone)
+
+exports.solve = (exp, trail=new Trail, cont = done, failcont = faildone) ->
+  solver.trail= trail
+  solver.state = undefined
+  solver.failcont = faildone
+  solver.done = false
+  solver.failed = false
+  solver.value = null
+  result = solver.solve(exp, cont)
+  return result
 
 Var = class exports.Var
   constructor: (@name, @binding = @) ->
@@ -160,7 +207,7 @@ Var = class exports.Var
     if result instanceof exports.Var then result
     else getvalue(result)
 
-  cont: (solver, cont) -> (v, solver) => cont(@deref(solver.trail), solver)
+  cont: (cont) -> => (solver.value = @deref(solver.trail); cont())
 
   toString:() -> "vari(#{@name})"
 
@@ -186,24 +233,48 @@ class exports.Apply
 
   toString: -> "#{@caller}(#{@args.join(', ')})"
 
-  cont: (solver, cont) -> @caller.apply_cont(solver, cont, @args)
+  cont: (cont) -> @caller.apply_cont(cont, @args)
 
-  quasiquote:  (solver, cont) ->
-    if @caller.name is "unquote"
-      return  solver.cont(@args[0], (v, solver) -> cont(v, solver))
-    else if @caller.name is "unquoteSlice"
-      return solver.cont(@args[0], (v, solver) -> cont(new UnquoteSliceValue(v), solver))
-    params = []
-    cont = do (cont=cont) => ((v, solver) => [cont, new @constructor(@caller, params), solver])
+  quasiquote:  (cont) ->
     args = @args
-    for i in [args.length-1..0] by -1
-      cont = do (i=i, cont=cont) ->
-        solver.quasiquote(args[i], (v, solver) ->
-          if v instanceof UnquoteSliceValue
-            for x in v.value then params.push x
-          else params.push(v);
-          cont(null, solver))
-    cont
+    caller = @caller
+    if caller.name is "unquote"
+      return  solver.cont(args[0], -> cont())
+    else if caller.name is "unquoteSlice"
+      return solver.cont(args[0], -> (solver.value = new UnquoteSliceValue(solver.value); cont()))
+    length = args.length
+    constructor = @constructor
+    switch length
+      when 0
+        do (cont=cont) -> ->  (solver.value = new constructor(caller, []); cont)
+      when 1
+        do (cont=cont) ->
+          solver.quasiquote(args[0], ->
+            value = solver.value
+            if value instanceof UnquoteSliceValue
+              params = value.value
+            else params = [value]
+            solver.value = new constructor(caller, params)
+            cont)
+      else
+        params = []
+        cont = do (cont=cont) -> solver.quasiquote(args[length-1], ->
+          value = solver.value
+          if value instanceof UnquoteSliceValue
+            for x in value.value then params.push x
+          else params.push(value);
+          solver.value = new constructor(caller, params)
+          cont)
+        args = @args
+        for i in [length-2..0] by -1
+          cont = do (i=i, cont=cont) ->
+            solver.quasiquote(args[i],  ->
+              value = solver.value
+              if value instanceof UnquoteSliceValue
+                for x in value.value then params.push x
+              else params.push(value);
+              cont())
+        cont
 
 UnquoteSliceValue = class exports.UnquoteSliceValue
   constructor: (@value) ->
@@ -212,14 +283,11 @@ exports.apply = (caller, args) -> new exports.Apply(caller, args)
 
 Command = class exports.Command
   @directRun = false
-  @done = (v, solver) -> (solver.done = true; [null, solver.trail.getvalue(v), solver])
-  @faildone = (v, solver) -> (solver.done = true; [null, solver.trail.getvalue(v), solver])
   constructor: (@fun, @name) ->
     @callable = (args...) =>
       applied = exports.apply(@, args)
       if Command.directRun
-        result = Command.globalSolver.solve(applied, Command.done)
-        Command.globalSolver.done = false
+        result = solver.solve(applied)
         result
       else applied
 
@@ -229,30 +297,28 @@ Command = class exports.Command
 maker = (klass) -> (name_or_fun, fun) -> (if fun? then new klass(fun, name_or_fun) else new klass(name_or_fun)).callable
 
 class exports.Special extends exports.Command
-  apply_cont: (solver, cont, args) -> @fun(solver, cont, args...)
+  apply_cont: (cont, args) -> @fun(cont, args...)
 
 exports.special = special = maker(exports.Special)
 
 class exports.Fun extends exports.Command
-  apply_cont: (solver, cont, args) ->  solver.argsCont(args, (params, solver) => [cont, @fun(params...), solver])
+  apply_cont: (cont, args) ->  solver.argsCont(args, () => solver.value = @fun(solver.value...); cont)
 
 exports.fun = maker(exports.Fun)
 
 class exports.Macro extends exports.Command
-  apply_cont: (solver, cont, args) -> solver.cont(@fun(args...), cont)
+  apply_cont: (cont, args) -> solver.cont(@fun(args...), cont)
 
 exports.macro = maker(exports.Macro)
 
 class exports.Proc extends exports.Command
-  apply_cont:  (solver, cont, args) ->
-    (v, solver) =>
+  apply_cont:  (cont, args) ->
+    fun = @fun
+    ->
       Command.directRun = true
-      savedSolver = Command.globalSolver
-      Command.globalSolver = solver
-      result = @fun(args...)
-      Command.globalSolver = savedSolver
+      solver.value = fun(args...)
       Command.directRun = false
-      [cont, result, solver]
+      cont
 
 exports.proc = maker(exports.Proc)
 
@@ -260,5 +326,5 @@ exports.tofun = (name, cmd) ->
   # cmd can be an instance of subclass of Command, especially macro(macro don't eval its arguments)
   # and specials that don't eval their arguments.
   unless cmd? then (cmd = name; name = 'noname')
-  special(name, (solver, cont, args...) ->
-          solver.argsCont(args, (params, solver) -> [solver.cont(cmd(params...), cont), params, solver]))
+  special(name, (cont, args...) ->
+          solver.argsCont(args, -> (params = solver.value; solver.cont(cmd(params...), cont))))
