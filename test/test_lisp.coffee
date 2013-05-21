@@ -18,7 +18,7 @@ exports.Test =
     test.equal  solve(begin(assign(a, 1),  block('a', if_(eq(a, 10000000), break_('a', a)), inc(a), continue_('a')))), 10000000
     test.done()
 
-exports.Test =
+xexports.Test =
   "test if_ iff begin": (test) ->
     test.equal  solve(begin(1)), 1
     test.equal  solve(begin(1, 2)), 2

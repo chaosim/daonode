@@ -73,9 +73,12 @@ exports.Test =
   "test unify var": (test) ->
     a = vari('a')
     test.equal  solve(unify(a, 1)), true
+    test.equal  solve(andp(unify(a, 1))), true
     test.equal  solve(andp(unify(a, 1), unify(a, 2))), false
-    #    throw new Error 'infinite recursion?'
-    #    test.equal  solve(orp(andp(unify(a, 1), unify(a, 2)), unify(a, 2))), true
+    test.equal  solve(andp(unify(a, 1), unify(a, 2), unify(a, 2))), false
+    a.binding = a
+    test.equal  solve(orp(andp(unify(a, 1), unify(a, 2)), unify(a, 2))), true
+    test.equal  solve(orp(andp(unify(a, 1), unify(a, 2)))), false
     test.done()
 
   "test findall once": (test) ->
@@ -99,8 +102,7 @@ exports.Test =
     test.done()
 
   "test findall": (test) ->
-#    test.equal  solve(orp(findall(orp(print_(1), print_(2))),
-#                         print_(3))), null
+    test.equal  solve(orp(findall(orp(print_(1), print_(2))),
+                         print_(3))), null
     test.equal  solve(findall(once(orp(print_(1), (print_(2)))))), null
     test.done()
-
