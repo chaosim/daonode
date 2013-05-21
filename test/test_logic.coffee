@@ -63,8 +63,8 @@ exports.Test =
     test.done()
 
   "test macro": (test) ->
-    same = macro((x) -> x)
-    orpm = macro((x, y) -> orp(x, y))
+    same = macro(1, (x) -> x)
+    orpm = macro(2, (x, y) -> orp(x, y))
     test.equal  solve(same(1)), 1
     test.equal  solve(same(print_(1))), null
     test.equal  solve(orpm(fail, print_(2))), null
@@ -85,20 +85,19 @@ exports.Test =
     test.done()
 
   "test rule": (test) ->
-    r = rule((x, y)->
+    r = rule(2, (x, y)->
       [[x,y], 1])
     test.equal  solve(r(1,1)), 1
     test.done()
 
 
   "test rule2": (test) ->
-    r = rule((x, y)->
+    r = rule(2, (x, y)->
       [[1,2], print_(1),
        [1,1], print_(2)])
     test.equal  solve(r(1,1)), null
     test.done()
 
-xexports.Test =
   "test findall": (test) ->
 #    test.equal  solve(orp(findall(orp(print_(1), print_(2))),
 #                         print_(3))), null

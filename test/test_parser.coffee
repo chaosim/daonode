@@ -11,7 +11,7 @@ dao = require base+"solve"
 
 xexports = {}
 
-exports.Test =
+xexports.Test =
   "test char": (test) ->
     test.equal  solve(parsetext(char('a'), 'a')), null
     test.equal dao.status, dao.SUCCESS
@@ -37,30 +37,29 @@ exports.Test =
 exports.Test =
   "test greedyany": (test) ->
     _ = dummy('_')
-#    test.equal  solve(parsetext(greedyany(char(_)), 'a')), 1
-#    test.equal dao.status, dao.SUCCESS
-#    test.equal  solve(parsetext(greedyany(char(_)), 'ab')), 2
-#    test.equal dao.status, dao.SUCCESS
-#    test.equal  solve(parsetext(greedyany(char(_)), 'abc')), 3
-#    test.equal dao.status, dao.SUCCESS
-#    test.equal  solve(parsetext(begin(greedyany(char(_)), eoi), 'a')), true
-#    test.equal dao.status, dao.SUCCESS
+    test.equal  solve(parsetext(greedyany(char(_)), 'a')), 1
+    test.equal dao.status, dao.SUCCESS
+    test.equal  solve(parsetext(greedyany(char(_)), 'ab')), 2
+    test.equal dao.status, dao.SUCCESS
+    test.equal  solve(parsetext(greedyany(char(_)), 'abc')), 3
+    test.equal dao.status, dao.SUCCESS
+    test.equal  solve(parsetext(begin(greedyany(char(_)), eoi), 'a')), true
+    test.equal dao.status, dao.SUCCESS
     test.equal  solve(parsetext(begin(greedyany(char(_)), char('c'), eoi), 'ac')), 2
     test.equal dao.status, dao.FAIL
-#    test.equal  solve(parsetext(findall(begin(greedyany(char(_)), char('c'), eoi)), 'abc')), 3
-#    test.equal dao.status, dao.SUCCESS
-#    debug("solve(parsetext(findall(greedyany(begin(char(_), print_(getvalue(_))))), 'abc'))")
-#    test.equal  solve(parsetext(findall(greedyany(begin(char(_), print_(getvalue(_))))), 'abc')), null
-#    test.equal dao.status, dao.SUCCESS
-#    test.equal  solve(parsetext(greedyany(char('a')), 'aa')), null
-#    test.equal dao.status, dao.SUCCESS
-#    test.equal  solve(parsetext(greedyany(char('a')), 'b')), null
-#    test.equal dao.status, dao.SUCCESS
-#    test.equal  solve(parsetext(orp(begin(greedyany(char(_)), char('c'), eoi), print_('a')), 'abc')), null
-#    test.equal dao.status, dao.SUCCESS
+    test.equal  solve(parsetext(findall(begin(greedyany(char(_)), char('c'), eoi)), 'abc')), 3
+    test.equal dao.status, dao.SUCCESS
+    debug("solve(parsetext(findall(greedyany(begin(char(_), print_(getvalue(_))))), 'abc'))")
+    test.equal  solve(parsetext(findall(greedyany(begin(char(_), print_(getvalue(_))))), 'abc')), null
+    test.equal dao.status, dao.SUCCESS
+    test.equal  solve(parsetext(greedyany(char('a')), 'aa')), null
+    test.equal dao.status, dao.SUCCESS
+    test.equal  solve(parsetext(greedyany(char('a')), 'b')), null
+    test.equal dao.status, dao.SUCCESS
+    test.equal  solve(parsetext(orp(begin(greedyany(char(_)), char('c'), eoi), print_('a')), 'abc')), null
+    test.equal dao.status, dao.SUCCESS
     test.done()
 
-xexports.Test =
   "test any": (test) ->
     _ = dummy('_')
     test.equal  solve(parsetext(any(char(_)), 'a')), 1
@@ -85,12 +84,16 @@ xexports.Test =
     test.equal dao.status, dao.SUCCESS
     test.done()
 
-xexports.Test =
   "test lazyany": (test) ->
     _ = dummy('_')
+    result = vari('result')
     test.equal  solve(parsetext(lazyany(char(_)), 'a')), null
     test.equal dao.status, dao.SUCCESS
-    test.equal  solve(parsetext(lazyany(char(_)), 'ab')), null
+    test.deepEqual  solve(begin(parsetext(lazyany(char(_), result, _), 'a'), result)), []
+    test.equal dao.status, dao.SUCCESS
+    test.deepEqual  solve(begin(parsetext(lazyany(char(_), result, _), 'a'), result)), []
+    test.equal dao.status, dao.SUCCESS
+    test.equal  solve(begin(parsetext(lazyany(char(_, result, _)), 'a'), result)), ['a']
     test.equal dao.status, dao.SUCCESS
     test.equal  solve(parsetext(lazyany(char(_)), 'abc')), null
     test.equal dao.status, dao.SUCCESS
@@ -116,9 +119,9 @@ xexports.Test =
     test.equal dao.status, dao.SUCCESS
     test.done()
 
-xexports.Test =
-  "test lazyany": (test) ->
+  "test lazyany2": (test) ->
     _ = dummy('_')
-    test.equal  solve(parsetext(findall(begin(greedyany(char(_)), char('c'), eoi)), 'abc')), 3
+    result = vari('result')
+    test.deepEqual  solve(begin(parsetext(lazyany(char(_), result, _), 'a'), result)), []
     test.equal dao.status, dao.SUCCESS
     test.done()

@@ -26,9 +26,9 @@ exports.Test =
     test.done()
 
   "test builtin function": (test) ->
-    same = fun((x)->x)
+    same = fun(1, (x)->x)
     test.equal  solve(same(1)), 1
-    add = fun((x, y) -> x+y)
+    add = fun(2, (x, y) -> x+y)
     test.equal  solve(add(1, 2)), 3
     test.done()
 
@@ -52,19 +52,19 @@ exports.Test =
     test.done()
 
   "test macro": (test) ->
-    m = macro('a', ->)
+    m = macro(0, 'a', ->)
     m()
     test.done()
 
   "test proc,aka online function in dao": (test) ->
-    a = proc('a', () ->
+    a = proc(0, 'a', () ->
       i = 0
       add(1, 2))
     test.equal solve(a()), 3
     test.done()
 
   "test macro tofun": (test) ->
-    orpm = macro((x, y) -> orp(x, y))
+    orpm = macro(2, (x, y) -> orp(x, y))
     test.equal  solve(orpm(print_(1), print_(2))), null
     test.equal  solve(tofun(orpm)(print_(1), print_(2))), null
     test.equal  solve(tofun(orpm)(quote(print_(1)), quote(print_(2)))), null

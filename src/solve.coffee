@@ -8,20 +8,15 @@ exports.debug = debug = (items...) ->
                 if s=='[object Object]' then JSON.stringify(x) else s
               else '[Function]') )...)
 
-class BindingError
-  constructor: (@vari, @message) ->
+class Error
+  constructor: (@exp, @message='', @stack = @) ->  # @stack: to make webstorm nodeunit happy.
+  toString: () -> "#{@constructor.name}: #{@exp} >>> #{@message}"
 
-class TypeError
-  constructor: (@exp, @message) ->
-
-class ExpressionError
-  constructor: (@exp, @message) ->
-
-class ArgumentError
-  constructor: (@exp, @message) ->
-
-class ArityError
-  constructor: (@exp, @message) ->
+class BindingError extends Error
+class TypeError extends Error
+class ExpressionError extends Error
+class ArgumentError extends Error
+class ArityError extends Error
 
 exports.SUCCESS = 1
 exports.UNKNOWN = 0
@@ -260,6 +255,11 @@ exports.dummies = (names) -> new DummyVar(name) for name in split names,  reElem
 
 class exports.Apply
   constructor: (@caller, @args) ->
+    length = args.length; arity = @caller.arity
+    if arity!=-1 and length!=arity
+      for x in @args
+        if x.caller.name is "unquoteSlice" then return
+      throw new ArityError(@)
 
   toString: -> "#{@caller}(#{@args.join(', ')})"
 
@@ -291,7 +291,7 @@ Command = class exports.Command
   @directRun = false
   @done = (v, solver) -> (solver.done = true; [null, solver.trail.getvalue(v), solver])
   @faildone = (v, solver) -> (solver.done = true; [null, solver.trail.getvalue(v), solver])
-  constructor: (@fun, @name) ->
+  constructor: (@fun, @name, @arity) ->
     @callable = (args...) =>
       applied = exports.apply(@, args)
       if Command.directRun
@@ -299,26 +299,29 @@ Command = class exports.Command
         Command.globalSolver.done = false
         result
       else applied
+    @callable.arity = @arity
 
   register: (exports) -> exports[@name] = @callable
   toString: () -> @name
 
-maker = (klass) -> (name_or_fun, fun) -> (if fun? then new klass(fun, name_or_fun) else new klass(name_or_fun)).callable
+commandMaker = (klass) -> (arity, name_or_fun, fun) ->
+  if not _.isNumber(arity) then throw new ArgumentError(arity)
+  (if fun? then new klass(fun, name_or_fun, arity) else new klass(name_or_fun, 'noname', arity)).callable
 
 class exports.Special extends exports.Command
   apply_cont: (solver, cont, args) -> @fun(solver, cont, args...)
 
-exports.special = special = maker(exports.Special)
+exports.special = special = commandMaker(exports.Special)
 
 class exports.Fun extends exports.Command
   apply_cont: (solver, cont, args) ->  solver.argsCont(args, (params, solver) => [cont, @fun(params...), solver])
 
-exports.fun = maker(exports.Fun)
+exports.fun = commandMaker(exports.Fun)
 
 class exports.Macro extends exports.Command
   apply_cont: (solver, cont, args) -> solver.cont(@fun(args...), cont)
 
-exports.macro = maker(exports.Macro)
+exports.macro = commandMaker(exports.Macro)
 
 class exports.Proc extends exports.Command
   apply_cont:  (solver, cont, args) ->
@@ -331,11 +334,11 @@ class exports.Proc extends exports.Command
       Command.directRun = false
       [cont, result, solver]
 
-exports.proc = maker(exports.Proc)
+exports.proc = commandMaker(exports.Proc)
 
 exports.tofun = (name, cmd) ->
   # cmd can be an instance of subclass of Command, especially macro(macro don't eval its arguments)
   # and specials that don't eval their arguments.
   unless cmd? then (cmd = name; name = 'noname')
-  special(name, (solver, cont, args...) ->
+  special(cmd.arity, name, (solver, cont, args...) ->
           solver.argsCont(args, (params, solver) -> [solver.cont(cmd(params...), cont), params, solver]))

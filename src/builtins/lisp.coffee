@@ -9,25 +9,25 @@ special = solve.special
 macro = solve.macro
 debug = solve.debug
 
-exports.quote = special('quote', (solver, cont, exp) ->
+exports.quote = special(1, 'quote', (solver, cont, exp) ->
     (v, solver) -> cont(exp, solver))
 
-exports.eval_ = special('eval', (solver, cont, exp) ->
+exports.eval_ = special(1, 'eval', (solver, cont, exp) ->
   solver.cont(exp, (v, solver) -> [solver.cont(v, cont), null, solver]))
 
-exports.assign = special('assign', (solver, cont, vari, exp) ->
+exports.assign = special(2, 'assign', (solver, cont, vari, exp) ->
   # different from is_ in logic.coffee:
   # Because not using vari.bind, this is not saved in solver.trail and so it can NOT be restored in solver.failcont
   # EXCEPT the vari has been in solver.trail in the logic branch before.
   solver.cont(exp, (v, solver) -> (vari.binding = v; cont(v, solver))))
 
-exports.zero = special('assign', (solver, cont, vari, exp) ->
+exports.zero = special(1, 'zero', (solver, cont, vari, exp) ->
   (v, solver) -> (vari.binding = 0; cont(v, solver)))
 
-exports.one = special('assign', (solver, cont, vari, exp) ->
+exports.one = special(1, 'one', (solver, cont, vari, exp) ->
  (v, solver) -> (vari.binding = 1; cont(v, solver)))
 
-exports.begin = special('begin', (solver, cont, exps...) -> solver.expsCont(exps, cont))
+exports.begin = special(-1, 'begin', (solver, cont, exps...) -> solver.expsCont(exps, cont))
 
 if_fun = (solver, cont, test, then_, else_) ->
   then_cont = solver.cont(then_, cont)
@@ -43,7 +43,7 @@ if_fun = (solver, cont, test, then_, else_) ->
       else cont(null, solver)
     solver.cont(test, action)
 
-exports.if_ = special('if_', if_fun)
+exports.if_ = special(-1, 'if_', if_fun)
 
 iff_fun = (solver, cont, clauses, else_) ->
   length = clauses.length
@@ -60,7 +60,7 @@ iff_fun = (solver, cont, clauses, else_) ->
       else [iff_else_cont, v, solver]
     solver.cont(test, action)
 
-exports.iff = special('iff', iff_fun)
+exports.iff = special(-1, 'iff', iff_fun)
 
 ### iff's macro version
 iff = macro (clauses_, else_) ->
@@ -72,7 +72,7 @@ iff = macro (clauses_, else_) ->
      exports.if_(clauses[0][0], clauses[0][1], iff(clauses[1...], else_)
 ###
 
-exports.block = block = special('block', (solver, cont, label, body...) ->
+exports.block = block = special(-1, 'block', (solver, cont, label, body...) ->
   if not _.isString(label) then (label = ''; body = [label].concat(body))
 
   exits = solver.exits[label] ?= []
@@ -93,7 +93,7 @@ exports.block = block = special('block', (solver, cont, label, body...) ->
   defaultContinues.pop()
   fun)
 
-exports.break_ = break_ = special('break_', (solver, cont, label='', value=null) ->
+exports.break_ = break_ = special(-1, 'break_', (solver, cont, label='', value=null) ->
   if value != null and not _.isString label then throw new TypeError([label, value])
   if value is null and not _.isString label then (value = label; label = '')
   exits = solver.exits[label]
@@ -102,7 +102,7 @@ exports.break_ = break_ = special('break_', (solver, cont, label='', value=null)
   valCont = (v, solver) -> solver.protect(exitCont)(v, solver)
   solver.cont(value, valCont))
 
-exports.continue_ = continue_ = special('continue_', (solver, cont, label='') ->
+exports.continue_ = continue_ = special(-1, 'continue_', (solver, cont, label='') ->
   continues = solver.continues[label]
   if not continues or continues==[] then throw Error(label)
   continueCont = continues[continues.length-1]
@@ -110,33 +110,33 @@ exports.continue_ = continue_ = special('continue_', (solver, cont, label='') ->
 
 not_ = general.not_
 
-exports.loop_ = macro('loop', (label, body...) ->
+exports.loop_ = macro(-1, 'loop', (label, body...) ->
   if not _.isString(label) then (label = ''; body = [label].concat body)
   block(label, body.concat([continue_(label)])...))
 
-exports.while_ = macro('while_', (label, test, body...) ->
+exports.while_ = macro(-1, 'while_', (label, test, body...) ->
   if not _.isString(label) then (label = ''; test = label; body = [test].concat body)
   block(label, [if_(not_(test), break_(label))].concat(body).concat([continue_(label)])...))
 
-exports.until_ = macro('until_', (label,body..., test) ->
+exports.until_ = macro(-1, 'until_', (label,body..., test) ->
    if not _.isString(label) then (label = ''; test = label; body = [test].concat body)
    body = body.concat([if_(not_(test), continue_(label))])
    block(label, body...))
 
-exports.catch_ = special('catch_', (solver, cont, tag, forms...) ->
+exports.catch_ = special(-1, 'catch_', (solver, cont, tag, forms...) ->
   tagCont = (v, solver) ->
     solver.pushCatch(v, cont)
     formsCont = solver.expsCont(forms, (v2, solver) -> solver.popCatch(v); [cont, v2, solver])
     [formsCont, v, solver]
   solver.cont(tag, tagCont))
 
-exports.throw_ = special('throw_', (solver, cont, tag, form) ->
+exports.throw_ = special(2, 'throw_', (solver, cont, tag, form) ->
   formCont =  (v, solver) ->
     solver.cont(form, (v2, solver) ->
       solver.protect(solver.findCatch(v))(v2, solver))(v, solver)
   solver.cont(tag, formCont))
 
-exports.protect = special('protect', (solver, cont, form, cleanup...) ->
+exports.protect = special(-1, 'protect', (solver, cont, form, cleanup...) ->
   oldprotect = solver.protect
   solver.protect = (fun) -> (v1, solver) ->
                                solver.expsCont(cleanup, (v2, solver) ->
@@ -149,21 +149,21 @@ exports.protect = special('protect', (solver, cont, form, cleanup...) ->
   result = solver.cont(form, cleanupCont)
   result)
 
-exports.callcc = special('callcc', (solver, cont, fun) -> (v, solver) ->
+exports.callcc = special(1, 'callcc', (solver, cont, fun) -> (v, solver) ->
   result = fun(cont)[1]
   solver.done = false
   cont(result, solver))
 
-exports.callfc = special('callfc', (solver, cont, fun) -> (v, solver) ->
+exports.callfc = special(1, 'callfc', (solver, cont, fun) -> (v, solver) ->
   result = fun(solver.failcont)[1]
   solver.done = false
   cont(result, solver))
 
-exports.quasiquote = exports.qq = special('quasiquote', (solver, cont, item) ->
+exports.quasiquote = exports.qq = special(1, 'quasiquote', (solver, cont, item) ->
   solver.quasiquote?(item, cont))
 
-exports.unquote = exports.uq = special('unquote', (solver, cont, item) ->
+exports.unquote = exports.uq = special(1, 'unquote', (solver, cont, item) ->
   throw "unquote: too many unquote and unquoteSlice" )
 
-exports.unquoteSlice = exports.uqs = special('unquoteSlice', (solver, cont, item) ->
+exports.unquoteSlice = exports.uqs = special(1, 'unquoteSlice', (solver, cont, item) ->
   throw "unquoteSlice: too many unquote and unquoteSlice")

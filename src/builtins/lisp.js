@@ -15,40 +15,40 @@
 
   debug = solve.debug;
 
-  exports.quote = special('quote', function(solver, cont, exp) {
+  exports.quote = special(1, 'quote', function(solver, cont, exp) {
     return function(v, solver) {
       return cont(exp, solver);
     };
   });
 
-  exports.eval_ = special('eval', function(solver, cont, exp) {
+  exports.eval_ = special(1, 'eval', function(solver, cont, exp) {
     return solver.cont(exp, function(v, solver) {
       return [solver.cont(v, cont), null, solver];
     });
   });
 
-  exports.assign = special('assign', function(solver, cont, vari, exp) {
+  exports.assign = special(2, 'assign', function(solver, cont, vari, exp) {
     return solver.cont(exp, function(v, solver) {
       vari.binding = v;
       return cont(v, solver);
     });
   });
 
-  exports.zero = special('assign', function(solver, cont, vari, exp) {
+  exports.zero = special(1, 'zero', function(solver, cont, vari, exp) {
     return function(v, solver) {
       vari.binding = 0;
       return cont(v, solver);
     };
   });
 
-  exports.one = special('assign', function(solver, cont, vari, exp) {
+  exports.one = special(1, 'one', function(solver, cont, vari, exp) {
     return function(v, solver) {
       vari.binding = 1;
       return cont(v, solver);
     };
   });
 
-  exports.begin = special('begin', function() {
+  exports.begin = special(-1, 'begin', function() {
     var cont, exps, solver;
 
     solver = arguments[0], cont = arguments[1], exps = 3 <= arguments.length ? __slice.call(arguments, 2) : [];
@@ -81,7 +81,7 @@
     }
   };
 
-  exports.if_ = special('if_', if_fun);
+  exports.if_ = special(-1, 'if_', if_fun);
 
   iff_fun = function(solver, cont, clauses, else_) {
     var action, iff_else_cont, length, test, then_, then_cont, _ref, _ref1;
@@ -107,7 +107,7 @@
     }
   };
 
-  exports.iff = special('iff', iff_fun);
+  exports.iff = special(-1, 'iff', iff_fun);
 
   /* iff's macro version
   iff = macro (clauses_, else_) ->
@@ -120,7 +120,7 @@
   */
 
 
-  exports.block = block = special('block', function() {
+  exports.block = block = special(-1, 'block', function() {
     var body, cont, continues, defaultContinues, defaultExits, exits, fun, holder, label, solver, _base, _base1, _base2, _base3, _ref, _ref1, _ref2, _ref3;
 
     solver = arguments[0], cont = arguments[1], label = arguments[2], body = 4 <= arguments.length ? __slice.call(arguments, 3) : [];
@@ -151,7 +151,7 @@
     return fun;
   });
 
-  exports.break_ = break_ = special('break_', function(solver, cont, label, value) {
+  exports.break_ = break_ = special(-1, 'break_', function(solver, cont, label, value) {
     var exitCont, exits, valCont;
 
     if (label == null) {
@@ -178,7 +178,7 @@
     return solver.cont(value, valCont);
   });
 
-  exports.continue_ = continue_ = special('continue_', function(solver, cont, label) {
+  exports.continue_ = continue_ = special(-1, 'continue_', function(solver, cont, label) {
     var continueCont, continues;
 
     if (label == null) {
@@ -196,7 +196,7 @@
 
   not_ = general.not_;
 
-  exports.loop_ = macro('loop', function() {
+  exports.loop_ = macro(-1, 'loop', function() {
     var body, label;
 
     label = arguments[0], body = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
@@ -207,7 +207,7 @@
     return block.apply(null, [label].concat(__slice.call(body.concat([continue_(label)]))));
   });
 
-  exports.while_ = macro('while_', function() {
+  exports.while_ = macro(-1, 'while_', function() {
     var body, label, test;
 
     label = arguments[0], test = arguments[1], body = 3 <= arguments.length ? __slice.call(arguments, 2) : [];
@@ -219,7 +219,7 @@
     return block.apply(null, [label].concat(__slice.call([if_(not_(test), break_(label))].concat(body).concat([continue_(label)]))));
   });
 
-  exports.until_ = macro('until_', function() {
+  exports.until_ = macro(-1, 'until_', function() {
     var body, label, test, _i;
 
     label = arguments[0], body = 3 <= arguments.length ? __slice.call(arguments, 1, _i = arguments.length - 1) : (_i = 1, []), test = arguments[_i++];
@@ -232,7 +232,7 @@
     return block.apply(null, [label].concat(__slice.call(body)));
   });
 
-  exports.catch_ = special('catch_', function() {
+  exports.catch_ = special(-1, 'catch_', function() {
     var cont, forms, solver, tag, tagCont;
 
     solver = arguments[0], cont = arguments[1], tag = arguments[2], forms = 4 <= arguments.length ? __slice.call(arguments, 3) : [];
@@ -249,7 +249,7 @@
     return solver.cont(tag, tagCont);
   });
 
-  exports.throw_ = special('throw_', function(solver, cont, tag, form) {
+  exports.throw_ = special(2, 'throw_', function(solver, cont, tag, form) {
     var formCont;
 
     formCont = function(v, solver) {
@@ -260,7 +260,7 @@
     return solver.cont(tag, formCont);
   });
 
-  exports.protect = special('protect', function() {
+  exports.protect = special(-1, 'protect', function() {
     var cleanup, cleanupCont, cont, form, oldprotect, result, solver;
 
     solver = arguments[0], cont = arguments[1], form = arguments[2], cleanup = 4 <= arguments.length ? __slice.call(arguments, 3) : [];
@@ -283,7 +283,7 @@
     return result;
   });
 
-  exports.callcc = special('callcc', function(solver, cont, fun) {
+  exports.callcc = special(1, 'callcc', function(solver, cont, fun) {
     return function(v, solver) {
       var result;
 
@@ -293,7 +293,7 @@
     };
   });
 
-  exports.callfc = special('callfc', function(solver, cont, fun) {
+  exports.callfc = special(1, 'callfc', function(solver, cont, fun) {
     return function(v, solver) {
       var result;
 
@@ -303,15 +303,15 @@
     };
   });
 
-  exports.quasiquote = exports.qq = special('quasiquote', function(solver, cont, item) {
+  exports.quasiquote = exports.qq = special(1, 'quasiquote', function(solver, cont, item) {
     return typeof solver.quasiquote === "function" ? solver.quasiquote(item, cont) : void 0;
   });
 
-  exports.unquote = exports.uq = special('unquote', function(solver, cont, item) {
+  exports.unquote = exports.uq = special(1, 'unquote', function(solver, cont, item) {
     throw "unquote: too many unquote and unquoteSlice";
   });
 
-  exports.unquoteSlice = exports.uqs = special('unquoteSlice', function(solver, cont, item) {
+  exports.unquoteSlice = exports.uqs = special(1, 'unquoteSlice', function(solver, cont, item) {
     throw "unquoteSlice: too many unquote and unquoteSlice";
   });
 

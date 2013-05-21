@@ -11,17 +11,17 @@
 
   Trail = solve.Trail;
 
-  exports.succeed = special('succeed', function(solver, cont) {
+  exports.succeed = special(0, 'succeed', function(solver, cont) {
     return cont;
   })();
 
-  exports.fail = special('fail', function(solver, cont) {
+  exports.fail = special(0, 'fail', function(solver, cont) {
     return function(v, solver) {
       return solver.failcont(v, solver);
     };
   })();
 
-  exports.andp = special('andp', function() {
+  exports.andp = special(-1, 'andp', function() {
     var args, cont, solver;
 
     solver = arguments[0], cont = arguments[1], args = 3 <= arguments.length ? __slice.call(arguments, 2) : [];
@@ -65,9 +65,9 @@
     };
   };
 
-  exports.orp = special('orp', orpFun);
+  exports.orp = special(-1, 'orp', orpFun);
 
-  exports.cutable = special('cutable', function(solver, cont, x) {
+  exports.cutable = special(1, 'cutable', function(solver, cont, x) {
     var cc, xcont;
 
     cc = null;
@@ -81,14 +81,14 @@
     };
   });
 
-  exports.cut = special('cut', function(solver, cont) {
+  exports.cut = special(0, 'cut', function(solver, cont) {
     return function(v, solver) {
       solver.failcont = solver.cutCont;
       return cont(v, solver);
     };
   })();
 
-  exports.ifp = special('ifp', function(solver, cont, test, action, else_) {
+  exports.ifp = special(-1, 'ifp', function(solver, cont, test, action, else_) {
     var actionCont, cc, ccCont, elseCont, resultCont;
 
     cc = null;
@@ -129,7 +129,7 @@
     }
   });
 
-  exports.notp = special('notp', function(solver, cont, x) {
+  exports.notp = special(1, 'notp', function(solver, cont, x) {
     var fc, mycont;
 
     fc = null;
@@ -155,14 +155,14 @@
     };
   });
 
-  exports.repeat = special('repeat', function(solver, cont) {
+  exports.repeat = special(0, 'repeat', function(solver, cont) {
     return function(v, solver) {
       solver.failcont = cont;
       return [cont, null, solver];
     };
   })();
 
-  exports.call = special('call', function() {
+  exports.call = special(1, 'call', function() {
     var args, cont, solver;
 
     solver = arguments[0], cont = arguments[1], args = 3 <= arguments.length ? __slice.call(arguments, 2) : [];
@@ -174,7 +174,7 @@
     });
   });
 
-  exports.findall = special('findall', function(solver, cont, exp) {
+  exports.findall = special(1, 'findall', function(solver, cont, exp) {
     var fc, findallDone, findnext;
 
     fc = null;
@@ -192,7 +192,7 @@
     };
   });
 
-  exports.once = special('once', function(solver, cont, x) {
+  exports.once = special(1, 'once', function(solver, cont, x) {
     var cont1, fc;
 
     fc = null;
@@ -206,7 +206,7 @@
     };
   });
 
-  exports.is_ = special('is_', function(solver, cont, vari, exp) {
+  exports.is_ = special(2, 'is_', function(solver, cont, vari, exp) {
     return solver.cont(exp, function(v, solver) {
       vari.bind(v, solver.trail);
       return [cont, true, solver];
@@ -223,7 +223,7 @@
     };
   };
 
-  exports.unify = special('unify', unifyFun);
+  exports.unify = special(2, 'unify', unifyFun);
 
   exports.notunifyFun = notunifyFun = function(solver, cont, x, y) {
     return function(v, solver) {
@@ -235,7 +235,7 @@
     };
   };
 
-  exports.notunify = special('notunify', notunifyFun);
+  exports.notunify = special(2, 'notunify', notunifyFun);
 
   exports.unifyListFun = unifyListFun = function(solver, cont, xs, ys) {
     return function(v, solver) {
@@ -255,7 +255,7 @@
     };
   };
 
-  exports.unifyList = unifyList = special('unifyList', unifyListFun);
+  exports.unifyList = unifyList = special(2, 'unifyList', unifyListFun);
 
   exports.notunifyListFun = notunifyListFun = function(solver, cont, xs, ys) {
     return function(v, solver) {
@@ -275,14 +275,14 @@
     };
   };
 
-  exports.notunifyList = notunifyList = special('notunifyList', notunifyListFun);
+  exports.notunifyList = notunifyList = special(2, 'notunifyList', notunifyListFun);
 
-  exports.rule = function(name, fun) {
+  exports.rule = function(arity, name, fun) {
     if (fun == null) {
       fun = name;
       name = 'noname_rule';
     }
-    return macro(name, function() {
+    return macro(arity, name, function() {
       var args, body, clauses, head, i;
 
       args = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
@@ -302,7 +302,7 @@
     });
   };
 
-  exports.callfc = special('callfc', function(solver, cont, fun) {
+  exports.callfc = special(1, 'callfc', function(solver, cont, fun) {
     return function(v, solver) {
       var result;
 
@@ -312,7 +312,7 @@
     };
   });
 
-  exports.truep = special('truep', function(solver, cont, fun, x) {
+  exports.truep = special(1, 'truep', function(solver, cont, fun, x) {
     return solver.cont(x, function(x1, solver) {
       if (x1) {
         return cont(x1, solver);
@@ -322,7 +322,7 @@
     });
   });
 
-  exports.falsep = special('falsep', function(solver, cont, fun, x) {
+  exports.falsep = special(1, 'falsep', function(solver, cont, fun, x) {
     return solver.cont(x, function(x1, solver) {
       if (!x1) {
         return cont(x1, solver);
@@ -337,7 +337,7 @@
       fun = name;
       name = 'noname';
     }
-    return special(name, function(solver, cont, x) {
+    return special(1, name, function(solver, cont, x) {
       return solver.cont(x, function(x1, solver) {
         var result;
 
@@ -356,7 +356,7 @@
       fun = name;
       name = 'noname';
     }
-    return special(name, function(solver, cont, x, y) {
+    return special(2, name, function(solver, cont, x, y) {
       var x1, ycont;
 
       x1 = null;
@@ -405,7 +405,7 @@
       fun = name;
       name = 'noname';
     }
-    return special(name, function(solver, cont, x, y, z) {
+    return special(3, name, function(solver, cont, x, y, z) {
       var ycont, zcont;
 
       zcont = solver.cont(z, function(z, solver) {
@@ -428,12 +428,12 @@
     });
   };
 
-  exports.functionPredicate = function(name, fun) {
+  exports.functionPredicate = function(arity, name, fun) {
     if (fun == null) {
       fun = name;
       name = 'noname';
     }
-    return special(name, function() {
+    return special(arity, name, function() {
       var args, cont, solver;
 
       solver = arguments[0], cont = arguments[1], args = 3 <= arguments.length ? __slice.call(arguments, 2) : [];
@@ -450,7 +450,7 @@
     });
   };
 
-  exports.between = special('between', function(solver, cont, fun, x, y, z) {
+  exports.between = special(3, 'between', function(solver, cont, fun, x, y, z) {
     var y1, ycont, z1, zcont;
 
     y1 = z1 = null;
@@ -496,7 +496,7 @@
     });
   });
 
-  exports.rangep = special('between', function(solver, cont, fun, x, y) {
+  exports.rangep = special(2, 'rangep', function(solver, cont, fun, x, y) {
     var x1, ycont;
 
     x1 = null;
@@ -528,7 +528,7 @@
     });
   });
 
-  exports.varp = special('varp', function(solver, cont, x) {
+  exports.varp = special(1, 'varp', function(solver, cont, x) {
     return solver.cont(x, function(x1, solver) {
       if (x1 instanceof dao.Var) {
         return cont(true, solver);
@@ -538,7 +538,7 @@
     });
   });
 
-  exports.nonvarp = special('varp', function(solver, cont, x) {
+  exports.nonvarp = special(1, 'varp', function(solver, cont, x) {
     return solver.cont(x, function(x1, solver) {
       if (!(x1 instanceof dao.Var)) {
         return cont(true, solver);
@@ -548,7 +548,7 @@
     });
   });
 
-  exports.freep = special('freep', function(solver, cont, x) {
+  exports.freep = special(1, 'freep', function(solver, cont, x) {
     return function(v, solver) {
       if (solver.trail.deref(x) instanceof Var) {
         return cont(true, solver);
@@ -558,7 +558,7 @@
     };
   });
 
-  exports.numberp = special('numberp', function(solver, cont, x) {
+  exports.numberp = special(1, 'numberp', function(solver, cont, x) {
     return solver.cont(x, function(x1, solver) {
       if (_.isNumber(x1)) {
         return cont(true, solver);
@@ -568,7 +568,7 @@
     });
   });
 
-  exports.stringp = special('stringp', function(solver, cont, x) {
+  exports.stringp = special(1, 'stringp', function(solver, cont, x) {
     return solver.cont(x, function(x1, solver) {
       if (_.isString(x1)) {
         return cont(true, solver);
@@ -578,7 +578,7 @@
     });
   });
 
-  exports.atomp = special('atomp', function(solver, cont, x) {
+  exports.atomp = special(1, 'atomp', function(solver, cont, x) {
     return solver.cont(x, function(x1, solver) {
       if (_.isNumber(x1) || _.isString(x1)) {
         return cont(true, solver);
@@ -588,7 +588,7 @@
     });
   });
 
-  exports.arrayp = special('arrayp', function(solver, cont, x) {
+  exports.listp = special(1, 'listp', function(solver, cont, x) {
     return solver.cont(x, function(x1, solver) {
       if (_.isArray(x1)) {
         return cont(true, solver);
@@ -598,7 +598,7 @@
     });
   });
 
-  exports.callablep = special('callablep', function(solver, cont, x) {
+  exports.callablep = special(1, 'callablep', function(solver, cont, x) {
     return solver.cont(x, function(x1, solver) {
       if (x1 instanceof dao.Apply) {
         return cont(true, solver);

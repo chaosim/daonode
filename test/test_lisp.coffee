@@ -53,7 +53,7 @@ exports.Test =
     test.done()
 
   "test proc,aka online function in dao": (test) ->
-    r = proc('a', () ->
+    r = proc(0, 'a', () ->
       i = 0
       add(1, 2))
     a = r()
@@ -124,15 +124,14 @@ exports.Test =
     test.done()
 
   "test argsCont": (test) ->
-    f = (args...) ->_.map(args, (x) -> x+1)
-    df = fun(f)
-    test.deepEqual  solve(df(1)), [2]
-    test.deepEqual  solve(df(1, 2)), [2, 3]
-    test.deepEqual  solve(df(1, 2, 3)), [2, 3, 4]
-    test.deepEqual  solve(df(1, 2, 3, 4)), [2, 3, 4, 5]
-    test.deepEqual  solve(df(1, 2, 3, 4, 5)), [2, 3, 4, 5, 6]
-    test.deepEqual  solve(df(1, 2, 3, 4, 5, 6)), [2, 3, 4, 5, 6, 7]
-    test.deepEqual  solve(df(1, 2, 3, 4, 5, 6, 7)), [2, 3, 4, 5, 6, 7, 8]
-    test.deepEqual  solve(df(1, 2, 3, 4, 5, 6, 7, 8)), [2, 3, 4, 5, 6, 7, 8, 9]
-    test.deepEqual  solve(df(1, 2, 3, 4, 5, 6, 7, 8, 9)), [2, 3, 4, 5, 6, 7, 8, 9, 10]
+    incall = fun(-1, (args...) ->_.map(args, (x) -> x+1))
+    test.deepEqual  solve(incall(1)), [2]
+    test.deepEqual  solve(incall(1, 2)), [2, 3]
+    test.deepEqual  solve(incall(1, 2, 3)), [2, 3, 4]
+    test.deepEqual  solve(incall(1, 2, 3, 4)), [2, 3, 4, 5]
+    test.deepEqual  solve(incall(1, 2, 3, 4, 5)), [2, 3, 4, 5, 6]
+    test.deepEqual  solve(incall(1, 2, 3, 4, 5, 6)), [2, 3, 4, 5, 6, 7]
+    test.deepEqual  solve(incall(1, 2, 3, 4, 5, 6, 7)), [2, 3, 4, 5, 6, 7, 8]
+    test.deepEqual  solve(incall(1, 2, 3, 4, 5, 6, 7, 8)), [2, 3, 4, 5, 6, 7, 8, 9]
+    test.deepEqual  solve(incall(1, 2, 3, 4, 5, 6, 7, 8, 9)), [2, 3, 4, 5, 6, 7, 8, 9, 10]
     test.done()

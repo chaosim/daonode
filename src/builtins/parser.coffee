@@ -7,64 +7,60 @@ logic = require "../../src/builtins/logic"
 [Trail, solve, Var,  ExpressionError, TypeError, special] = (dao[name]  for name in\
 "Trail, solve, Var,  ExpressionError, TypeError, special".split(", "))
 
-exports.parse = special('parse', (solver, cont, exp, state) -> (v, solver) ->
-  old_state = solver.state
-  solver.state = state
-  solver.cont(exp, (v, solver) ->
-    solver.state = old_state
-    [cont, v, solver])(v, solver))
-
-exports.parse = special('parse', (solver, cont, exp, state) ->
-  old_state = solver.state
-  solver.state = state
-  solver.cont(exp, (v, solver) ->
-    solver.state = old_state
-    [cont, v, solver]))
+exports.parse = special(2, 'parse', (solver, cont, exp, state) ->
+  oldState = null
+  expCont = solver.cont(exp, (v, solver) ->
+    solver.state = oldState
+    [cont, v, solver])
+  (v, solver) ->
+    oldState = solver.state
+    solver.state = state
+    expCont(v, solver))
 
 exports.parsetext = exports.parsesequence = (exp, sequence) -> exports.parse(exp, [sequence, 0])
 
-exports.setstate = special('setstate', (solver, cont, state) -> (v, solver) ->
+exports.setstate = special(1, 'setstate', (solver, cont, state) -> (v, solver) ->
   solver.state = state
   cont(v, solver))
 
 exports.settext = exports.setsequence = (sequence) -> exports.setstate([sequence, 0])
 
-exports.getstate = special('getstate', (solver, cont) -> (v, solver) ->
-  cont(solver.state, solver))
+exports.getstate = special(0, 'getstate', (solver, cont) -> (v, solver) ->
+  cont(solver.state, solver))()
 
-exports.gettext = exports.getsequence = special('gettext', (solver, cont) -> (v, solver) ->
-  cont(solver.state[0], solver))
+exports.gettext = exports.getsequence = special(0, 'gettext', (solver, cont) -> (v, solver) ->
+  cont(solver.state[0], solver))()
 
-exports.getpos =special('getpos', (solver, cont) -> (v, solver) ->
-  cont(solver.state[1], solver))
+exports.getpos =special(0, 'getpos', (solver, cont) -> (v, solver) ->
+  cont(solver.state[1], solver))()
 
-exports.eoi = special('eoi', (solver, cont) -> (v, solver) ->
+exports.eoi = special(0, 'eoi', (solver, cont) -> (v, solver) ->
   [data, pos] = solver.state
   if pos>=data.length then cont(true, solver) else solver.failcont(v, solver))()
 
-exports.boi = special('boi', (solver, cont) -> (v, solver) ->
+exports.boi = special(0, 'boi', (solver, cont) -> (v, solver) ->
   if solver.state[1] is 0 then cont(true, solver) else solver.failcont(v, solver))()
 
-exports.step = special('step', (solver, cont, n=1) -> (v, solver) ->
+exports.step = special(-1, 'step', (solver, cont, n=1) -> (v, solver) ->
   [text, pos] = solver.state
   solver.state = [text, pos+n]
   cont(pos+n, solver))
 
-exports.lefttext =  special('lefttext', (solver, cont) -> (v, solver) ->
+exports.lefttext =  special(0, 'lefttext', (solver, cont) -> (v, solver) ->
   [text, pos] = solver.state
-  cont(text[pos...], solver))
+  cont(text[pos...], solver))()
 
-exports.subtext =  exports.subsequence =  special('subtext', (solver, cont, length, start) -> (v, solver) ->
+exports.subtext =  exports.subsequence =  special(-1, 'subtext', (solver, cont, length, start) -> (v, solver) ->
   [text, pos] = solver.state
   start = start? or pos
   length = length? or text.length
   cont(text[start...start+length], solver))
 
-exports.nextchar =  special('nextchar', (solver, cont) -> (v, solver) ->
+exports.nextchar =  special(0, 'nextchar', (solver, cont) -> (v, solver) ->
   [text, pos] = solver.state
   cont(text[pos], solver))
 
-exports.follow = special('follow', (solver, cont, item) ->
+exports.follow = special(1, 'follow', (solver, cont, item) ->
   state = null
   itemCont =  solver.cont(item, (v, solver) ->
     solver.state = state;
@@ -73,7 +69,7 @@ exports.follow = special('follow', (solver, cont, item) ->
     state = solver.state
     itemCont(v, solver))
 
-exports.notfollow = special('notfollow', (solver, cont, item) ->
+exports.notfollow = special(1, 'notfollow', (solver, cont, item) ->
   fc = state = null
   itemCont =  solver.cont(item, (v, solver) ->
     solver.state = state
@@ -96,7 +92,7 @@ parallelFun = (solver, cont, state, args) ->
 
 exports.checkParallel = checkFunction = (state, baseState) -> state[1] is baseState[1]
 
-exports.parallel = special('parallel', (solver, cont, args...) ->
+exports.parallel = special(-1, 'parallel', (solver, cont, args...) ->
   # from current position to right pass all of args
   length = args.length
   if length is 0 then throw new ArgumentError(args)
@@ -119,13 +115,13 @@ exports.parallel = special('parallel', (solver, cont, args...) ->
       ycont(v, solver))
     xcont)
 
-exports.may = special('may', (solver, cont, exp) ->
+exports.may = special(1, 'may', (solver, cont, exp) ->
   exp_cont = solver.cont(exp, cont)
   (v, solver) ->
     solver.appendFailcont(cont)
     exp_cont(v, solver))
 
-exports.lazymay = special('lazymay', (solver, cont, exp) ->
+exports.lazymay = special(1, 'lazymay', (solver, cont, exp) ->
   expCont = solver.cont(exp, cont)
   (v, solver) ->
     fc = solver.failcont
@@ -134,7 +130,7 @@ exports.lazymay = special('lazymay', (solver, cont, exp) ->
       expCont(v, solver)
     cont(v, solver))
 
-exports.greedymay = special('greedymay', (solver, cont, exp) ->
+exports.greedymay = special(1, 'greedymay', (solver, cont, exp) ->
   fc = null
   expCont = solver.cont(exp, (v, solver) ->
     solver.failcont = fc
@@ -146,9 +142,9 @@ exports.greedymay = special('greedymay', (solver, cont, exp) ->
       cont(v, solver)
     expCont(v, solver))
 
-any = (exp, result, template) -> if not reslult then any1(exp) else any2(exp, result, template)
+exports.any = (exp, result, template) -> if not result then any1(exp) else any2(exp, result, template)
 
-exports.any1 = special('any', (solver, cont, exp) ->
+any1 = special(1, 'any', (solver, cont, exp) ->
   anyCont = (v, solver) ->
     fc = solver.failcont
     trail = solver.trail
@@ -164,7 +160,7 @@ exports.any1 = special('any', (solver, cont, exp) ->
   expCont = solver.cont(exp, anyCont)
   anyCont)
 
-exports.any2 = special('any', (solver, cont, exp, result, template) ->
+any2 = special(3, 'any', (solver, cont, exp, result, template) ->
   result1 = null
   anyCont = (v, solver) ->
     fc = solver.failcont
@@ -184,9 +180,10 @@ exports.any2 = special('any', (solver, cont, exp, result, template) ->
     anyCont(v, solver))
   (v, solver) -> result1 = []; anyCont(v, solver))
 
-lazyany = (exp, result, template) -> if not reslult then lazyany1(exp) else lazyany2(exp, result, template)
+exports.lazyany = (exp, result, template) ->
+  if not result then lazyany1(exp) else lazyany2(exp, result, template)
 
-exports.lazyany1 = special('lazyany', (solver, cont, exp) ->
+lazyany1 = special(1, 'lazyany', (solver, cont, exp) ->
   fc = null
   anyCont = (v, solver) ->
     solver.failcont = anyFcont
@@ -197,22 +194,23 @@ exports.lazyany1 = special('lazyany', (solver, cont, exp) ->
     [expcont, v, solver]
   (v, solver) ->  fc = solver.failcont; anyCont(v, solver))
 
-exports.lazyany2 = special('lazyany', (solver, cont, exp, result, template) ->
+lazyany2 = special(3, 'lazyany', (solver, cont, exp, result, template) ->
   result1 = fc = null
   anyCont = (v, solver) ->
-    result1.push(solver.trail.getvalue(template))
     solver.failcont = anyFcont
+    result.bind(result1, solver.trail)
     cont(v, solver)
-  expcont = solver.cont(exp, anyCont)
+  expcont = solver.cont(exp, (v, solver) ->
+    result1.push(solver.trail.getvalue(template))
+    anyCont(v, solver))
   anyFcont = (v, solver) ->
     solver.failcont = fc
-    result.bind(result1)
     [expcont, v, solver]
   (v, solver) -> result1 = []; fc = solver.failcont; anyCont(v, solver))
 
-greedyany = (exp, result, template) -> if not reslult then greedyany1(exp) else greedyany2(exp, result, template)
+exports.greedyany = (exp, result, template) -> if not result then greedyany1(exp) else greedyany2(exp, result, template)
 
-exports.greedyany1 = special('greedyany', (solver, cont, exp) ->
+greedyany1 = special(1, 'greedyany', (solver, cont, exp) ->
   anyCont = (v, solver) -> [expCont, v, solver]
   expCont =  solver.cont(exp, anyCont)
   (v, solver) ->
@@ -220,7 +218,7 @@ exports.greedyany1 = special('greedyany', (solver, cont, exp) ->
     solver.failcont = (v, solver) -> (solver.failcont = fc; cont(v, solver))
     anyCont(v, solver))
 
-exports.greedyany2 = special('greedyany', (solver, cont, exp, result, template) ->
+greedyany2 = special(3, 'greedyany', (solver, cont, exp, result, template) ->
   result1 = null
   anyCont = (v, solver) ->
     result1.push(solver.trail.getvalue(template));
@@ -232,9 +230,9 @@ exports.greedyany2 = special('greedyany', (solver, cont, exp, result, template) 
     solver.failcont = (v, solver) -> (solver.failcont = fc; result.bind(result1); cont(v, solver))
     anyCont(v, solver))
 
-some = (exp, result, template) -> if not result then some1(exp) else some2(exp, result, template)
+exports.some = (exp, result, template) -> if not result then some1(exp) else some2(exp, result, template)
 
-exports.some1 = special('some', (solver, cont, exp) ->
+some1 = special(1, 'some', (solver, cont, exp) ->
   someCont = (v, solver) ->
     fc = solver.failcont
     trail = solver.trail
@@ -250,7 +248,7 @@ exports.some1 = special('some', (solver, cont, exp) ->
   expCont = solver.cont(exp, someCont)
   expCont)
 
-exports.some2 = special('some', (solver, cont, exp, result, template) ->
+some2 = special(3, 'some', (solver, cont, exp, result, template) ->
   result1 = null
   someCont = (v, solver) ->
     fc = solver.failcont
@@ -270,9 +268,9 @@ exports.some2 = special('some', (solver, cont, exp, result, template) ->
     someCont(v, solver))
   (v, solver) -> result1 = []; expCont(v, solver))
 
-lazysome = (exp, result, template) -> if not result then lazysome1(exp) else lazysome2(exp, result, template)
+exports.lazysome = (exp, result, template) -> if not result then lazysome1(exp) else lazysome2(exp, result, template)
 
-exports.lazysome1 = special('lazysome', (solver, cont, exp) ->
+lazysome1 = special(1, 'lazysome', (solver, cont, exp) ->
   fc = null
   someFcont = (v, solver) ->
     solver.failcont = fc
@@ -283,7 +281,7 @@ exports.lazysome1 = special('lazysome', (solver, cont, exp) ->
   expcont = solver.cont(exp, someCont)
   (v, solver) ->  fc = solver.failcont; expcont(v, solver))
 
-exports.lazysome2 = special('lazysome', (solver, cont, exp, result, template) ->
+lazysome2 = special(3, 'lazysome', (solver, cont, exp, result, template) ->
   result1 = fc = null
   someFcont = (v, solver) ->
     solver.failcont = fc
@@ -296,9 +294,9 @@ exports.lazysome2 = special('lazysome', (solver, cont, exp, result, template) ->
   expcont = solver.cont(exp, someCont)
   (v, solver) -> result1 = []; fc = solver.failcont; expcont(v, solver))
 
-greedysome = (exp, result, template) -> if not result then greedysome1(exp) else greedysome2(exp, result, template)
+exports.greedysome = (exp, result, template) -> if not result then greedysome1(exp) else greedysome2(exp, result, template)
 
-exports.greedysome1 = special('greedysome', (solver, cont, exp) ->
+greedysome1 = special(1, 'greedysome', (solver, cont, exp) ->
   someCont = (v, solver) -> [expCont, v, solver]
   expCont =  solver.cont(exp, someCont)
   (v, solver) ->
@@ -306,7 +304,7 @@ exports.greedysome1 = special('greedysome', (solver, cont, exp) ->
     solver.failcont = (v, solver) -> (solver.failcont = fc; cont(v, solver))
     expCont(v, solver))
 
-exports.greedysome2 = special('greedysome', (solver, cont, exp, result, template) ->
+greedysome2 = special(3, 'greedysome', (solver, cont, exp, result, template) ->
   result1 = null
   someCont = (v, solver) ->
     result1.push(solver.trail.getvalue(template));
@@ -318,7 +316,7 @@ exports.greedysome2 = special('greedysome', (solver, cont, exp, result, template
     solver.failcont = (v, solver) -> (solver.failcont = fc; result.bind(result1); cont(v, solver))
     expCont(v, solver))
 
-times = (exp, expectTimes, result, template) ->
+exports.times = (exp, expectTimes, result, template) ->
   if not result then times1(exp, expectTimes)
   else times2(exp, expectTimes, result, template)
 
@@ -365,7 +363,7 @@ times1Fun = (solver, cont, exp, expectTimes) ->
       else
         (v, solver) -> i = 0; anyCont(v, solver))
 
-exports.times1 = special('times', times1Fun)
+times1 = special(2, 'times', times1Fun)
 
 numberTimes2Fun = (solver, cont, exp, expectTimes, result, template) ->
   expectTimes = Math.ceil(expectTimes)
@@ -418,21 +416,25 @@ times2Fun = (solver, cont, exp, expectTimes, result, template) ->
       else
         (v, solver) -> i = 0; anyCont(v, solver))
 
-exports.times2 = special('times', times2Fun)
-
-exports.seplist0 = (exp, options) ->
-  options = {sep:char(' '), expectTimes:null, result:null, template:null}
-  # 0 or more exp separated by sep
+times2 = special(4, 'times', times2Fun)
 
 exports.seplist1 = (exp, options) ->
-  options = _.extend options, {sep:char(' '), expectTimes:null, result:null, template:null}
-  sep = options.sep; expectTimes = options.expectTimes
-  result = options.result; template = options.template
-
-  succeed = logic.succeed; andp = logic.andp; bind = logic.bind; is_ = logic.is_
-  list = general.list; push = general.array; zero = lisp.zero
   # 1 or more exp separated by sep
-  if _.isNumber(expectTimes)
+  sep = options.sep or char(' ');
+  expectTimes = options.expectTimes
+  result = options.result or null;
+  template = options.template or null
+
+  succeed = logic.succeed; andp = logic.andp; bind = logic.bind; is_ = logic.is_; getvalue = logic.getvalue
+  list = general.list; push = general.array; one = lisp.zero
+
+  if expectTimes is null
+    if result is null
+      andp(exp, any(andp(sep, exp)))
+    else
+       andp(bind(result, []), exp, push(result, getvalue(template)),
+                  any(andp(sep, exp, push(result, getvalue(template)))))
+  else if _.isNumber(expectTimes)
     expectTimes = Math.ceil Math.max 0, expectTimes
     if result is null
       switch expectTimes
@@ -444,24 +446,26 @@ exports.seplist1 = (exp, options) ->
         when 0 then bind(result, [])
         when 1 then andp(exp, bind(result, list(getvalue(template))))
         else andp(bind(result, []), exp, push(result,getvalue(template)),
-                  times(andp(sep, exp, push(result,getvalue(template)),expectTimes-1)))
+                  times(andp(sep, exp, push(result, getvalue(template))), expectTimes-1))
   else
+    n = newVar('n')
+    i = newVar('i')
     if result is null
-       ifp(freep(expectTimes), andp(exp, assign(i, 0); any(andp(sep, exp),inc(i)), bind(expectTimes, i))
-           andp(exp, is_(n, sub(expectTimes, 1)), times(andp(sep, exp),n)))
+       ifp(freep(expectTimes), andp(exp, one(i); any(andp(sep, exp,inc(i))), bind(expectTimes, i))
+           andp(exp, is_(n, sub(expectTimes, 1)), times(andp(sep, exp), n)))
     else
-      andp(bind(reuslt, []),
+      andp(bind(result, []),
            ifp(freep(expectTimes),
-               andp(exp, zero(i),
+               andp(exp, one(i),
                     push(result,getvalue(template)),
-                    any(andp(sep, exp, push(result,getvalue(template)),inc(i))),
+                    any(andp(sep, exp, push(result, getvalue(template)),inc(i))),
                     bind(expectTimes, i))
                andp(exp,
                     push(result,getvalue(template)),
                     is_(n, sub(expectTimes, 1)),
                     times(andp(sep, exp, push(result,getvalue(template))),n))))
 
-exports.char = special('char', (solver, cont, x) ->  (v, solver) ->
+exports.char = special(1, 'char', (solver, cont, x) ->  (v, solver) ->
   [data, pos] = solver.state
   if pos>=data.length then return solver.failcont(v, solver)
   trail = solver.trail
@@ -477,7 +481,7 @@ exports.char = special('char', (solver, cont, x) ->  (v, solver) ->
     else throw new ExpressionError(x)
   else throw new TypeError(x))
 
-exports.followChar = special('followChar', (solver, cont, arg) -> (v, solver) ->
+exports.followChar = special(1, 'followChar', (solver, cont, arg) -> (v, solver) ->
   [data, pos] = solver.state
   if pos>=data.length then return solver.failcont(v, solver)
   trail = solver.trail
@@ -490,7 +494,7 @@ exports.followChar = special('followChar', (solver, cont, arg) -> (v, solver) ->
     else throw new ValueError(x)
   else throw new TypeError(x))
 
-exports.notFollowChar = special('followChar', (solver, cont, x) -> (v, solver) ->
+exports.notFollowChar = special(1, 'notfollowChar', (solver, cont, x) -> (v, solver) ->
   [data, pos] = solver.state
   if pos>=data.length then return solver.failcont(v, solver)
   trail = solver.trail
@@ -503,7 +507,7 @@ exports.notFollowChar = special('followChar', (solver, cont, x) -> (v, solver) -
     else throw new ValueError(x)
   else throw new TypeError(x))
 
-exports.followChars = special('followChar', (solver, cont, chars) -> (v, solver) ->
+exports.followChars = special(1, 'followChars', (solver, cont, chars) -> (v, solver) ->
   # follow one of char in chars
   chars = trail.deref(chars)
   if chars instanceof Var then throw new TypeError(chars)
@@ -516,7 +520,7 @@ exports.followChars = special('followChar', (solver, cont, chars) -> (v, solver)
     throw new TypeError(chars)
   else solver.failcont(pos, solver))
 
-exports.notFollowChars = special('followChar', (solver, cont, chars) -> (v, solver) ->
+exports.notFollowChars = special(1, 'notFollowChars', (solver, cont, chars) -> (v, solver) ->
   # not follow one of char in chars
   chars = trail.deref(chars)
   if chars instanceof Var then throw new TypeError(chars)
@@ -529,7 +533,7 @@ exports.notFollowChars = special('followChar', (solver, cont, chars) -> (v, solv
     throw new TypeError(chars)
   else cont(pos, solver))
 
-exports.charWhen = special('charWhen', (solver, cont, test) -> (v, solver) ->
+exports.charWhen = special(1, 'charWhen', (solver, cont, test) -> (v, solver) ->
   [data, pos] = solver.state
   if pos>=data.length then return solver.failcont(false, solver)
   c = data[pos]
@@ -537,7 +541,7 @@ exports.charWhen = special('charWhen', (solver, cont, test) -> (v, solver) ->
   else solver.failcont(c, solver))
 
 exports.charBetween = (x, start, end) -> exports.charWhen(x, (c) -> start<c<end)
-exports.charIn = (x, set) -> exports.charWhen(x, (c) ->  c in set)
+exports.charIn = (x, set) -> exports.charWhen((c) ->  c in x)
 exports.digit = exports.charWhen((c)->'0'<=c<='9')
 exports.digit1_9 = exports.charWhen((c)->'1'<=c<='9')
 exports.lower = exports.charWhen((c)->'a'<=c<='z')
@@ -549,7 +553,7 @@ exports.tabspace = exports.charIn(' \t')
 exports.whitespace = exports.charIn(' \t\r\n')
 exports.newline = exports.charIn('\r\n')
 
-exports.spaces = special('spaces', (solver, cont) -> (v, solver) ->
+exports.spaces = special(0, 'spaces', (solver, cont) -> (v, solver) ->
   # 1 or more spaces
   [data, pos] = solver.state
   if pos>=data.length then return solver.failcont(false, solver)
@@ -559,7 +563,7 @@ exports.spaces = special('spaces', (solver, cont) -> (v, solver) ->
   while p< length and data[p] is ' ' then p++
   cont(p-pos, solver))
 
-exports.spaces0 = special('spaces', (solver, cont) -> (v, solver) ->
+exports.spaces0 = special(0, 'spaces', (solver, cont) -> (v, solver) ->
   # 0 or more spaces
   [data, pos] = solver.state
   if pos>=data.length then return cont(0, solver)
@@ -569,7 +573,7 @@ exports.spaces0 = special('spaces', (solver, cont) -> (v, solver) ->
   while p< length and data[p] is ' ' then p++
   cont(p-pos, solver))
 
-exports.stringWhile = special('stringWhile', (solver, cont, test) -> (v, solver) ->
+exports.stringWhile = special(1, 'stringWhile', (solver, cont, test) -> (v, solver) ->
   [data, pos] = solver.state
   length = data.length
   if pos is length then return solver.failcont(false, solver)
@@ -592,7 +596,7 @@ exports.tabspaces = exports.stringIn(' \t')
 exports.whitespaces = exports.stringIn(' \t\r\n')
 exports.newlinespaces = exports.stringIn('\r\n')
 
-exports.stringWhile0 = special('stringWhile0', (solver, cont, test) -> (v, solver) ->
+exports.stringWhile0 = special(1, 'stringWhile0', (solver, cont, test) -> (v, solver) ->
   [data, pos] = solver.state
   length = data.length
   if pos is length then return cont('', solver)
@@ -615,7 +619,7 @@ exports.tabspaces0 = exports.stringIn0(' \t')
 exports.whitespaces0 = exports.stringIn0(' \t\r\n')
 exports.newlines0 = exports.stringIn0('\r\n')
 
-exports.float = special('float', (solver, cont, arg) -> (v, solver) ->
+exports.float = special(1, 'float', (solver, cont, arg) -> (v, solver) ->
   [text, pos] = solver.parse_state
   length = text.length
   if pos>=length then return solver.failcont(v, solver)
@@ -640,7 +644,7 @@ exports.float = special('float', (solver, cont, arg) -> (v, solver) ->
       else solver.failcont(v, solver)          s
     else throw new exports.TypeError(arg))
 
-exports.literal = special('literal', (solver, cont, arg) -> (v, solver) ->
+exports.literal = special(1, 'literal', (solver, cont, arg) -> (v, solver) ->
   arg = solver.trail.deref(arg)
   if (arg instanceof Var) then throw new exports.TypeError(arg)
   [text, pos] = solver.parse_state
@@ -655,7 +659,7 @@ exports.literal = special('literal', (solver, cont, arg) -> (v, solver) ->
     cont(p, solver)
   else solver.failcont(p, solver))
 
-exports.followLiteral = special('followLiteral', (solver, cont, arg) -> (v, solver) ->
+exports.followLiteral = special(1, 'followLiteral', (solver, cont, arg) -> (v, solver) ->
   arg = solver.trail.deref(arg)
   if (arg instanceof Var) then throw new exports.TypeError(arg)
   [text, pos] = solver.parse_state
@@ -668,7 +672,7 @@ exports.followLiteral = special('followLiteral', (solver, cont, arg) -> (v, solv
   if i is length2 then cont(p, solver)
   else solver.failcont(p, solver))
 
-exports.notFollowLiteral = special('followLiteral', (solver, cont, arg) -> (v, solver) ->
+exports.notFollowLiteral = special(1, 'followLiteral', (solver, cont, arg) -> (v, solver) ->
   arg = solver.trail.deref(arg)
   if (arg instanceof Var) then throw new exports.TypeError(arg)
   [text, pos] = solver.parse_state
@@ -681,8 +685,7 @@ exports.notFollowLiteral = special('followLiteral', (solver, cont, arg) -> (v, s
   if i is length2 then solver.failcont(p, solver)
   else cont(p, solver))
 
-
-exports.quoteString = special('quoteString', (solver, cont, quote) -> (v, solver) ->
+exports.quoteString = special(1, 'quoteString', (solver, cont, quote) -> (v, solver) ->
   string = ''
   [text, pos] = solver.parse_state
   length = text.length
