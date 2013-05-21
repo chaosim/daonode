@@ -11,20 +11,6 @@ I.use base+"builtins/parser: char parsetext may any"
 xexports = {}
 
 exports.Test =
-  "test 1": (test) ->
-    test.equal  solve(1), 1
-    test.done()
-
-
-  "test vari": (test) ->
-    a = vari('a')
-    test.equal  solve(a), a
-    test.done()
-
-  "test print": (test) ->
-    test.equal  solve(print_('a')), null
-    test.done()
-
   "test and print": (test) ->
     test.equal  solve(andp(print_(1), print_(2))), null
     test.done()
@@ -76,24 +62,6 @@ exports.Test =
     test.equal  solve(orp(unify(a, 1), unify(a, 2))), true
     test.done()
 
-  "test builtin function": (test) ->
-    same = fun((x)->x)
-    test.equal  solve(same(1)), 1
-    add = fun((x, y) -> x+y)
-    test.equal  solve(add(1, 2)), 3
-    test.done()
-
-  "test var bind unify trail": (test) ->
-    trail = new Trail
-    x = vari('x')
-    test.equal x.binding, x
-    x.bind(1, trail)
-    test.ok x.unify(1, trail)
-    test.ok not x.unify(2, trail)
-    trail.undo()
-    test.ok x.unify(2, trail)
-    test.done()
-
   "test macro": (test) ->
     same = macro((x) -> x)
     orpm = macro((x, y) -> orp(x, y))
@@ -110,16 +78,9 @@ exports.Test =
     #    test.equal  solve(orp(andp(unify(a, 1), unify(a, 2)), unify(a, 2))), true
     test.done()
 
-  "test macro": (test) ->
-    same = macro((x) -> x)
-    orpm = macro((x, y) -> orp(x, y))
-    test.equal  solve(same(1)), 1
-    test.equal  solve(same(print_(1))), null
-    test.equal  solve(orpm(fail, print_(2))), null
-    test.done()
-
   "test findall once": (test) ->
     test.equal  solve(findall(orp(print_(1), print_(2)))), null
+    test.equal  solve(findall(orp(print_(1), print_(2), print_(3)))), null
     test.equal  solve(findall(once(orp(print_(1), print_(2))))), null
     test.done()
 
@@ -135,5 +96,12 @@ exports.Test =
       [[1,2], print_(1),
        [1,1], print_(2)])
     test.equal  solve(r(1,1)), null
+    test.done()
+
+xexports.Test =
+  "test findall": (test) ->
+#    test.equal  solve(orp(findall(orp(print_(1), print_(2))),
+#                         print_(3))), null
+    test.equal  solve(findall(once(orp(print_(1), (print_(2)))))), null
     test.done()
 

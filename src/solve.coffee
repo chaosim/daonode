@@ -8,39 +8,73 @@ exports.debug = debug = (items...) ->
                 if s=='[object Object]' then JSON.stringify(x) else s
               else '[Function]') )...)
 
-exports.done = done =(v, solver) -> console.log("succeed!"); solver.done = true; [null, solver.trail.getvalue(v), solver]
+class BindingError
+  constructor: (@vari, @message) ->
 
-exports.faildone = faildone =(v, solver) -> console.log("fail!"); solver.done = true;  [null, solver.trail.getvalue(v), solver]
+class TypeError
+  constructor: (@exp, @message) ->
 
-exports.solve = (exp, trail=new Trail, cont = done, failcont = faildone) ->
-  new exports.Solver(trail, failcont).solve(exp, cont)
+class ExpressionError
+  constructor: (@exp, @message) ->
 
-exports.solver = (trail=new Trail, failcont = faildone, state) -> new exports.Solver(trail, failcont, state)
+class ArgumentError
+  constructor: (@exp, @message) ->
+
+class ArityError
+  constructor: (@exp, @message) ->
+
+exports.SUCCESS = 1
+exports.UNKNOWN = 0
+exports.FAIL = -1
+exports.status = exports.UNKNOWN
+
+exports.done = done =(v, solver) ->
+  solver.done = true
+  exports.status = exports.SUCCESS
+  [null, solver.trail.getvalue(v), solver]
+
+exports.faildone = faildone = (v, solver) ->
+  solver.done = true
+  exports.status = exports.FAIL
+  [null, solver.trail.getvalue(v), solver]
+
+exports.solve = (exp, cont=done, failcont=faildone, trail=new Trail) ->
+  exports.status = exports.UNKNOWN
+  new exports.Solver(failcont, trail).solve(exp, cont)
+
+exports.solver = (failcont = faildone, trail=new Trail, state) -> new exports.Solver(failcont, trail, state)
 
 class exports.Solver
-  constructor: (@trail=new exports.Trail, @failcont = faildone, @state) ->
+  constructor: (@failcont=faildone, @trail=new Trail, @state) ->
     @cutCont = @failcont
     @catches = {}
     @exits = {}
     @continues = {}
     @done = false
 
-  pushCatch: (value, cont) ->
-    catches = @catches[value] ?= []
-    catches.push(cont)
-
-  popCatch: (value) -> catches = @catches[value]; catches.pop(); if catches.length is 0 then delete @catches[value]
-
-  findCatch: (value) ->
-    catches = @catches[value]
-    if not catches? or catches.length is 0 then throw new NotCatched
-    catches[catches.length-1]
-
-  protect: (fun) -> fun
+  solve: (exp, cont = done) ->
+    cont = @cont(exp, cont or done)
+    value = null
+    solver = @
+    while not solver.done
+      [cont, value, solver] = cont(value, solver)
+    value
 
   cont: (exp, cont) -> exp?.cont?(@, cont) or ((v, solver) -> cont(exp, solver))
 
   quasiquote: (exp, cont) -> exp?.quasiquote?(@, cont) or ((v, solver) -> cont(exp, solver))
+
+  appendFailcont: (fun) ->
+    trail = @trail
+    @trail = new Trail
+    state = @state
+    fc = @failcont
+    @failcont = (v, solver) ->
+      solver.trail.undo()
+      solver.trail = trail
+      solver.state = state
+      solver.failcont = fc;
+      fun(v, solver)
 
   expsCont: (exps, cont) ->
     length = exps.length
@@ -131,20 +165,28 @@ class exports.Solver
             solver.cont(args[i], _cont)
         cont
 
-  solve: (exp, cont = done) ->
-    cont = @cont(exp, cont or done)
-    value = null
-    solver = @
-    while not solver.done
-      [cont, value, solver] = cont(value, solver)
-    value
+  pushCatch: (value, cont) ->
+    catches = @catches[value] ?= []
+    catches.push(cont)
+
+  popCatch: (value) -> catches = @catches[value]; catches.pop(); if catches.length is 0 then delete @catches[value]
+
+  findCatch: (value) ->
+    catches = @catches[value]
+    if not catches? or catches.length is 0 then throw new NotCatched
+    catches[catches.length-1]
+
+  protect: (fun) -> fun
+
+
+MAXBINDINGCHAINLENGTH = 200 # to break cylylic binding
 
 Trail = class exports.Trail
   constructor: (@data={}) ->
   set: (vari, value) ->  if not @data.hasOwnProperty(vari.name) then @data[vari.name] = [vari, value]
   undo: () -> for name, pair of @data then pair[0].binding = pair[1]
   deref: (x) -> x?.deref?(@) or x
-  getvalue: (x) -> x?.getvalue?(@) or x
+  getvalue: (x, chainslength=0) -> x?.getvalue?(@, chainslength) or x
   unify: (x, y) -> x?.unify?(y, @) or y?.unify?(x, @) or (x is y)
 
 Var = class exports.Var
@@ -155,9 +197,11 @@ Var = class exports.Var
     if next is @ or next not instanceof Var then next
     else
       chains = [v]
+      length = 1
       while 1
         chains.push(next)
         v = next; next = v.binding
+        length++
         if next is v
           for i in [0...chains.length-2]
             x = chains[i]
@@ -170,6 +214,8 @@ Var = class exports.Var
             x.binding = next
             trail.set(x, chains[i+1])
           return next
+        else if length > MAXBINDINGCHAINLENGTH
+          throw BindingError(v, "Binding chains is too long!")
 
   bind: (value, trail) ->
     trail.set(@, @binding)
@@ -184,10 +230,10 @@ Var = class exports.Var
 
   _unify: (y, trail) -> @bind(y, trail); true
 
-  getvalue: (trail) ->
+  getvalue: (trail, chainslength=0) ->
     result = @deref(trail)
     if result instanceof exports.Var then result
-    else getvalue(result)
+    else trail.getvalue(result, chainslength+1)
 
   cont: (solver, cont) -> (v, solver) => cont(@deref(solver.trail), solver)
 
@@ -202,10 +248,12 @@ exports.DummyVar = class DummyVar extends Var
   deref: (trail) -> @
   bind: (value, trail) -> @binding = value
   _unify: (y, trail) -> @binding = y; true
-  getvalue: (trail) ->
+  getvalue: (trail, chainslength=1) ->
     result = @binding
-    if result is @ then result
-    else getvalue(result)
+    if result is @
+    else if chainslength>MAXBINDINGCHAINLENGTH
+      throw new BindingError(result, "Binding chains is too long!")
+    else trail.getvalue(result, chainslength+1)
 
 exports.dummy = (name) -> new exports.DummyVar(name)
 exports.dummies = (names) -> new DummyVar(name) for name in split names,  reElements
