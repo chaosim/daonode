@@ -79,9 +79,6 @@ exports.length = special('length', (solver, cont, x) ->
 exports.neg = special('neg', (solver, cont, x) ->
   solver.cont(x, (v, solver) -> cont(-v, solver)))
 
-exports.neg = special('neg', (solver, cont, x) ->
-  solver.cont(x, (v, solver) -> cont(-v, solver)))
-
 exports.abs = special('abs', (solver, cont, x) ->
   solver.cont(x, (v, solver) -> cont(Math.abs(v), solver)))
 
@@ -102,11 +99,20 @@ exports.second = special('first', (solver, cont, x) ->
 exports.third = special('first', (solver, cont, x) ->
   solver.cont(x, (v, solver) -> cont(v[2], solver)))
 
-exports.concat = special('index', (solver, cont, x, y) ->
+exports.concat = special('concat', (solver, cont, x, y) ->
   ycont =  solver.cont(y, (v, solver) -> cont(x.concat(y), solver))
+  xcont = (v, solver) ->  x = v; ycont(null, solver)
+  solver.cont(x, xcont))
+
+exports.list = special('list', (solver, cont, args...) ->
+  solver.argsCont(args, cont))
+
+exports.push = special('push', (solver, cont, x, y) ->
+  ycont =  solver.cont(y, (v, solver) -> cont(x.push(y), solver))
   xcont = (v, solver) ->  x = v; ycont(null, solver)
   solver.cont(x, xcont))
 
 exports.free = special('freep', (solver, cont, x) ->
   # x is a free variable?
+  # this never fail, which is different from logic.freep
   (v, solver) -> cont(solver.trail.deref(x) instanceof Var, solver))

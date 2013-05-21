@@ -190,12 +190,6 @@
     });
   });
 
-  exports.neg = special('neg', function(solver, cont, x) {
-    return solver.cont(x, function(v, solver) {
-      return cont(-v, solver);
-    });
-  });
-
   exports.abs = special('abs', function(solver, cont, x) {
     return solver.cont(x, function(v, solver) {
       return cont(Math.abs(v), solver);
@@ -239,11 +233,31 @@
     });
   });
 
-  exports.concat = special('index', function(solver, cont, x, y) {
+  exports.concat = special('concat', function(solver, cont, x, y) {
     var xcont, ycont;
 
     ycont = solver.cont(y, function(v, solver) {
       return cont(x.concat(y), solver);
+    });
+    xcont = function(v, solver) {
+      x = v;
+      return ycont(null, solver);
+    };
+    return solver.cont(x, xcont);
+  });
+
+  exports.list = special('list', function() {
+    var args, cont, solver;
+
+    solver = arguments[0], cont = arguments[1], args = 3 <= arguments.length ? __slice.call(arguments, 2) : [];
+    return solver.argsCont(args, cont);
+  });
+
+  exports.push = special('push', function(solver, cont, x, y) {
+    var xcont, ycont;
+
+    ycont = solver.cont(y, function(v, solver) {
+      return cont(x.push(y), solver);
     });
     xcont = function(v, solver) {
       x = v;

@@ -2,6 +2,8 @@ _ = require('underscore')
 
 dao = require "../../src/solve"
 
+logic = require "../../src/builtins/logic"
+
 [Trail, solve, Var,  ExpressionError, TypeError, special] = (dao[name]  for name in\
 "Trail, solve, Var,  ExpressionError, TypeError, special".split(", "))
 
@@ -417,6 +419,47 @@ times2Fun = (solver, cont, exp, expectTimes, result, template) ->
         (v, solver) -> i = 0; anyCont(v, solver))
 
 exports.times2 = special('times', times2Fun)
+
+exports.seplist0 = (exp, options) ->
+  options = {sep:char(' '), expectTimes:null, result:null, template:null}
+  # 0 or more exp separated by sep
+
+exports.seplist1 = (exp, options) ->
+  options = _.extend options, {sep:char(' '), expectTimes:null, result:null, template:null}
+  sep = options.sep; expectTimes = options.expectTimes
+  result = options.result; template = options.template
+
+  succeed = logic.succeed; andp = logic.andp; bind = logic.bind; is_ = logic.is_
+  list = general.list; push = general.array; zero = lisp.zero
+  # 1 or more exp separated by sep
+  if _.isNumber(expectTimes)
+    expectTimes = Math.ceil Math.max 0, expectTimes
+    if result is null
+      switch expectTimes
+        when 0 then succeed
+        when 1 then exp
+        else andp(exp, times(andp(sep, exp), expectTimes-1))
+    else
+      switch expectTimes
+        when 0 then bind(result, [])
+        when 1 then andp(exp, bind(result, list(getvalue(template))))
+        else andp(bind(result, []), exp, push(result,getvalue(template)),
+                  times(andp(sep, exp, push(result,getvalue(template)),expectTimes-1)))
+  else
+    if result is null
+       ifp(freep(expectTimes), andp(exp, assign(i, 0); any(andp(sep, exp),inc(i)), bind(expectTimes, i))
+           andp(exp, is_(n, sub(expectTimes, 1)), times(andp(sep, exp),n)))
+    else
+      andp(bind(reuslt, []),
+           ifp(freep(expectTimes),
+               andp(exp, zero(i),
+                    push(result,getvalue(template)),
+                    any(andp(sep, exp, push(result,getvalue(template)),inc(i))),
+                    bind(expectTimes, i))
+               andp(exp,
+                    push(result,getvalue(template)),
+                    is_(n, sub(expectTimes, 1)),
+                    times(andp(sep, exp, push(result,getvalue(template))),n))))
 
 exports.char = special('char', (solver, cont, x) ->  (v, solver) ->
   [data, pos] = solver.state

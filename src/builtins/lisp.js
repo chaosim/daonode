@@ -30,8 +30,22 @@
   exports.assign = special('assign', function(solver, cont, vari, exp) {
     return solver.cont(exp, function(v, solver) {
       vari.binding = v;
-      return [cont, v, solver];
+      return cont(v, solver);
     });
+  });
+
+  exports.zero = special('assign', function(solver, cont, vari, exp) {
+    return function(v, solver) {
+      vari.binding = 0;
+      return cont(v, solver);
+    };
+  });
+
+  exports.one = special('assign', function(solver, cont, vari, exp) {
+    return function(v, solver) {
+      vari.binding = 1;
+      return cont(v, solver);
+    };
   });
 
   exports.begin = special('begin', function() {
