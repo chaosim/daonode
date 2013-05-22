@@ -7,6 +7,7 @@ general = require "../../src/builtins/general"
 
 special = solve.special
 macro = solve.macro
+
 debug = solve.debug
 
 exports.quote = special(1, 'quote', (solver, cont, exp) ->
@@ -27,7 +28,7 @@ exports.zero = special(1, 'zero', (solver, cont, vari, exp) ->
 exports.one = special(1, 'one', (solver, cont, vari, exp) ->
  (v, solver) -> (vari.binding = 1; cont(v, solver)))
 
-exports.begin = special(-1, 'begin', (solver, cont, exps...) -> solver.expsCont(exps, cont))
+exports.begin = special(null, 'begin', (solver, cont, exps...) -> solver.expsCont(exps, cont))
 
 if_fun = (solver, cont, test, then_, else_) ->
   then_cont = solver.cont(then_, cont)
@@ -43,7 +44,7 @@ if_fun = (solver, cont, test, then_, else_) ->
       else cont(null, solver)
     solver.cont(test, action)
 
-exports.if_ = special(-1, 'if_', if_fun)
+exports.if_ = special([2,3], 'if_', if_fun)
 
 iff_fun = (solver, cont, clauses, else_) ->
   length = clauses.length
@@ -60,7 +61,7 @@ iff_fun = (solver, cont, clauses, else_) ->
       else [iff_else_cont, v, solver]
     solver.cont(test, action)
 
-exports.iff = special(-1, 'iff', iff_fun)
+exports.iff = special(-2, 'iff', iff_fun)
 
 ### iff's macro version
 iff = macro (clauses_, else_) ->
@@ -72,7 +73,7 @@ iff = macro (clauses_, else_) ->
      exports.if_(clauses[0][0], clauses[0][1], iff(clauses[1...], else_)
 ###
 
-exports.block = block = special(-1, 'block', (solver, cont, label, body...) ->
+exports.block = block = special(null, 'block', (solver, cont, label, body...) ->
   if not _.isString(label) then (label = ''; body = [label].concat(body))
 
   exits = solver.exits[label] ?= []
@@ -93,7 +94,7 @@ exports.block = block = special(-1, 'block', (solver, cont, label, body...) ->
   defaultContinues.pop()
   fun)
 
-exports.break_ = break_ = special(-1, 'break_', (solver, cont, label='', value=null) ->
+exports.break_ = break_ = special([0, 1,2], 'break_', (solver, cont, label='', value=null) ->
   if value != null and not _.isString label then throw new TypeError([label, value])
   if value is null and not _.isString label then (value = label; label = '')
   exits = solver.exits[label]
@@ -102,7 +103,7 @@ exports.break_ = break_ = special(-1, 'break_', (solver, cont, label='', value=n
   valCont = (v, solver) -> solver.protect(exitCont)(v, solver)
   solver.cont(value, valCont))
 
-exports.continue_ = continue_ = special(-1, 'continue_', (solver, cont, label='') ->
+exports.continue_ = continue_ = special([0,1], 'continue_', (solver, cont, label='') ->
   continues = solver.continues[label]
   if not continues or continues==[] then throw Error(label)
   continueCont = continues[continues.length-1]
@@ -110,19 +111,20 @@ exports.continue_ = continue_ = special(-1, 'continue_', (solver, cont, label=''
 
 not_ = general.not_
 
-exports.loop_ = macro(-1, 'loop', (label, body...) ->
+exports.loop_ = macro(null, 'loop', (label, body...) ->
   if not _.isString(label) then (label = ''; body = [label].concat body)
   block(label, body.concat([continue_(label)])...))
 
-exports.while_ = macro(-1, 'while_', (label, test, body...) ->
+exports.while_ = macro(null, 'while_', (label, test, body...) ->
   if not _.isString(label) then (label = ''; test = label; body = [test].concat body)
   block(label, [if_(not_(test), break_(label))].concat(body).concat([continue_(label)])...))
 
-exports.until_ = macro(-1, 'until_', (label,body..., test) ->
+exports.until_ = macro(null, 'until_', (label,body..., test) ->
    if not _.isString(label) then (label = ''; test = label; body = [test].concat body)
    body = body.concat([if_(not_(test), continue_(label))])
    block(label, body...))
 
+# aka. lisp style catch/throw
 exports.catch_ = special(-1, 'catch_', (solver, cont, tag, forms...) ->
   tagCont = (v, solver) ->
     solver.pushCatch(v, cont)
@@ -136,6 +138,7 @@ exports.throw_ = special(2, 'throw_', (solver, cont, tag, form) ->
       solver.protect(solver.findCatch(v))(v2, solver))(v, solver)
   solver.cont(tag, formCont))
 
+# aka. lisp's unwind-protect
 exports.protect = special(-1, 'protect', (solver, cont, form, cleanup...) ->
   oldprotect = solver.protect
   solver.protect = (fun) -> (v1, solver) ->
@@ -149,6 +152,7 @@ exports.protect = special(-1, 'protect', (solver, cont, form, cleanup...) ->
   result = solver.cont(form, cleanupCont)
   result)
 
+# todo: need a trampoline for running the current continuation until done or faildone
 exports.callcc = special(1, 'callcc', (solver, cont, fun) -> (v, solver) ->
   result = fun(cont)[1]
   solver.done = false

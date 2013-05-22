@@ -48,7 +48,7 @@
     };
   });
 
-  exports.begin = special(-1, 'begin', function() {
+  exports.begin = special(null, 'begin', function() {
     var cont, exps, solver;
 
     solver = arguments[0], cont = arguments[1], exps = 3 <= arguments.length ? __slice.call(arguments, 2) : [];
@@ -81,7 +81,7 @@
     }
   };
 
-  exports.if_ = special(-1, 'if_', if_fun);
+  exports.if_ = special([2, 3], 'if_', if_fun);
 
   iff_fun = function(solver, cont, clauses, else_) {
     var action, iff_else_cont, length, test, then_, then_cont, _ref, _ref1;
@@ -107,7 +107,7 @@
     }
   };
 
-  exports.iff = special(-1, 'iff', iff_fun);
+  exports.iff = special(-2, 'iff', iff_fun);
 
   /* iff's macro version
   iff = macro (clauses_, else_) ->
@@ -120,7 +120,7 @@
   */
 
 
-  exports.block = block = special(-1, 'block', function() {
+  exports.block = block = special(null, 'block', function() {
     var body, cont, continues, defaultContinues, defaultExits, exits, fun, holder, label, solver, _base, _base1, _base2, _base3, _ref, _ref1, _ref2, _ref3;
 
     solver = arguments[0], cont = arguments[1], label = arguments[2], body = 4 <= arguments.length ? __slice.call(arguments, 3) : [];
@@ -151,7 +151,7 @@
     return fun;
   });
 
-  exports.break_ = break_ = special(-1, 'break_', function(solver, cont, label, value) {
+  exports.break_ = break_ = special([0, 1, 2], 'break_', function(solver, cont, label, value) {
     var exitCont, exits, valCont;
 
     if (label == null) {
@@ -178,7 +178,7 @@
     return solver.cont(value, valCont);
   });
 
-  exports.continue_ = continue_ = special(-1, 'continue_', function(solver, cont, label) {
+  exports.continue_ = continue_ = special([0, 1], 'continue_', function(solver, cont, label) {
     var continueCont, continues;
 
     if (label == null) {
@@ -196,7 +196,7 @@
 
   not_ = general.not_;
 
-  exports.loop_ = macro(-1, 'loop', function() {
+  exports.loop_ = macro(null, 'loop', function() {
     var body, label;
 
     label = arguments[0], body = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
@@ -207,7 +207,7 @@
     return block.apply(null, [label].concat(__slice.call(body.concat([continue_(label)]))));
   });
 
-  exports.while_ = macro(-1, 'while_', function() {
+  exports.while_ = macro(null, 'while_', function() {
     var body, label, test;
 
     label = arguments[0], test = arguments[1], body = 3 <= arguments.length ? __slice.call(arguments, 2) : [];
@@ -219,7 +219,7 @@
     return block.apply(null, [label].concat(__slice.call([if_(not_(test), break_(label))].concat(body).concat([continue_(label)]))));
   });
 
-  exports.until_ = macro(-1, 'until_', function() {
+  exports.until_ = macro(null, 'until_', function() {
     var body, label, test, _i;
 
     label = arguments[0], body = 3 <= arguments.length ? __slice.call(arguments, 1, _i = arguments.length - 1) : (_i = 1, []), test = arguments[_i++];

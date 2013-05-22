@@ -1,7 +1,7 @@
 {
   "name":         "daonode",
   "description":  "continuation based compiler for javascript",
-  "keywords":     ["javascript", "language", "coffeescript", "daonode", "compiler"],
+  "keywords":     ["javascript", "language", "coffeescript", "daonode", "parser", "evaluator", "logic programming", "functional programming"],
   "author":       "Caoxingming",
   "version":      "0.1.0",
   "licenses":     [{
@@ -15,13 +15,6 @@
     "lib" : "./lib/daonode"
   },
   "main" : "./lib/daonode/daonode",
-  "bin":          {
-    "coffee":     "./bin/daonode",
-    "cake":       "./bin/cake"
-  },
-  "scripts": {
-    "test": "node ./bin/cake test"
-  },
   "homepage":     "https://github.com/chaosim/daonode",
   "bugs":         "https://github.com/chaosim/daonode/issues",
   "repository":   {

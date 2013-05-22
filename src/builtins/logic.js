@@ -21,7 +21,7 @@
     };
   })();
 
-  exports.andp = special(-1, 'andp', function() {
+  exports.andp = special(null, 'andp', function() {
     var args, cont, solver;
 
     solver = arguments[0], cont = arguments[1], args = 3 <= arguments.length ? __slice.call(arguments, 2) : [];
@@ -65,7 +65,7 @@
     };
   };
 
-  exports.orp = special(-1, 'orp', orpFun);
+  exports.orp = special(null, 'orp', orpFun);
 
   exports.cutable = special(1, 'cutable', function(solver, cont, x) {
     var cc, xcont;
@@ -88,7 +88,7 @@
     };
   })();
 
-  exports.ifp = special(-1, 'ifp', function(solver, cont, test, action, else_) {
+  exports.ifp = special([2, 3], 'ifp', function(solver, cont, test, action, else_) {
     var actionCont, cc, ccCont, elseCont, resultCont;
 
     cc = null;
@@ -161,18 +161,6 @@
       return [cont, null, solver];
     };
   })();
-
-  exports.call = special(1, 'call', function() {
-    var args, cont, solver;
-
-    solver = arguments[0], cont = arguments[1], args = 3 <= arguments.length ? __slice.call(arguments, 2) : [];
-    return solver.argsCont(args, function(params, solver) {
-      var goal, _ref;
-
-      goal = params[0];
-      return solver.cont((_ref = goal.caller).callable.apply(_ref, goal.args.concat(params.slice(1))), cont);
-    });
-  });
 
   exports.findall = special(1, 'findall', function(solver, cont, exp) {
     var fc, findallDone, findnext;

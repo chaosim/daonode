@@ -1,5 +1,11 @@
 _ = require('underscore')
 
+#todo: compile
+# an idea: direct compile by function and compile to function?
+#todo: optimazation: partial evaluation?
+# nottodo: variable's apply_cont:: canceled. lisp1 should be good.
+# nottodo: Apply's apply_cont:: lisp1 should be good.
+
 exports.debug = debug = (items...) ->
   console.log((
       (for x in items
@@ -17,6 +23,15 @@ class TypeError extends Error
 class ExpressionError extends Error
 class ArgumentError extends Error
 class ArityError extends Error
+
+exports.checkArity1 = (args, n) ->
+  if arguments.length isnt n then throw new ArityError(args)
+
+exports.checkArity2 = (args, n) ->
+  if arguments.length < n then throw new ArityError(args)
+
+exports.checkArity3 = (args, arities...) ->
+  if arguments.length not in arities then throw new ArityError(args)
 
 exports.SUCCESS = 1
 exports.UNKNOWN = 0
@@ -173,7 +188,6 @@ class exports.Solver
 
   protect: (fun) -> fun
 
-
 MAXBINDINGCHAINLENGTH = 200 # to break cylylic binding
 
 Trail = class exports.Trail
@@ -231,6 +245,7 @@ Var = class exports.Var
     else trail.getvalue(result, chainslength+1)
 
   cont: (solver, cont) -> (v, solver) => cont(@deref(solver.trail), solver)
+  # nottodo: variable's apply_cont:: canceled. lisp1 should be good.
 
   toString:() -> "vari(#{@name})"
 
@@ -250,15 +265,27 @@ exports.DummyVar = class DummyVar extends Var
       throw new BindingError(result, "Binding chains is too long!")
     else trail.getvalue(result, chainslength+1)
 
+  # nottodo: variable's apply_cont:: canceled. lisp1 should be good.
+
 exports.dummy = (name) -> new exports.DummyVar(name)
 exports.dummies = (names) -> new DummyVar(name) for name in split names,  reElements
 
 class exports.Apply
   constructor: (@caller, @args) ->
+    # null: (...)
+    # [2, 4]: (a, b), (a, b, c, d)
+    # -1: (a, b...);   -2: (a, b, c...)
+    # 1: (a);      3: (a, b, c)
     length = args.length; arity = @caller.arity
-    if arity!=-1 and length!=arity
+    ok = false
+    if arity is null then ok = true
+    if _.isArray(arity)
+      if length in arity then ok = true
+    else if _.isNumber(arity)
+      if (arity>=0 and length is arity) or (arity<0 and length>=-arity) then ok = true
+    if not ok
       for x in @args
-        if x.caller.name is "unquoteSlice" then return
+        if x?.caller?.name? is "unquoteSlice" then return
       throw new ArityError(@)
 
   toString: -> "#{@caller}(#{@args.join(', ')})"
@@ -285,15 +312,13 @@ class exports.Apply
 UnquoteSliceValue = class exports.UnquoteSliceValue
   constructor: (@value) ->
 
-exports.apply = (caller, args) -> new exports.Apply(caller, args)
-
 Command = class exports.Command
   @directRun = false
   @done = (v, solver) -> (solver.done = true; [null, solver.trail.getvalue(v), solver])
   @faildone = (v, solver) -> (solver.done = true; [null, solver.trail.getvalue(v), solver])
   constructor: (@fun, @name, @arity) ->
     @callable = (args...) =>
-      applied = exports.apply(@, args)
+      applied = new exports.Apply(@, args)
       if Command.directRun
         result = Command.globalSolver.solve(applied, Command.done)
         Command.globalSolver.done = false
@@ -305,13 +330,26 @@ Command = class exports.Command
   toString: () -> @name
 
 commandMaker = (klass) -> (arity, name_or_fun, fun) ->
-  if not _.isNumber(arity) then throw new ArgumentError(arity)
+  if not _.isNumber(arity) and arity isnt null and not _.isArray(arity) then throw new ArgumentError(arity)
   (if fun? then new klass(fun, name_or_fun, arity) else new klass(name_or_fun, 'noname', arity)).callable
 
 class exports.Special extends exports.Command
   apply_cont: (solver, cont, args) -> @fun(solver, cont, args...)
 
 exports.special = special = commandMaker(exports.Special)
+
+# to keep it simple, not to implmenting the apply_cont in Var and Apply
+exports.call = special(-1, 'call', (solver, cont, goal, args...) ->
+  goal1 = null
+  argsCont =  solver.argsCont(args, (params,  solver) ->
+    solver.cont(goal1(params...), cont)(null, solver))
+  solver.cont(goal, (v, solver) -> goal1 = goal; argsCont(null, solver)))
+
+exports.apply  = special(2, 'apply', (solver, cont, goal, args) ->
+  goal1 = null
+  argsCont =  solver.argsCont(args, (params,  solver) ->
+    solver.cont(goal1(params...), cont)(null, solver))
+  solver.cont(goal, (v, solver) -> goal1 = goal; argsCont(null, solver)))
 
 class exports.Fun extends exports.Command
   apply_cont: (solver, cont, args) ->  solver.argsCont(args, (params, solver) => [cont, @fun(params...), solver])

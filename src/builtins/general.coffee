@@ -2,30 +2,9 @@ solve = require "../../src/solve"
 fun = solve.fun
 special = solve.special
 
-exports.print_ = fun(-1, 'print_', (args...) -> console.log(args...))
-exports.add = fun(2, 'add', (x, y) -> x+y)
-exports.sub = fun(2, 'sub', (x, y) -> x-y)
-exports.mul = fun(2, 'mul', (x, y) -> x*y)
-exports.div = fun(2, 'div', (x, y) -> x/y)
-exports.mod = fun(2, 'mod', (x, y) -> x%y)
+exports.print_ = special(null, 'eq', (solver, cont, args...) ->
+  solver.argsCont(args, (args,  solver) -> console.log(args...); cont(null, solver)))
 
-exports.and_ = fun(2, 'and_', (x, y) -> x and y)
-exports.or_ = fun(2, 'or_', (x, y) -> x or y)
-exports.not_ = fun(1, 'not_', (x) -> not x)
-exports.lshift = fun(2, 'lshift', (x, y) -> x<<y)
-exports.rshift = fun(2, 'rshift', (x, y) -> x>>y)
-exports.bitand = fun(2, 'bitand', (x, y) -> x&y)
-exports.bitor = fun(2, 'bitor', (x, y) -> x|y)
-exports.bitnot = fun(2, 'bitnot', (x) -> ~x)
-
-#exports.eq = fun('eq', (x, y) -> x==y)
-#exports.ne = fun('ne', (x, y) -> x!=y)
-#exports.lt = fun('lt', (x, y) -> x<y)
-#exports.le = fun('le', (x, y) -> x<=y)
-#exports.ge = fun('ge', (x, y) -> x>=y)
-#exports.gt = fun('gt', (x, y) -> x>y)
-
-# more optimized version
 exports.eq = special(2, 'eq', (solver, cont, x, y) ->
   ycont =  solver.cont(y, (v, solver) -> cont(x==v, solver))
   xcont = (v, solver) ->  x = v; ycont(null, solver)
@@ -55,6 +34,67 @@ exports.ge = special(2, 'ge', (solver, cont, x, y) ->
   ycont =  solver.cont(y, (v, solver) -> cont(x>=v, solver))
   xcont = (v, solver) ->  x = v; ycont(null, solver)
   solver.cont(x, xcont))
+
+exports.add = special(2, 'add', (solver, cont, x, y) ->
+  ycont =  solver.cont(y, (v, solver) -> cont(x+v, solver))
+  xcont = (v, solver) ->  x = v; ycont(null, solver)
+  solver.cont(x, xcont))
+
+exports.sub = special(2, 'sub', (solver, cont, x, y) ->
+  ycont =  solver.cont(y, (v, solver) -> cont(x-v, solver))
+  xcont = (v, solver) ->  (x = v; ycont(null, solver))
+  solver.cont(x, xcont))
+
+exports.mul = special(2, 'mul', (solver, cont, x, y) ->
+  ycont =  solver.cont(y, (v, solver) -> cont(x*v, solver))
+  xcont = (v, solver) ->  x = v; ycont(null, solver)
+  solver.cont(x, xcont))
+
+exports.div = special(2, 'div', (solver, cont, x, y) ->
+  ycont =  solver.cont(y, (v, solver) -> cont(x/v, solver))
+  xcont = (v, solver) ->  (x = v; ycont(null, solver))
+  solver.cont(x, xcont))
+
+exports.mod = special(2, 'mod', (solver, cont, x, y) ->
+  ycont =  solver.cont(y, (v, solver) -> cont(x%v, solver))
+  xcont = (v, solver) ->  x = v; ycont(null, solver)
+  solver.cont(x, xcont))
+
+exports.and_ = special(2, 'and_', (solver, cont, x, y) ->
+  ycont =  solver.cont(y, (v, solver) -> cont(x and v, solver))
+  xcont = (v, solver) ->  x = v; ycont(null, solver)
+  solver.cont(x, xcont))
+
+exports.or_ = special(2, 'or_', (solver, cont, x, y) ->
+  ycont =  solver.cont(y, (v, solver) -> cont(x and v, solver))
+  xcont = (v, solver) ->  x = v; ycont(null, solver)
+  solver.cont(x, xcont))
+
+exports.not_ = special(1, 'not_', (solver, cont, x) ->
+  solver.cont(x, (v, solver) -> cont(not v, solver)))
+
+exports.lshift = special(2, 'lshift', (solver, cont, x, y) ->
+  ycont =  solver.cont(y, (v, solver) -> cont(x << v, solver))
+  xcont = (v, solver) ->  x = v; ycont(null, solver)
+  solver.cont(x, xcont))
+
+exports.rshift = special(2, 'rshift', (solver, cont, x, y) ->
+  ycont =  solver.cont(y, (v, solver) -> cont(x >> v, solver))
+  xcont = (v, solver) ->  x = v; ycont(null, solver)
+  solver.cont(x, xcont))
+
+exports.bitand = special(2, 'bitand', (solver, cont, x, y) ->
+  ycont =  solver.cont(y, (v, solver) -> cont(x & v, solver))
+  xcont = (v, solver) ->  x = v; ycont(null, solver)
+  solver.cont(x, xcont))
+
+exports.bitor = special(2, 'bitor', (solver, cont, x, y) ->
+  ycont =  solver.cont(y, (v, solver) -> cont(x | v, solver))
+  xcont = (v, solver) ->  x = v; ycont(null, solver)
+  solver.cont(x, xcont))
+
+exports.bitnot = special(1, 'not_', (solver, cont, x) ->
+  solver.cont(x, (v, solver) -> cont(~v, solver)))
 
 # Because not using vari.bind, these are not saved in solver.trail and so it can NOT be restored in solver.failcont
 # EXCEPT the vari has been in solver.trail in the logic branch before.
@@ -104,7 +144,7 @@ exports.concat = special(2, 'concat', (solver, cont, x, y) ->
   xcont = (v, solver) ->  x = v; ycont(null, solver)
   solver.cont(x, xcont))
 
-exports.list = special(-1, 'list', (solver, cont, args...) ->
+exports.list = special([], 'list', (solver, cont, args...) ->
   solver.argsCont(args, cont))
 
 exports.push = special(2, 'push', (solver, cont, x, y) ->

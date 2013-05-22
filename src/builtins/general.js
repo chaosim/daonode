@@ -9,63 +9,14 @@
 
   special = solve.special;
 
-  exports.print_ = fun(-1, 'print_', function() {
-    var args;
+  exports.print_ = special(null, 'eq', function() {
+    var args, cont, solver;
 
-    args = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
-    return console.log.apply(console, args);
-  });
-
-  exports.add = fun(2, 'add', function(x, y) {
-    return x + y;
-  });
-
-  exports.sub = fun(2, 'sub', function(x, y) {
-    return x - y;
-  });
-
-  exports.mul = fun(2, 'mul', function(x, y) {
-    return x * y;
-  });
-
-  exports.div = fun(2, 'div', function(x, y) {
-    return x / y;
-  });
-
-  exports.mod = fun(2, 'mod', function(x, y) {
-    return x % y;
-  });
-
-  exports.and_ = fun(2, 'and_', function(x, y) {
-    return x && y;
-  });
-
-  exports.or_ = fun(2, 'or_', function(x, y) {
-    return x || y;
-  });
-
-  exports.not_ = fun(1, 'not_', function(x) {
-    return !x;
-  });
-
-  exports.lshift = fun(2, 'lshift', function(x, y) {
-    return x << y;
-  });
-
-  exports.rshift = fun(2, 'rshift', function(x, y) {
-    return x >> y;
-  });
-
-  exports.bitand = fun(2, 'bitand', function(x, y) {
-    return x & y;
-  });
-
-  exports.bitor = fun(2, 'bitor', function(x, y) {
-    return x | y;
-  });
-
-  exports.bitnot = fun(2, 'bitnot', function(x) {
-    return ~x;
+    solver = arguments[0], cont = arguments[1], args = 3 <= arguments.length ? __slice.call(arguments, 2) : [];
+    return solver.argsCont(args, function(args, solver) {
+      console.log.apply(console, args);
+      return cont(null, solver);
+    });
   });
 
   exports.eq = special(2, 'eq', function(solver, cont, x, y) {
@@ -144,6 +95,161 @@
       return ycont(null, solver);
     };
     return solver.cont(x, xcont);
+  });
+
+  exports.add = special(2, 'add', function(solver, cont, x, y) {
+    var xcont, ycont;
+
+    ycont = solver.cont(y, function(v, solver) {
+      return cont(x + v, solver);
+    });
+    xcont = function(v, solver) {
+      x = v;
+      return ycont(null, solver);
+    };
+    return solver.cont(x, xcont);
+  });
+
+  exports.sub = special(2, 'sub', function(solver, cont, x, y) {
+    var xcont, ycont;
+
+    ycont = solver.cont(y, function(v, solver) {
+      return cont(x - v, solver);
+    });
+    xcont = function(v, solver) {
+      x = v;
+      return ycont(null, solver);
+    };
+    return solver.cont(x, xcont);
+  });
+
+  exports.mul = special(2, 'mul', function(solver, cont, x, y) {
+    var xcont, ycont;
+
+    ycont = solver.cont(y, function(v, solver) {
+      return cont(x * v, solver);
+    });
+    xcont = function(v, solver) {
+      x = v;
+      return ycont(null, solver);
+    };
+    return solver.cont(x, xcont);
+  });
+
+  exports.div = special(2, 'div', function(solver, cont, x, y) {
+    var xcont, ycont;
+
+    ycont = solver.cont(y, function(v, solver) {
+      return cont(x / v, solver);
+    });
+    xcont = function(v, solver) {
+      x = v;
+      return ycont(null, solver);
+    };
+    return solver.cont(x, xcont);
+  });
+
+  exports.mod = special(2, 'mod', function(solver, cont, x, y) {
+    var xcont, ycont;
+
+    ycont = solver.cont(y, function(v, solver) {
+      return cont(x % v, solver);
+    });
+    xcont = function(v, solver) {
+      x = v;
+      return ycont(null, solver);
+    };
+    return solver.cont(x, xcont);
+  });
+
+  exports.and_ = special(2, 'and_', function(solver, cont, x, y) {
+    var xcont, ycont;
+
+    ycont = solver.cont(y, function(v, solver) {
+      return cont(x && v, solver);
+    });
+    xcont = function(v, solver) {
+      x = v;
+      return ycont(null, solver);
+    };
+    return solver.cont(x, xcont);
+  });
+
+  exports.or_ = special(2, 'or_', function(solver, cont, x, y) {
+    var xcont, ycont;
+
+    ycont = solver.cont(y, function(v, solver) {
+      return cont(x && v, solver);
+    });
+    xcont = function(v, solver) {
+      x = v;
+      return ycont(null, solver);
+    };
+    return solver.cont(x, xcont);
+  });
+
+  exports.not_ = special(1, 'not_', function(solver, cont, x) {
+    return solver.cont(x, function(v, solver) {
+      return cont(!v, solver);
+    });
+  });
+
+  exports.lshift = special(2, 'lshift', function(solver, cont, x, y) {
+    var xcont, ycont;
+
+    ycont = solver.cont(y, function(v, solver) {
+      return cont(x << v, solver);
+    });
+    xcont = function(v, solver) {
+      x = v;
+      return ycont(null, solver);
+    };
+    return solver.cont(x, xcont);
+  });
+
+  exports.rshift = special(2, 'rshift', function(solver, cont, x, y) {
+    var xcont, ycont;
+
+    ycont = solver.cont(y, function(v, solver) {
+      return cont(x >> v, solver);
+    });
+    xcont = function(v, solver) {
+      x = v;
+      return ycont(null, solver);
+    };
+    return solver.cont(x, xcont);
+  });
+
+  exports.bitand = special(2, 'bitand', function(solver, cont, x, y) {
+    var xcont, ycont;
+
+    ycont = solver.cont(y, function(v, solver) {
+      return cont(x & v, solver);
+    });
+    xcont = function(v, solver) {
+      x = v;
+      return ycont(null, solver);
+    };
+    return solver.cont(x, xcont);
+  });
+
+  exports.bitor = special(2, 'bitor', function(solver, cont, x, y) {
+    var xcont, ycont;
+
+    ycont = solver.cont(y, function(v, solver) {
+      return cont(x | v, solver);
+    });
+    xcont = function(v, solver) {
+      x = v;
+      return ycont(null, solver);
+    };
+    return solver.cont(x, xcont);
+  });
+
+  exports.bitnot = special(1, 'not_', function(solver, cont, x) {
+    return solver.cont(x, function(v, solver) {
+      return cont(~v, solver);
+    });
   });
 
   exports.inc = special(1, 'inc', function(solver, cont, vari) {
@@ -246,7 +352,7 @@
     return solver.cont(x, xcont);
   });
 
-  exports.list = special(-1, 'list', function() {
+  exports.list = special([], 'list', function() {
     var args, cont, solver;
 
     solver = arguments[0], cont = arguments[1], args = 3 <= arguments.length ? __slice.call(arguments, 2) : [];

@@ -41,7 +41,7 @@ exports.eoi = special(0, 'eoi', (solver, cont) -> (v, solver) ->
 exports.boi = special(0, 'boi', (solver, cont) -> (v, solver) ->
   if solver.state[1] is 0 then cont(true, solver) else solver.failcont(v, solver))()
 
-exports.step = special(-1, 'step', (solver, cont, n=1) -> (v, solver) ->
+exports.step = special([0,1], 'step', (solver, cont, n=1) -> (v, solver) ->
   [text, pos] = solver.state
   solver.state = [text, pos+n]
   cont(pos+n, solver))
@@ -50,7 +50,7 @@ exports.lefttext =  special(0, 'lefttext', (solver, cont) -> (v, solver) ->
   [text, pos] = solver.state
   cont(text[pos...], solver))()
 
-exports.subtext =  exports.subsequence =  special(-1, 'subtext', (solver, cont, length, start) -> (v, solver) ->
+exports.subtext =  exports.subsequence =  special([0,1,2], 'subtext', (solver, cont, length, start) -> (v, solver) ->
   [text, pos] = solver.state
   start = start? or pos
   length = length? or text.length
@@ -58,7 +58,7 @@ exports.subtext =  exports.subsequence =  special(-1, 'subtext', (solver, cont, 
 
 exports.nextchar =  special(0, 'nextchar', (solver, cont) -> (v, solver) ->
   [text, pos] = solver.state
-  cont(text[pos], solver))
+  cont(text[pos], solver))()
 
 exports.follow = special(1, 'follow', (solver, cont, item) ->
   state = null
@@ -92,7 +92,7 @@ parallelFun = (solver, cont, state, args) ->
 
 exports.checkParallel = checkFunction = (state, baseState) -> state[1] is baseState[1]
 
-exports.parallel = special(-1, 'parallel', (solver, cont, args...) ->
+exports.parallel = special(null, 'parallel', (solver, cont, args...) ->
   # from current position to right pass all of args
   length = args.length
   if length is 0 then throw new ArgumentError(args)
@@ -171,14 +171,13 @@ any2 = special(3, 'any', (solver, cont, exp, result, template) ->
       solver.trail.undo()
       solver.trail = trail
       solver.state = state
-      solver.failcont = fc
-      result.bind(result1)
+      solver.failcont = (v, solver) -> result1.pop(); fc(v, solver)
       cont(v, solver)
     [expCont, v, solver]
   expCont = solver.cont(exp, (v, solver) ->
     result1.push(solver.trail.getvalue(template))
     anyCont(v, solver))
-  (v, solver) -> result1 = []; anyCont(v, solver))
+  (v, solver) -> result1 = [];  result.bind(result1, solver.trail); anyCont(v, solver))
 
 exports.lazyany = (exp, result, template) ->
   if not result then lazyany1(exp) else lazyany2(exp, result, template)
@@ -220,14 +219,12 @@ greedyany1 = special(1, 'greedyany', (solver, cont, exp) ->
 
 greedyany2 = special(3, 'greedyany', (solver, cont, exp, result, template) ->
   result1 = null
-  anyCont = (v, solver) ->
-    result1.push(solver.trail.getvalue(template));
-    [expCont, v, solver]
-  expCont =  solver.cont(exp, anyCont)
+  anyCont = (v, solver) -> [expCont, v, solver]
+  expCont =  solver.cont(exp, (v, solver) ->  result1.push(solver.trail.getvalue(template)); anyCont(v, solver))
   (v, solver) ->
     result1 = [];
     fc = solver.failcont;
-    solver.failcont = (v, solver) -> (solver.failcont = fc; result.bind(result1); cont(v, solver))
+    solver.failcont = (v, solver) -> (solver.failcont = fc; result.bind(result1, solver.trail); cont(v, solver))
     anyCont(v, solver))
 
 exports.some = (exp, result, template) -> if not result then some1(exp) else some2(exp, result, template)
@@ -259,14 +256,13 @@ some2 = special(3, 'some', (solver, cont, exp, result, template) ->
       solver.trail.undo()
       solver.trail = trail
       solver.state = state
-      solver.failcont = fc
-      result.bind(result1)
+      solver.failcont = (v, solver) -> result1.pop(); fc(v, solver)
       cont(v, solver)
     [expCont, v, solver]
   expCont = solver.cont(exp, (v, solver) ->
     result1.push(solver.trail.getvalue(template))
     someCont(v, solver))
-  (v, solver) -> result1 = []; expCont(v, solver))
+  (v, solver) -> result1 = []; result.bind(result1, solver.trail); expCont(v, solver))
 
 exports.lazysome = (exp, result, template) -> if not result then lazysome1(exp) else lazysome2(exp, result, template)
 
@@ -285,14 +281,17 @@ lazysome2 = special(3, 'lazysome', (solver, cont, exp, result, template) ->
   result1 = fc = null
   someFcont = (v, solver) ->
     solver.failcont = fc
-    result.bind(result1)
     [expcont, v, solver]
   someCont = (v, solver) ->
     result1.push(solver.trail.getvalue(template))
     solver.failcont = someFcont
     cont(v, solver)
   expcont = solver.cont(exp, someCont)
-  (v, solver) -> result1 = []; fc = solver.failcont; expcont(v, solver))
+  (v, solver) ->
+    result1 = [];
+    result.bind(result1, solver.trail);
+    fc = solver.failcont;
+    expcont(v, solver))
 
 exports.greedysome = (exp, result, template) -> if not result then greedysome1(exp) else greedysome2(exp, result, template)
 
@@ -313,7 +312,7 @@ greedysome2 = special(3, 'greedysome', (solver, cont, exp, result, template) ->
   (v, solver) ->
     result1 = [];
     fc = solver.failcont;
-    solver.failcont = (v, solver) -> (solver.failcont = fc; result.bind(result1); cont(v, solver))
+    solver.failcont = (v, solver) -> (solver.failcont = fc; result.bind(result1, solver.trail); cont(v, solver))
     expCont(v, solver))
 
 exports.times = (exp, expectTimes, result, template) ->
@@ -323,9 +322,9 @@ exports.times = (exp, expectTimes, result, template) ->
 numberTimes1Fun = (solver, cont, exp, expectTimes) ->
   expectTimes = Math.ceil(expectTimes)
   if expectTimes<0 then throw new ValueError(expectTimes)
-  else if i is 0 then cont
-  else if i is 1 then solver.cont(exp, cont)
-  else if i is 2
+  else if expectTimes is 0 then cont
+  else if expectTimes is 1 then solver.cont(exp, cont)
+  else if expectTimes is 2
     expCont = solver.cont(exp, cont)
     solver.cont(exp, expCont)
   else
@@ -333,50 +332,48 @@ numberTimes1Fun = (solver, cont, exp, expectTimes) ->
     expCont = solver.cont(exp, (v, solver) ->
       i++
       if i is expectTimes then cont(v, solver)
-      else timesCont(v, solver))
-    (v, solver) -> i = 0; timesCont = (v, solver) -> expCont(v, solver)
+      else expCont(v, solver))
+    (v, solver) -> i = 0; expCont(v, solver)
 
 times1Fun = (solver, cont, exp, expectTimes) ->
   if _.isNumber(expectTimes) then numberTimes1Fun(solver, cont, exp, expectTimes)
   else
-    expecTimes1 = i = null
-
-    cont1 = (v, solver) -> expectTimes1.bind(i); cont(v, solver)
+    expectTimes1 = i = null
+    # caution:  like any, variable expectTimes may be 0!!!
     anyCont = (v, solver) ->
-      i++
       fc = solver.failcont
       trail = solver.trail
       solver.trail = new dao.Trail
       state = solver.state
       solver.failcont = (v, solver) ->
-        i--
         solver.trail.undo()
         solver.trail = trail
         solver.state = state
-        solver.failcont = fc
-        cont1(v, solver)
+        solver.failcont = (v, solver) -> i--; fc(v, solver)
+        expectTimes1.bind(i, solver.trail)
+        cont(v, solver)
       [expCont, v, solver]
-    expCont = solver.cont(exp, anyCont)
+    expCont = solver.cont(exp, (v, solver) -> i++; anyCont(v, solver))
     solver.cont(expectTimes, (v, solver) ->
-      expectTimes1= v
-      if _.isNumber(expectTimes1) then numberTimes1Fun(solver, cont, exp, expectTimes1)
-      else
-        (v, solver) -> i = 0; anyCont(v, solver))
+      expectTimes1 = v
+      if _.isNumber(expectTimes1)
+        numberTimes1Fun(solver, cont, exp, expectTimes1)(v, solver)
+      else i = 0; anyCont(v, solver))
 
 times1 = special(2, 'times', times1Fun)
 
 numberTimes2Fun = (solver, cont, exp, expectTimes, result, template) ->
   expectTimes = Math.ceil(expectTimes)
   if expectTimes<0 then throw new ValueError(expectTimes)
-  else if i is 0 then (v, solver) -> result.bind([]); cont(v, solver)
-  else if i is 1 then solver.cont(exp, (v, solver) ->
-    result.bind([solver.trail.getvalue(template)]);
+  else if expectTimes is 0 then (v, solver) -> result.bind([], solver.trail); cont(v, solver)
+  else if expectTimes is 1 then solver.cont(exp, (v, solver) ->
+    result.bind([solver.trail.getvalue(template)], solver.trail);
     cont(v, solver))
-  else if i is 2
+  else if expectTimes is 2
     result1 = []
     expCont = solver.cont(exp, (v, solver) ->
       result1.push solver.trail.getvalue(template)
-      result.bind(result1);
+      result.bind(result1, solver.trail);
       cont(v, solver))
     solver.cont(exp, (v, solver) ->
       result1.push solver.trail.getvalue(template)
@@ -386,35 +383,32 @@ numberTimes2Fun = (solver, cont, exp, expectTimes, result, template) ->
     expCont = solver.cont(exp, (v, solver) ->
       i++
       result1.push solver.trail.getvalue(template)
-      if i is expectTimes then (v, solver) ->  result.bind(result1); cont(v, solver)
-      else timesCont(v, solver))
-    (v, solver) -> i = 0;  result1 = []; timesCont = (v, solver) -> expCont(v, solver)
+      if i is expectTimes then result.bind(result1, solver.trail); cont(v, solver)
+      else expCont(v, solver))
+    (v, solver) -> i = 0;  result1 = []; expCont(v, solver)
 
 times2Fun = (solver, cont, exp, expectTimes, result, template) ->
   if _.isNumber(expectTimes) then numberTimes2Fun(solver, cont, exp, expectTimes, result, template)
   else
-    expecTimes1 = i = null
-    cont1 = (v, solver) -> expectTimes1.bind(i); cont(v, solver)
+    result1 = expectTimes1 = i = null
     anyCont = (v, solver) ->
-      i++
       fc = solver.failcont
       trail = solver.trail
       solver.trail = new dao.Trail
       state = solver.state
       solver.failcont = (v, solver) ->
-        i--
         solver.trail.undo()
         solver.trail = trail
         solver.state = state
-        solver.failcont = fc
-        cont1(v, solver)
+        solver.failcont = (v, solver) -> i--; result1.pop(); fc(v, solver)
+        expectTimes1.bind(i, solver.trail);
+        cont(v, solver)
       [expCont, v, solver]
-    expCont = solver.cont(exp, anyCont)
+    expCont = solver.cont(exp, (v, solver) -> i++; result1.push solver.trail.getvalue(template); anyCont(v, solver))
     solver.cont(expectTimes, (v, solver) ->
       expectTimes1= v
-      if _.isNumber(expectTimes1) then numberTimes2Fun(solver, cont, exp, expectTimes1, result, template)
-      else
-        (v, solver) -> i = 0; anyCont(v, solver))
+      if _.isNumber(expectTimes1) then numberTimes2Fun(solver, cont, exp, expectTimes1, result, template)(v, solver)
+      else i = 0; result1 = []; result.bind(result1, solver.trail); anyCont(v, solver))
 
 times2 = special(4, 'times', times2Fun)
 

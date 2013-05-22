@@ -93,7 +93,7 @@
     };
   })();
 
-  exports.step = special(-1, 'step', function(solver, cont, n) {
+  exports.step = special([0, 1], 'step', function(solver, cont, n) {
     if (n == null) {
       n = 1;
     }
@@ -115,7 +115,7 @@
     };
   })();
 
-  exports.subtext = exports.subsequence = special(-1, 'subtext', function(solver, cont, length, start) {
+  exports.subtext = exports.subsequence = special([0, 1, 2], 'subtext', function(solver, cont, length, start) {
     return function(v, solver) {
       var pos, text, _ref1;
 
@@ -133,7 +133,7 @@
       _ref1 = solver.state, text = _ref1[0], pos = _ref1[1];
       return cont(text[pos], solver);
     };
-  });
+  })();
 
   exports.follow = special(1, 'follow', function(solver, cont, item) {
     var itemCont, state;
@@ -186,7 +186,7 @@
     return state[1] === baseState[1];
   };
 
-  exports.parallel = special(-1, 'parallel', function() {
+  exports.parallel = special(null, 'parallel', function() {
     var adjustCont, args, cont, length, right, solver, x, xcont, y, ycont;
 
     solver = arguments[0], cont = arguments[1], args = 3 <= arguments.length ? __slice.call(arguments, 2) : [];
@@ -311,8 +311,10 @@
         solver.trail.undo();
         solver.trail = trail;
         solver.state = state;
-        solver.failcont = fc;
-        result.bind(result1);
+        solver.failcont = function(v, solver) {
+          result1.pop();
+          return fc(v, solver);
+        };
         return cont(v, solver);
       };
       return [expCont, v, solver];
@@ -323,6 +325,7 @@
     });
     return function(v, solver) {
       result1 = [];
+      result.bind(result1, solver.trail);
       return anyCont(v, solver);
     };
   });
@@ -410,10 +413,12 @@
 
     result1 = null;
     anyCont = function(v, solver) {
-      result1.push(solver.trail.getvalue(template));
       return [expCont, v, solver];
     };
-    expCont = solver.cont(exp, anyCont);
+    expCont = solver.cont(exp, function(v, solver) {
+      result1.push(solver.trail.getvalue(template));
+      return anyCont(v, solver);
+    });
     return function(v, solver) {
       var fc;
 
@@ -421,7 +426,7 @@
       fc = solver.failcont;
       solver.failcont = function(v, solver) {
         solver.failcont = fc;
-        result.bind(result1);
+        result.bind(result1, solver.trail);
         return cont(v, solver);
       };
       return anyCont(v, solver);
@@ -474,8 +479,10 @@
         solver.trail.undo();
         solver.trail = trail;
         solver.state = state;
-        solver.failcont = fc;
-        result.bind(result1);
+        solver.failcont = function(v, solver) {
+          result1.pop();
+          return fc(v, solver);
+        };
         return cont(v, solver);
       };
       return [expCont, v, solver];
@@ -486,6 +493,7 @@
     });
     return function(v, solver) {
       result1 = [];
+      result.bind(result1, solver.trail);
       return expCont(v, solver);
     };
   });
@@ -523,7 +531,6 @@
     result1 = fc = null;
     someFcont = function(v, solver) {
       solver.failcont = fc;
-      result.bind(result1);
       return [expcont, v, solver];
     };
     someCont = function(v, solver) {
@@ -534,6 +541,7 @@
     expcont = solver.cont(exp, someCont);
     return function(v, solver) {
       result1 = [];
+      result.bind(result1, solver.trail);
       fc = solver.failcont;
       return expcont(v, solver);
     };
@@ -582,7 +590,7 @@
       fc = solver.failcont;
       solver.failcont = function(v, solver) {
         solver.failcont = fc;
-        result.bind(result1);
+        result.bind(result1, solver.trail);
         return cont(v, solver);
       };
       return expCont(v, solver);
@@ -603,11 +611,11 @@
     expectTimes = Math.ceil(expectTimes);
     if (expectTimes < 0) {
       throw new ValueError(expectTimes);
-    } else if (i === 0) {
+    } else if (expectTimes === 0) {
       return cont;
-    } else if (i === 1) {
+    } else if (expectTimes === 1) {
       return solver.cont(exp, cont);
-    } else if (i === 2) {
+    } else if (expectTimes === 2) {
       expCont = solver.cont(exp, cont);
       return solver.cont(exp, expCont);
     } else {
@@ -617,61 +625,54 @@
         if (i === expectTimes) {
           return cont(v, solver);
         } else {
-          return timesCont(v, solver);
+          return expCont(v, solver);
         }
       });
       return function(v, solver) {
-        var timesCont;
-
         i = 0;
-        return timesCont = function(v, solver) {
-          return expCont(v, solver);
-        };
+        return expCont(v, solver);
       };
     }
   };
 
   times1Fun = function(solver, cont, exp, expectTimes) {
-    var anyCont, cont1, expCont, expecTimes1, i;
+    var anyCont, expCont, expectTimes1, i;
 
     if (_.isNumber(expectTimes)) {
       return numberTimes1Fun(solver, cont, exp, expectTimes);
     } else {
-      expecTimes1 = i = null;
-      cont1 = function(v, solver) {
-        expectTimes1.bind(i);
-        return cont(v, solver);
-      };
+      expectTimes1 = i = null;
       anyCont = function(v, solver) {
         var fc, state, trail;
 
-        i++;
         fc = solver.failcont;
         trail = solver.trail;
         solver.trail = new dao.Trail;
         state = solver.state;
         solver.failcont = function(v, solver) {
-          i--;
           solver.trail.undo();
           solver.trail = trail;
           solver.state = state;
-          solver.failcont = fc;
-          return cont1(v, solver);
+          solver.failcont = function(v, solver) {
+            i--;
+            return fc(v, solver);
+          };
+          expectTimes1.bind(i, solver.trail);
+          return cont(v, solver);
         };
         return [expCont, v, solver];
       };
-      expCont = solver.cont(exp, anyCont);
+      expCont = solver.cont(exp, function(v, solver) {
+        i++;
+        return anyCont(v, solver);
+      });
       return solver.cont(expectTimes, function(v, solver) {
-        var expectTimes1;
-
         expectTimes1 = v;
         if (_.isNumber(expectTimes1)) {
-          return numberTimes1Fun(solver, cont, exp, expectTimes1);
+          return numberTimes1Fun(solver, cont, exp, expectTimes1)(v, solver);
         } else {
-          return function(v, solver) {
-            i = 0;
-            return anyCont(v, solver);
-          };
+          i = 0;
+          return anyCont(v, solver);
         }
       });
     }
@@ -685,21 +686,21 @@
     expectTimes = Math.ceil(expectTimes);
     if (expectTimes < 0) {
       throw new ValueError(expectTimes);
-    } else if (i === 0) {
+    } else if (expectTimes === 0) {
       return function(v, solver) {
-        result.bind([]);
+        result.bind([], solver.trail);
         return cont(v, solver);
       };
-    } else if (i === 1) {
+    } else if (expectTimes === 1) {
       return solver.cont(exp, function(v, solver) {
-        result.bind([solver.trail.getvalue(template)]);
+        result.bind([solver.trail.getvalue(template)], solver.trail);
         return cont(v, solver);
       });
-    } else if (i === 2) {
+    } else if (expectTimes === 2) {
       result1 = [];
       expCont = solver.cont(exp, function(v, solver) {
         result1.push(solver.trail.getvalue(template));
-        result.bind(result1);
+        result.bind(result1, solver.trail);
         return cont(v, solver);
       });
       return solver.cont(exp, function(v, solver) {
@@ -712,67 +713,62 @@
         i++;
         result1.push(solver.trail.getvalue(template));
         if (i === expectTimes) {
-          return function(v, solver) {
-            result.bind(result1);
-            return cont(v, solver);
-          };
+          result.bind(result1, solver.trail);
+          return cont(v, solver);
         } else {
-          return timesCont(v, solver);
+          return expCont(v, solver);
         }
       });
       return function(v, solver) {
-        var timesCont;
-
         i = 0;
         result1 = [];
-        return timesCont = function(v, solver) {
-          return expCont(v, solver);
-        };
+        return expCont(v, solver);
       };
     }
   };
 
   times2Fun = function(solver, cont, exp, expectTimes, result, template) {
-    var anyCont, cont1, expCont, expecTimes1, i;
+    var anyCont, expCont, expectTimes1, i, result1;
 
     if (_.isNumber(expectTimes)) {
       return numberTimes2Fun(solver, cont, exp, expectTimes, result, template);
     } else {
-      expecTimes1 = i = null;
-      cont1 = function(v, solver) {
-        expectTimes1.bind(i);
-        return cont(v, solver);
-      };
+      result1 = expectTimes1 = i = null;
       anyCont = function(v, solver) {
         var fc, state, trail;
 
-        i++;
         fc = solver.failcont;
         trail = solver.trail;
         solver.trail = new dao.Trail;
         state = solver.state;
         solver.failcont = function(v, solver) {
-          i--;
           solver.trail.undo();
           solver.trail = trail;
           solver.state = state;
-          solver.failcont = fc;
-          return cont1(v, solver);
+          solver.failcont = function(v, solver) {
+            i--;
+            result1.pop();
+            return fc(v, solver);
+          };
+          expectTimes1.bind(i, solver.trail);
+          return cont(v, solver);
         };
         return [expCont, v, solver];
       };
-      expCont = solver.cont(exp, anyCont);
+      expCont = solver.cont(exp, function(v, solver) {
+        i++;
+        result1.push(solver.trail.getvalue(template));
+        return anyCont(v, solver);
+      });
       return solver.cont(expectTimes, function(v, solver) {
-        var expectTimes1;
-
         expectTimes1 = v;
         if (_.isNumber(expectTimes1)) {
-          return numberTimes2Fun(solver, cont, exp, expectTimes1, result, template);
+          return numberTimes2Fun(solver, cont, exp, expectTimes1, result, template)(v, solver);
         } else {
-          return function(v, solver) {
-            i = 0;
-            return anyCont(v, solver);
-          };
+          i = 0;
+          result1 = [];
+          result.bind(result1, solver.trail);
+          return anyCont(v, solver);
         }
       });
     }

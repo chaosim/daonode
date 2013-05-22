@@ -3,7 +3,8 @@
   var ArgumentError, ArityError, BindingError, Command, DummyVar, Error, ExpressionError, MAXBINDINGCHAINLENGTH, Trail, TypeError, UnquoteSliceValue, Var, commandMaker, debug, done, faildone, reElements, special, _, _ref, _ref1, _ref2, _ref3, _ref4, _ref5, _ref6, _ref7, _ref8, _ref9,
     __slice = [].slice,
     __hasProp = {}.hasOwnProperty,
-    __extends = function(child, parent) { for (var key in parent) { if (__hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; };
+    __extends = function(child, parent) { for (var key in parent) { if (__hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; },
+    __indexOf = [].indexOf || function(item) { for (var i = 0, l = this.length; i < l; i++) { if (i in this && this[i] === item) return i; } return -1; };
 
   _ = require('underscore');
 
@@ -106,6 +107,27 @@
     return ArityError;
 
   })(Error);
+
+  exports.checkArity1 = function(args, n) {
+    if (arguments.length !== n) {
+      throw new ArityError(args);
+    }
+  };
+
+  exports.checkArity2 = function(args, n) {
+    if (arguments.length < n) {
+      throw new ArityError(args);
+    }
+  };
+
+  exports.checkArity3 = function() {
+    var args, arities, _ref5;
+
+    args = arguments[0], arities = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
+    if (_ref5 = arguments.length, __indexOf.call(arities, _ref5) < 0) {
+      throw new ArityError(args);
+    }
+  };
 
   exports.SUCCESS = 1;
 
@@ -661,17 +683,30 @@
 
   exports.Apply = (function() {
     function Apply(caller, args) {
-      var arity, length, x, _i, _len, _ref6;
+      var arity, length, ok, x, _i, _len, _ref6, _ref7;
 
       this.caller = caller;
       this.args = args;
       length = args.length;
       arity = this.caller.arity;
-      if (arity !== -1 && length !== arity) {
+      ok = false;
+      if (arity === null) {
+        ok = true;
+      }
+      if (_.isArray(arity)) {
+        if (__indexOf.call(arity, length) >= 0) {
+          ok = true;
+        }
+      } else if (_.isNumber(arity)) {
+        if ((arity >= 0 && length === arity) || (arity < 0 && length >= -arity)) {
+          ok = true;
+        }
+      }
+      if (!ok) {
         _ref6 = this.args;
         for (_i = 0, _len = _ref6.length; _i < _len; _i++) {
           x = _ref6[_i];
-          if (x.caller.name === "unquoteSlice") {
+          if (((x != null ? (_ref7 = x.caller) != null ? _ref7.name : void 0 : void 0) != null) === "unquoteSlice") {
             return;
           }
         }
@@ -741,10 +776,6 @@
 
   })();
 
-  exports.apply = function(caller, args) {
-    return new exports.Apply(caller, args);
-  };
-
   Command = exports.Command = (function() {
     Command.directRun = false;
 
@@ -768,7 +799,7 @@
         var applied, args, result;
 
         args = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
-        applied = exports.apply(_this, args);
+        applied = new exports.Apply(_this, args);
         if (Command.directRun) {
           result = Command.globalSolver.solve(applied, Command.done);
           Command.globalSolver.done = false;
@@ -794,7 +825,7 @@
 
   commandMaker = function(klass) {
     return function(arity, name_or_fun, fun) {
-      if (!_.isNumber(arity)) {
+      if (!_.isNumber(arity) && arity !== null && !_.isArray(arity)) {
         throw new ArgumentError(arity);
       }
       return (fun != null ? new klass(fun, name_or_fun, arity) : new klass(name_or_fun, 'noname', arity)).callable;
@@ -818,6 +849,33 @@
   })(exports.Command);
 
   exports.special = special = commandMaker(exports.Special);
+
+  exports.call = special(-1, 'call', function() {
+    var args, argsCont, cont, goal, goal1, solver;
+
+    solver = arguments[0], cont = arguments[1], goal = arguments[2], args = 4 <= arguments.length ? __slice.call(arguments, 3) : [];
+    goal1 = null;
+    argsCont = solver.argsCont(args, function(params, solver) {
+      return solver.cont(goal1.apply(null, params), cont)(null, solver);
+    });
+    return solver.cont(goal, function(v, solver) {
+      goal1 = goal;
+      return argsCont(null, solver);
+    });
+  });
+
+  exports.apply = special(2, 'apply', function(solver, cont, goal, args) {
+    var argsCont, goal1;
+
+    goal1 = null;
+    argsCont = solver.argsCont(args, function(params, solver) {
+      return solver.cont(goal1.apply(null, params), cont)(null, solver);
+    });
+    return solver.cont(goal, function(v, solver) {
+      goal1 = goal;
+      return argsCont(null, solver);
+    });
+  });
 
   exports.Fun = (function(_super) {
     __extends(Fun, _super);

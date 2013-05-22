@@ -8,7 +8,7 @@ exports.succeed = special(0, 'succeed', (solver, cont) -> cont)()
 
 exports.fail = special(0, 'fail', (solver, cont) -> (v, solver) -> solver.failcont(v, solver))()
 
-exports.andp = special(-1, 'andp', (solver, cont, args...) -> solver.expsCont(args, cont))
+exports.andp = special(null, 'andp', (solver, cont, args...) -> solver.expsCont(args, cont))
 
 orpFun = (solver, cont, args...) ->
   length = args.length
@@ -38,7 +38,7 @@ orpFun = (solver, cont, args...) ->
     solver.failcont = orcont
     [xcont, null, solver]
 
-exports.orp = special(-1, 'orp', orpFun)
+exports.orp = special(null, 'orp', orpFun)
 
 exports.cutable = special(1, 'cutable', (solver, cont, x) ->
   cc = null
@@ -49,7 +49,7 @@ exports.cut = special(0, 'cut', (solver, cont) -> (v, solver) ->
   solver.failcont = solver.cutCont
   cont(v, solver))()
 
-exports.ifp = special(-1, 'ifp', (solver, cont, test, action, else_) ->
+exports.ifp = special([2,3], 'ifp', (solver, cont, test, action, else_) ->
   #if -> Then; _Else :- If, !, Then.
   #If -> _Then; Else :- !, Else.
   #If -> Then :- If, !, Then
@@ -100,13 +100,6 @@ exports.notp = special(1, 'notp', (solver, cont, x) ->
 exports.repeat = special(0, 'repeat', (solver, cont) ->
   (v, solver) -> solver.failcont = cont; [cont, null, solver])()
 
-# todo call(goal)
-
-exports.call = special(1, 'call', (solver, cont, args...) ->
-  solver.argsCont(args, (params,  solver) ->
-    goal = params[0]
-    solver.cont(goal.caller.callable(goal.args.concat(params[1...])...), cont)))
-
 exports.findall = special(1, 'findall', (solver, cont, exp) ->
   fc = null
   findnext = solver.cont(exp, (v, solver) -> solver.failcont(v, solver))
@@ -123,7 +116,7 @@ exports.is_ = special(2, 'is_', (solver, cont, vari, exp) ->
   # by using vari.bind, this is saved in solver.trail and can be restored in solver.failcont
   solver.cont(exp, (v, solver) ->  vari.bind(v, solver.trail); [cont, true, solver]))
 
-#todo unify function as the third function
+#todo: provide unify function as the third argument
 exports.unifyFun = unifyFun = (solver, cont, x, y) -> (v, solver) ->
   if solver.trail.unify(x, y) then cont(true, solver)
   else solver.failcont(false, solver)
@@ -154,8 +147,8 @@ exports.notunifyListFun = notunifyListFun = (solver, cont, xs, ys) ->  (v, solve
 
 exports.notunifyList = notunifyList = special(2, 'notunifyList', notunifyListFun)
 
-#todo anothter version for many rules which should be more effecient by using arity and the signature.
-# todo database rules: abolish, assert, retract
+#todo: optimize by using arity and the signature for rules which has many clauses
+# todo: database rules manipulation: abolish, assert, retract
 exports.rule = (arity, name, fun) ->
   unless fun? then (fun = name; name = 'noname_rule')
   macro(arity, name, (args...) ->
@@ -167,6 +160,7 @@ exports.rule = (arity, name, fun) ->
     orp(clauses...))
 
 # borrowed from lisp, same as in lisp.coffee
+# todo: need a trampoline for running the current continuation until done or faildone
 exports.callfc = special(1, 'callfc', (solver, cont, fun) -> (v, solver) ->
                          result = fun(solver.failcont)[1]
                          solver.done = false
