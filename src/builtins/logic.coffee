@@ -3,6 +3,7 @@ solve = require "../../src/solve"
 special = solve.special
 macro = solve.macro
 Trail = solve.Trail
+Var = solve.Var
 
 exports.succeed = special(0, 'succeed', (solver, cont) -> cont)()
 
@@ -115,6 +116,11 @@ exports.is_ = special(2, 'is_', (solver, cont, vari, exp) ->
   # different from assign in lisp.coffee:
   # by using vari.bind, this is saved in solver.trail and can be restored in solver.failcont
   solver.cont(exp, (v, solver) ->  vari.bind(v, solver.trail); [cont, true, solver]))
+
+exports.bind = special(2, 'bind', (solver, cont, vari, term) ->
+  # different from is_, do not evaluate the exp instead.
+  # by using vari.bind, this is saved in solver.trail and can be restored in solver.failcont
+  (v, solver) ->  vari.bind(term, solver.trail); [cont, true, solver])
 
 #todo: provide unify function as the third argument
 exports.unifyFun = unifyFun = (solver, cont, x, y) -> (v, solver) ->

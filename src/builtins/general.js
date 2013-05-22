@@ -363,7 +363,7 @@
     var xcont, ycont;
 
     ycont = solver.cont(y, function(v, solver) {
-      return cont(x.push(y), solver);
+      return cont(x.push(v), solver);
     });
     xcont = function(v, solver) {
       x = v;

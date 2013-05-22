@@ -5,7 +5,7 @@ I.use base+"solve: Trail, solve, fun, macro vari debug dummy"
 I.use base+"builtins/lisp: begin"
 I.use base+"builtins/logic: andp orp notp succeed fail unify findall once "
 I.use base+"""builtins/parser: char parsetext settext may greedymay
-           any greedyany lazyany some greedysome lazysome eoi nextchar, times"""
+           any greedyany lazyany some greedysome lazysome eoi nextchar, times seplist"""
 I.use base+"builtins/general: getvalue print_"
 
 dao = require base+"solve"
@@ -175,8 +175,6 @@ exports.Test =
     test.equal dao.status, dao.SUCCESS
     test.done()
 
-exports.Test =
-
   "test times": (test) ->
     _ = dummy('_')
     result = vari('result')
@@ -217,13 +215,32 @@ exports.Test =
     test.equal(dao.status, dao.SUCCESS);
     test.done()
 
-exports.Test =
+  "test seplist": (test) ->
+    _ = dummy('_')
+    result = vari('result')
+    n = vari('n')
+    test.equal  solve(parsetext(seplist(char(_)), 'a')), 1
+    test.equal(dao.status, dao.SUCCESS);
+    test.equal  solve(parsetext(seplist(char(_)), 'a a')), 3
+    test.equal(dao.status, dao.SUCCESS);
+    test.equal  solve(parsetext(seplist(char(_), {sep:char(',')}), 'a,a')), 3
+    test.equal(dao.status, dao.SUCCESS);
+    test.equal  solve(parsetext(seplist(char(_), {sep:char(','), times:3}), 'a,a, a')), 5
+    test.equal(dao.status, dao.SUCCESS);
+    test.deepEqual  solve(begin(parsetext(seplist(char(_), {sep:char(','), times:3, result:result, template:'a'}), 'a,a,a'), result)), ['a', 'a','a']
+    test.equal(dao.status, dao.SUCCESS);
+    test.deepEqual  solve(begin(parsetext(seplist(char(_), {sep:char(','), times:3, result:result, template:_}), 'a,b,c'), result)), ['a', 'b','c']
+    test.equal(dao.status, dao.SUCCESS);
+    test.deepEqual  solve(begin(parsetext(seplist(char(_), {sep:char(','), times:n, result:result, template:_}), 'a,b,c'), result)), ['a', 'b','c']
+    test.equal(dao.status, dao.SUCCESS);
+    test.done()
 
+exports.Test =
   "test": (test) ->
     _ = dummy('_')
     result = vari('result')
     n = vari('n');
     n.binding = n;
-    test.deepEqual(solve(begin(settext('a'), times(char(_), n, result, _), char('a'), eoi, result)), []);
+    test.deepEqual  solve(begin(parsetext(seplist(char(_), {sep:char(','), times:n, result:result, template:_}), 'a,b,c'), result)), ['a', 'b','c']
     test.equal(dao.status, dao.SUCCESS);
     test.done()

@@ -3,6 +3,8 @@ _ = require('underscore')
 dao = require "../../src/solve"
 
 logic = require "../../src/builtins/logic"
+general = require "../../src/builtins/general"
+lisp = require "../../src/builtins/lisp"
 
 [Trail, solve, Var,  ExpressionError, TypeError, special] = (dao[name]  for name in\
 "Trail, solve, Var,  ExpressionError, TypeError, special".split(", "))
@@ -412,15 +414,18 @@ times2Fun = (solver, cont, exp, expectTimes, result, template) ->
 
 times2 = special(4, 'times', times2Fun)
 
-exports.seplist1 = (exp, options) ->
+exports.seplist = (exp, options={}) ->
   # 1 or more exp separated by sep
   sep = options.sep or char(' ');
-  expectTimes = options.expectTimes
+  expectTimes = options.times or null
   result = options.result or null;
   template = options.template or null
 
-  succeed = logic.succeed; andp = logic.andp; bind = logic.bind; is_ = logic.is_; getvalue = logic.getvalue
-  list = general.list; push = general.array; one = lisp.zero
+  newVar = dao.newVar
+  succeed = logic.succeed; andp = logic.andp; bind = logic.bind; is_ = logic.is_
+  freep = logic.freep; ifp = logic.ifp
+  list = general.list; push = general.push; one = lisp.one;
+  inc = general.inc; sub = general.sub; getvalue = general.getvalue
 
   if expectTimes is null
     if result is null

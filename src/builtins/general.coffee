@@ -148,7 +148,7 @@ exports.list = special([], 'list', (solver, cont, args...) ->
   solver.argsCont(args, cont))
 
 exports.push = special(2, 'push', (solver, cont, x, y) ->
-  ycont =  solver.cont(y, (v, solver) -> cont(x.push(y), solver))
+  ycont =  solver.cont(y, (v, solver) -> cont(x.push(v), solver))
   xcont = (v, solver) ->  x = v; ycont(null, solver)
   solver.cont(x, xcont))
 

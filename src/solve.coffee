@@ -254,6 +254,12 @@ reElements = /\s*,\s*|\s+/
 exports.vari = (name) -> new exports.Var(name)
 exports.vars = (names) -> new Var(name) for name in split names,  reElements
 
+nameToIndexMap = {}
+exports.newVar = (name='v') ->
+  index = nameToIndexMap[name]? or 1
+  nameToIndexMap[name] = index+1
+  return new Var(name+index)
+
 exports.DummyVar = class DummyVar extends Var
   deref: (trail) -> @
   bind: (value, trail) -> @binding = value
