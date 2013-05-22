@@ -1,6 +1,6 @@
 {
   "name":         "daonode",
-  "description":  "continuation based compiler for javascript",
+  "description":  "functional logic solver with builtin parser",
   "keywords":     ["javascript", "language", "coffeescript", "daonode", "parser", "evaluator", "logic programming", "functional programming"],
   "author":       "Caoxingming",
   "version":      "0.1.0",
@@ -12,9 +12,9 @@
     "node":       ">=0.10.0"
   },
   "directories" : {
-    "lib" : "./lib/daonode"
+      "src" : "./src",
+      "src" : "./test"
   },
-  "main" : "./lib/daonode/daonode",
   "homepage":     "https://github.com/chaosim/daonode",
   "bugs":         "https://github.com/chaosim/daonode/issues",
   "repository":   {
@@ -22,7 +22,6 @@
     "url": "git://github.com/chaosim/daonode.git"
   },
   "devDependencies": {
-    "uglify-js":  "~2.2",
-    "coffeescript": ">=1.6.2"
+    "underscore": ""
   }
 }
