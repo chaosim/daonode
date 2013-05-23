@@ -9,11 +9,7 @@
     "url":        "https://raw.github.com/chaosim/daonode/master/LICENSE"
   }],
   "engines":      {
-    "node":       ">=0.10.0"
-  },
-  "directories" : {
-      "src" : "./src",
-      "src" : "./test"
+    "node":       "*"
   },
   "homepage":     "https://github.com/chaosim/daonode",
   "bugs":         "https://github.com/chaosim/daonode/issues",
@@ -22,6 +18,9 @@
     "url": "git://github.com/chaosim/daonode.git"
   },
   "devDependencies": {
-    "underscore": ""
-  }
+    "underscore": "*"
+  },
+"dependencies": {
+    "underscore": "*"
+}
 }
