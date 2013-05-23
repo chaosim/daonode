@@ -96,8 +96,8 @@ exports.bitor = special(2, 'bitor', (solver, cont, x, y) ->
 exports.bitnot = special(1, 'not_', (solver, cont, x) ->
   solver.cont(x, (v, solver) -> cont(~v, solver)))
 
-# Because not using vari.bind, these are not saved in solver.trail and so it can NOT be restored in solver.failcont
-# EXCEPT the vari has been in solver.trail in the logic branch before.
+# Because not using vari.bind, these are not saved in solver.env and so it can NOT be restored in solver.failcont
+# EXCEPT the vari has been in solver.env in the logic branch before.
 exports.inc = special(1, 'inc', (solver, cont, vari) ->
   (v, solver) -> cont(++vari.binding, solver))
 
@@ -111,7 +111,7 @@ exports.dec2 = special(1, 'dec2', (solver, cont, vari) ->
   (v, solver) -> (vari.binding--; cont(--vari.binding, solver)))
 
 exports.getvalue = special(1, 'getvalue', (solver, cont, x) ->
-  solver.cont(x, (v, solver) -> cont(solver.trail.getvalue(v), solver)))
+  solver.cont(x, (v, solver) -> cont(solver.env.getvalue(v), solver)))
 
 exports.length = special(1, 'length', (solver, cont, x) ->
   solver.cont(x, (v, solver) -> cont(v.length, solver)))
@@ -163,4 +163,4 @@ exports.pushp = special(2, 'pushp', (solver, cont, x, y) ->
 exports.free = special(1, 'freep', (solver, cont, x) ->
   # x is a free variable?
   # this never fail, which is different from logic.freep
-  (v, solver) -> cont(solver.trail.deref(x) instanceof Var, solver))
+  (v, solver) -> cont(solver.env.deref(x) instanceof Var, solver))

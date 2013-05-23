@@ -1,4 +1,4 @@
-# lispt.coffee don't know trail, failcont, state and like.
+# lispt.coffee don't know env, failcont, state and like.
 # lisp know cont only.
 
 _ = require('underscore')
@@ -18,8 +18,8 @@ exports.eval_ = special(1, 'eval', (solver, cont, exp) ->
 
 exports.assign = special(2, 'assign', (solver, cont, vari, exp) ->
   # different from is_ in logic.coffee:
-  # Because not using vari.bind, this is not saved in solver.trail and so it can NOT be restored in solver.failcont
-  # EXCEPT the vari has been in solver.trail in the logic branch before.
+  # Because not using vari.bind, this is not saved in solver.env and so it can NOT be restored in solver.failcont
+  # EXCEPT the vari has been in solver.env in the logic branch before.
   solver.cont(exp, (v, solver) -> (vari.binding = v; cont(v, solver))))
 
 exports.zero = special(1, 'zero', (solver, cont, vari, exp) ->

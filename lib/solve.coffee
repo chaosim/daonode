@@ -41,21 +41,21 @@ exports.status = exports.UNKNOWN
 exports.done = done =(v, solver) ->
   solver.done = true
   exports.status = exports.SUCCESS
-  [null, solver.trail.getvalue(v), solver]
+  [null, solver.env.getvalue(v), solver]
 
 exports.faildone = faildone = (v, solver) ->
   solver.done = true
   exports.status = exports.FAIL
-  [null, solver.trail.getvalue(v), solver]
+  [null, solver.env.getvalue(v), solver]
 
-exports.solve = (exp, cont=done, failcont=faildone, trail=new Trail) ->
+exports.solve = (exp, cont=done, failcont=faildone, env=new Env) ->
   exports.status = exports.UNKNOWN
-  new exports.Solver(failcont, trail).solve(exp, cont)
+  new exports.Solver(failcont, env).solve(exp, cont)
 
-exports.solver = (failcont = faildone, trail=new Trail, state) -> new exports.Solver(failcont, trail, state)
+exports.solver = (failcont = faildone, env=new Env, state) -> new exports.Solver(failcont, env, state)
 
 class exports.Solver
-  constructor: (@failcont=faildone, @trail=new Trail, @state) ->
+  constructor: (@failcont=faildone, @env=new Env, @state) ->
     @cutCont = @failcont
     @catches = {}
     @exits = {}
@@ -68,7 +68,7 @@ class exports.Solver
     else if oldState.copy? then state = oldState.copy()
     else if oldState.clone? then state = oldState.clone()
     else state  = oldState
-    result = new @constructor(@failcont, @trail.copy(), state)
+    result = new @constructor(@failcont, @env.copy(), state)
     result.cutCont = @cutCont
     result.catches = _.extend({}, @catches)
     result.exits = _.extend({}, @exits)
@@ -91,13 +91,13 @@ cont: (exp, cont) -> exp?.cont?(@, cont) or ((v, solver) -> cont(exp, solver))
   quasiquote: (exp, cont) -> exp?.quasiquote?(@, cont) or ((v, solver) -> cont(exp, solver))
 
   appendFailcont: (fun) ->
-    trail = @trail
-    @trail = new Trail
+    env = @env
+    @env = new Env
     state = @state
     fc = @failcont
     @failcont = (v, solver) ->
-      solver.trail.undo()
-      solver.trail = trail
+      solver.env.undo()
+      solver.env = env
       solver.state = state
       solver.failcont = fc;
       fun(v, solver)
@@ -206,62 +206,61 @@ cont: (exp, cont) -> exp?.cont?(@, cont) or ((v, solver) -> cont(exp, solver))
 
 MAXBINDINGCHAINLENGTH = 200 # to break cylylic binding
 
-Trail = class exports.Trail
-  constructor: (@data={}) ->
-  copy: () -> new Trail(_.extend({}, @data))
-  set: (vari, value) ->  if not @data.hasOwnProperty(vari.name) then @data[vari.name] = [vari, value]
-  undo: () -> for name, pair of @data then pair[0].binding = pair[1]
+exports.Env = class Env extends Object
+  copy: () ->
+    result = _.extend({}, @)
+    result.constructor = @constructor;
+    result.prototype = @prototype
+    return result
+  set: (vari, value) -> @[vari.name] = value
   deref: (x) -> x?.deref?(@) or x
   getvalue: (x, chainslength=0) -> x?.getvalue?(@, chainslength) or x
   unify: (x, y) -> x?.unify?(y, @) or y?.unify?(x, @) or (x is y)
 
 Var = class exports.Var
-  constructor: (@name, @binding = @) ->
-  deref: (trail) ->
+  constructor: (@name) ->
+  deref: (env) ->
     v = @
-    next = @binding
+    next = env.lookup(@)
     if next is @ or next not instanceof Var then next
     else
       chains = [v]
       length = 1
       while 1
         chains.push(next)
-        v = next; next = v.binding
+        v = next; next = env.lookup(v)
         length++
         if next is v
           for i in [0...chains.length-2]
             x = chains[i]
-            x.binding = next
-            trail.set(x, chains[i+1])
+            env.bind(x, next)
           return next
         else if not next instanceof Var
           for i in [0...chains.length-1]
             x = chains[i]
             x.binding = next
-            trail.set(x, chains[i+1])
+            env.set(x, chains[i+1])
           return next
         else if length > MAXBINDINGCHAINLENGTH
           throw BindingError(v, "Binding chains is too long!")
 
-  bind: (value, trail) ->
-    trail.set(@, @binding)
-    @binding = value
+  bind: (value, env) ->  env.set(@, value)
 
-  unify: (y, trail) ->
-    x = @deref(trail)
-    y = trail.deref(y)
-    if x instanceof exports.Var then (x.bind(y, trail); true)
-    else if y instanceof exports.Var then (y.bind(x,  trail); true)
-    else x._unify?(y, trail) or y._unify?(x, trail) or x is y
+  unify: (y, env) ->
+    x = @deref(env)
+    y = env.deref(y)
+    if x instanceof exports.Var then (x.bind(y, env); true)
+    else if y instanceof exports.Var then (y.bind(x,  env); true)
+    else x._unify?(y, env) or y._unify?(x, env) or x is y
 
-  _unify: (y, trail) -> @bind(y, trail); true
+  _unify: (y, env) -> @bind(y, env); true
 
-  getvalue: (trail, chainslength=0) ->
-    result = @deref(trail)
+  getvalue: (env, chainslength=0) ->
+    result = @deref(env)
     if result instanceof exports.Var then result
-    else trail.getvalue(result, chainslength+1)
+    else env.getvalue(result, chainslength+1)
 
-  cont: (solver, cont) -> (v, solver) => cont(@deref(solver.trail), solver)
+  cont: (solver, cont) -> (v, solver) => cont(@deref(solver.env), solver)
   # nottodo: variable's apply_cont:: canceled. lisp1 should be good.
 
   toString:() -> "vari(#{@name})"
@@ -278,15 +277,15 @@ exports.newVar = (name='v') ->
   return new Var(name+index)
 
 exports.DummyVar = class DummyVar extends Var
-  deref: (trail) -> @
-  bind: (value, trail) -> @binding = value
-  _unify: (y, trail) -> @binding = y; true
-  getvalue: (trail, chainslength=1) ->
+  deref: (env) -> @
+  bind: (value, env) -> @binding = value
+  _unify: (y, env) -> @binding = y; true
+  getvalue: (env, chainslength=1) ->
     result = @binding
     if result is @
     else if chainslength>MAXBINDINGCHAINLENGTH
       throw new BindingError(result, "Binding chains is too long!")
-    else trail.getvalue(result, chainslength+1)
+    else env.getvalue(result, chainslength+1)
 
   # nottodo: variable's apply_cont:: canceled. lisp1 should be good.
 
@@ -337,8 +336,8 @@ UnquoteSliceValue = class exports.UnquoteSliceValue
 
 Command = class exports.Command
   @directRun = false
-  @done = (v, solver) -> (solver.done = true; [null, solver.trail.getvalue(v), solver])
-  @faildone = (v, solver) -> (solver.done = true; [null, solver.trail.getvalue(v), solver])
+  @done = (v, solver) -> (solver.done = true; [null, solver.env.getvalue(v), solver])
+  @faildone = (v, solver) -> (solver.done = true; [null, solver.env.getvalue(v), solver])
   constructor: (@fun, @name, @arity) ->
     @callable = (args...) =>
       applied = new exports.Apply(@, args)

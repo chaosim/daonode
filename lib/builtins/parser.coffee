@@ -6,8 +6,8 @@ logic = require "../../lib/builtins/logic"
 general = require "../../lib/builtins/general"
 lisp = require "../../lib/builtins/lisp"
 
-[Trail, solve, Var,  ExpressionError, TypeError, special] = (dao[name]  for name in\
-"Trail, solve, Var,  ExpressionError, TypeError, special".split(", "))
+[Env, solve, Var,  ExpressionError, TypeError, special] = (dao[name]  for name in\
+"Env, solve, Var,  ExpressionError, TypeError, special".split(", "))
 
 exports.parse = special(2, 'parse', (solver, cont, exp, state) ->
   oldState = null
@@ -149,12 +149,12 @@ exports.any = (exp, result, template) -> if not result then any1(exp) else any2(
 any1 = special(1, 'any', (solver, cont, exp) ->
   anyCont = (v, solver) ->
     fc = solver.failcont
-    trail = solver.trail
-    solver.trail = new dao.Trail
+    env = solver.env
+    solver.env = new dao.Env
     state = solver.state
     solver.failcont = (v, solver) ->
-      solver.trail.undo()
-      solver.trail = trail
+      solver.env.undo()
+      solver.env = env
       solver.state = state
       solver.failcont = fc
       cont(v, solver)
@@ -166,20 +166,20 @@ any2 = special(3, 'any', (solver, cont, exp, result, template) ->
   result1 = null
   anyCont = (v, solver) ->
     fc = solver.failcont
-    trail = solver.trail
-    solver.trail = new dao.Trail
+    env = solver.env
+    solver.env = new dao.Env
     state = solver.state
     solver.failcont = (v, solver) ->
-      solver.trail.undo()
-      solver.trail = trail
+      solver.env.undo()
+      solver.env = env
       solver.state = state
       solver.failcont = (v, solver) -> result1.pop(); fc(v, solver)
       cont(v, solver)
     [expCont, v, solver]
   expCont = solver.cont(exp, (v, solver) ->
-    result1.push(solver.trail.getvalue(template))
+    result1.push(solver.env.getvalue(template))
     anyCont(v, solver))
-  (v, solver) -> result1 = [];  result.bind(result1, solver.trail); anyCont(v, solver))
+  (v, solver) -> result1 = [];  result.bind(result1, solver.env); anyCont(v, solver))
 
 exports.lazyany = (exp, result, template) ->
   if not result then lazyany1(exp) else lazyany2(exp, result, template)
@@ -199,10 +199,10 @@ lazyany2 = special(3, 'lazyany', (solver, cont, exp, result, template) ->
   result1 = fc = null
   anyCont = (v, solver) ->
     solver.failcont = anyFcont
-    result.bind(result1, solver.trail)
+    result.bind(result1, solver.env)
     cont(v, solver)
   expcont = solver.cont(exp, (v, solver) ->
-    result1.push(solver.trail.getvalue(template))
+    result1.push(solver.env.getvalue(template))
     anyCont(v, solver))
   anyFcont = (v, solver) ->
     solver.failcont = fc
@@ -222,11 +222,11 @@ greedyany1 = special(1, 'greedyany', (solver, cont, exp) ->
 greedyany2 = special(3, 'greedyany', (solver, cont, exp, result, template) ->
   result1 = null
   anyCont = (v, solver) -> [expCont, v, solver]
-  expCont =  solver.cont(exp, (v, solver) ->  result1.push(solver.trail.getvalue(template)); anyCont(v, solver))
+  expCont =  solver.cont(exp, (v, solver) ->  result1.push(solver.env.getvalue(template)); anyCont(v, solver))
   (v, solver) ->
     result1 = [];
     fc = solver.failcont;
-    solver.failcont = (v, solver) -> (solver.failcont = fc; result.bind(result1, solver.trail); cont(v, solver))
+    solver.failcont = (v, solver) -> (solver.failcont = fc; result.bind(result1, solver.env); cont(v, solver))
     anyCont(v, solver))
 
 exports.some = (exp, result, template) -> if not result then some1(exp) else some2(exp, result, template)
@@ -234,12 +234,12 @@ exports.some = (exp, result, template) -> if not result then some1(exp) else som
 some1 = special(1, 'some', (solver, cont, exp) ->
   someCont = (v, solver) ->
     fc = solver.failcont
-    trail = solver.trail
-    solver.trail = new dao.Trail
+    env = solver.env
+    solver.env = new dao.Env
     state = solver.state
     solver.failcont = (v, solver) ->
-      solver.trail.undo()
-      solver.trail = trail
+      solver.env.undo()
+      solver.env = env
       solver.state = state
       solver.failcont = fc
       cont(v, solver)
@@ -251,20 +251,20 @@ some2 = special(3, 'some', (solver, cont, exp, result, template) ->
   result1 = null
   someCont = (v, solver) ->
     fc = solver.failcont
-    trail = solver.trail
-    solver.trail = new dao.Trail
+    env = solver.env
+    solver.env = new dao.Env
     state = solver.state
     solver.failcont = (v, solver) ->
-      solver.trail.undo()
-      solver.trail = trail
+      solver.env.undo()
+      solver.env = env
       solver.state = state
       solver.failcont = (v, solver) -> result1.pop(); fc(v, solver)
       cont(v, solver)
     [expCont, v, solver]
   expCont = solver.cont(exp, (v, solver) ->
-    result1.push(solver.trail.getvalue(template))
+    result1.push(solver.env.getvalue(template))
     someCont(v, solver))
-  (v, solver) -> result1 = []; result.bind(result1, solver.trail); expCont(v, solver))
+  (v, solver) -> result1 = []; result.bind(result1, solver.env); expCont(v, solver))
 
 exports.lazysome = (exp, result, template) -> if not result then lazysome1(exp) else lazysome2(exp, result, template)
 
@@ -285,13 +285,13 @@ lazysome2 = special(3, 'lazysome', (solver, cont, exp, result, template) ->
     solver.failcont = fc
     [expcont, v, solver]
   someCont = (v, solver) ->
-    result1.push(solver.trail.getvalue(template))
+    result1.push(solver.env.getvalue(template))
     solver.failcont = someFcont
     cont(v, solver)
   expcont = solver.cont(exp, someCont)
   (v, solver) ->
     result1 = [];
-    result.bind(result1, solver.trail);
+    result.bind(result1, solver.env);
     fc = solver.failcont;
     expcont(v, solver))
 
@@ -308,13 +308,13 @@ greedysome1 = special(1, 'greedysome', (solver, cont, exp) ->
 greedysome2 = special(3, 'greedysome', (solver, cont, exp, result, template) ->
   result1 = null
   someCont = (v, solver) ->
-    result1.push(solver.trail.getvalue(template));
+    result1.push(solver.env.getvalue(template));
     [expCont, v, solver]
   expCont =  solver.cont(exp, someCont)
   (v, solver) ->
     result1 = [];
     fc = solver.failcont;
-    solver.failcont = (v, solver) -> (solver.failcont = fc; result.bind(result1, solver.trail); cont(v, solver))
+    solver.failcont = (v, solver) -> (solver.failcont = fc; result.bind(result1, solver.env); cont(v, solver))
     expCont(v, solver))
 
 exports.times = (exp, expectTimes, result, template) ->
@@ -344,15 +344,15 @@ times1Fun = (solver, cont, exp, expectTimes) ->
     # caution:  like any, variable expectTimes may be 0!!!
     anyCont = (v, solver) ->
       fc = solver.failcont
-      trail = solver.trail
-      solver.trail = new dao.Trail
+      env = solver.env
+      solver.env = new dao.Env
       state = solver.state
       solver.failcont = (v, solver) ->
-        solver.trail.undo()
-        solver.trail = trail
+        solver.env.undo()
+        solver.env = env
         solver.state = state
         solver.failcont = (v, solver) -> i--; fc(v, solver)
-        expectTimes1.bind(i, solver.trail)
+        expectTimes1.bind(i, solver.env)
         cont(v, solver)
       [expCont, v, solver]
     expCont = solver.cont(exp, (v, solver) -> i++; anyCont(v, solver))
@@ -367,25 +367,25 @@ times1 = special(2, 'times', times1Fun)
 numberTimes2Fun = (solver, cont, exp, expectTimes, result, template) ->
   expectTimes = Math.ceil(expectTimes)
   if expectTimes<0 then throw new ValueError(expectTimes)
-  else if expectTimes is 0 then (v, solver) -> result.bind([], solver.trail); cont(v, solver)
+  else if expectTimes is 0 then (v, solver) -> result.bind([], solver.env); cont(v, solver)
   else if expectTimes is 1 then solver.cont(exp, (v, solver) ->
-    result.bind([solver.trail.getvalue(template)], solver.trail);
+    result.bind([solver.env.getvalue(template)], solver.env);
     cont(v, solver))
   else if expectTimes is 2
     result1 = []
     expCont = solver.cont(exp, (v, solver) ->
-      result1.push solver.trail.getvalue(template)
-      result.bind(result1, solver.trail);
+      result1.push solver.env.getvalue(template)
+      result.bind(result1, solver.env);
       cont(v, solver))
     solver.cont(exp, (v, solver) ->
-      result1.push solver.trail.getvalue(template)
+      result1.push solver.env.getvalue(template)
       expCont(v, solver))
   else
     result1 = i = null
     expCont = solver.cont(exp, (v, solver) ->
       i++
-      result1.push solver.trail.getvalue(template)
-      if i is expectTimes then result.bind(result1, solver.trail); cont(v, solver)
+      result1.push solver.env.getvalue(template)
+      if i is expectTimes then result.bind(result1, solver.env); cont(v, solver)
       else expCont(v, solver))
     (v, solver) -> i = 0;  result1 = []; expCont(v, solver)
 
@@ -395,22 +395,22 @@ times2Fun = (solver, cont, exp, expectTimes, result, template) ->
     result1 = expectTimes1 = i = null
     anyCont = (v, solver) ->
       fc = solver.failcont
-      trail = solver.trail
-      solver.trail = new dao.Trail
+      env = solver.env
+      solver.env = new dao.Env
       state = solver.state
       solver.failcont = (v, solver) ->
-        solver.trail.undo()
-        solver.trail = trail
+        solver.env.undo()
+        solver.env = env
         solver.state = state
         solver.failcont = (v, solver) -> i--; result1.pop(); fc(v, solver)
-        expectTimes1.bind(i, solver.trail);
+        expectTimes1.bind(i, solver.env);
         cont(v, solver)
       [expCont, v, solver]
-    expCont = solver.cont(exp, (v, solver) -> i++; result1.push solver.trail.getvalue(template); anyCont(v, solver))
+    expCont = solver.cont(exp, (v, solver) -> i++; result1.push solver.env.getvalue(template); anyCont(v, solver))
     solver.cont(expectTimes, (v, solver) ->
       expectTimes1= v
       if _.isNumber(expectTimes1) then numberTimes2Fun(solver, cont, exp, expectTimes1, result, template)(v, solver)
-      else i = 0; result1 = []; result.bind(result1, solver.trail); anyCont(v, solver))
+      else i = 0; result1 = []; result.bind(result1, solver.env); anyCont(v, solver))
 
 times2 = special(4, 'times', times2Fun)
 
@@ -467,11 +467,11 @@ exports.seplist = (exp, options={}) ->
 exports.char = special(1, 'char', (solver, cont, x) ->  (v, solver) ->
   [data, pos] = solver.state
   if pos>=data.length then return solver.failcont(v, solver)
-  trail = solver.trail
-  x = trail.deref(x)
+  env = solver.env
+  x = env.deref(x)
   c = data[pos]
   if x instanceof Var
-    x.bind(c, solver.trail)
+    x.bind(c, solver.env)
     solver.state = [data, pos+1]
     cont(pos+1, solver)
   else if x is c then (solver.state = [data, pos+1]; cont(v, solver))
@@ -483,8 +483,8 @@ exports.char = special(1, 'char', (solver, cont, x) ->  (v, solver) ->
 exports.followChar = special(1, 'followChar', (solver, cont, arg) -> (v, solver) ->
   [data, pos] = solver.state
   if pos>=data.length then return solver.failcont(v, solver)
-  trail = solver.trail
-  x = trail.deref(x)
+  env = solver.env
+  x = env.deref(x)
   c = data[pos]
   if x instanceof Var then throw new TypeError(x)
   else if x is c then (cont(pos, solver))
@@ -496,8 +496,8 @@ exports.followChar = special(1, 'followChar', (solver, cont, arg) -> (v, solver)
 exports.notFollowChar = special(1, 'notfollowChar', (solver, cont, x) -> (v, solver) ->
   [data, pos] = solver.state
   if pos>=data.length then return solver.failcont(v, solver)
-  trail = solver.trail
-  x = trail.deref(x)
+  env = solver.env
+  x = env.deref(x)
   c = data[pos]
   if x instanceof Var then throw new TypeError(x)
   else if x is c then solver.failcont(pos, solver)
@@ -508,11 +508,11 @@ exports.notFollowChar = special(1, 'notfollowChar', (solver, cont, x) -> (v, sol
 
 exports.followChars = special(1, 'followChars', (solver, cont, chars) -> (v, solver) ->
   # follow one of char in chars
-  chars = trail.deref(chars)
+  chars = env.deref(chars)
   if chars instanceof Var then throw new TypeError(chars)
   [data, pos] = solver.state
   if pos>=data.length then return solver.failcont(v, solver)
-  trail = solver.trail
+  env = solver.env
   c = data[pos]
   if c in chars then cont(pos, solver)
   else if not _.isString(chars)
@@ -521,11 +521,11 @@ exports.followChars = special(1, 'followChars', (solver, cont, chars) -> (v, sol
 
 exports.notFollowChars = special(1, 'notFollowChars', (solver, cont, chars) -> (v, solver) ->
   # not follow one of char in chars
-  chars = trail.deref(chars)
+  chars = env.deref(chars)
   if chars instanceof Var then throw new TypeError(chars)
   [data, pos] = solver.state
   if pos>=data.length then return solver.failcont(v, solver)
-  trail = solver.trail
+  env = solver.env
   c = data[pos]
   if c in chars then solver.failcont(pos, solver)
   else if not _.isString(chars)
@@ -632,10 +632,10 @@ exports.float = special(1, 'float', (solver, cont, arg) -> (v, solver) ->
   while p<length and '0'<=text[p]<='9' then p++
   if text[pos:p]=='.' then return solver.failcont(v, solver)
   val = eval(text[pos...p])
-  arg = solver.trail.deref(arg)
+  arg = solver.env.deref(arg)
   value =  eval(text[pos:p])
   if (arg instanceof Var)
-    arg.bind(value, solver.trail)
+    arg.bind(value, solver.env)
     cont(value, solver)
   else
     if _.isNumber(arg)
@@ -644,7 +644,7 @@ exports.float = special(1, 'float', (solver, cont, arg) -> (v, solver) ->
     else throw new exports.TypeError(arg))
 
 exports.literal = special(1, 'literal', (solver, cont, arg) -> (v, solver) ->
-  arg = solver.trail.deref(arg)
+  arg = solver.env.deref(arg)
   if (arg instanceof Var) then throw new exports.TypeError(arg)
   [text, pos] = solver.parse_state
   length = text.length
@@ -659,7 +659,7 @@ exports.literal = special(1, 'literal', (solver, cont, arg) -> (v, solver) ->
   else solver.failcont(p, solver))
 
 exports.followLiteral = special(1, 'followLiteral', (solver, cont, arg) -> (v, solver) ->
-  arg = solver.trail.deref(arg)
+  arg = solver.env.deref(arg)
   if (arg instanceof Var) then throw new exports.TypeError(arg)
   [text, pos] = solver.parse_state
   length = text.length
@@ -672,7 +672,7 @@ exports.followLiteral = special(1, 'followLiteral', (solver, cont, arg) -> (v, s
   else solver.failcont(p, solver))
 
 exports.notFollowLiteral = special(1, 'followLiteral', (solver, cont, arg) -> (v, solver) ->
-  arg = solver.trail.deref(arg)
+  arg = solver.env.deref(arg)
   if (arg instanceof Var) then throw new exports.TypeError(arg)
   [text, pos] = solver.parse_state
   length = text.length
@@ -689,7 +689,7 @@ exports.quoteString = special(1, 'quoteString', (solver, cont, quote) -> (v, sol
   [text, pos] = solver.parse_state
   length = text.length
   if pos>=length then return solver.failcont(v, solver)
-  quote = solver.trail.deref(quote)
+  quote = solver.env.deref(quote)
   if (arg instanceof Var) then throw new exports.TypeError(arg)
   if text[pos]!=quote then return solver.failcont(v, solver)
   p = pos+1

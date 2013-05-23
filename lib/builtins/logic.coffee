@@ -2,7 +2,7 @@ solve = require "../../lib/solve"
 
 special = solve.special
 macro = solve.macro
-Trail = solve.Trail
+Env = solve.Env
 Var = solve.Var
 
 exports.succeed = special(0, 'succeed', (solver, cont) -> cont)()
@@ -32,17 +32,17 @@ orpFun = (solver, cont, args...) ->
     y = args[1...]
     xcont = solver.cont(x, cont)
     ycont = orpFun(solver, cont, y...)
-  trail = state = fc = null
+  env = state = fc = null
   orcont = (v, solver) ->
-    trail.undo()
+    solver.env = env
     solver.state = state
     solver.failcont = fc
     [ycont, v, solver]
   (v, solver) ->
-    trail = new Trail
+    env = solver.env.copy()
     state = solver.state
+    if state then state = state.copy?() or state.clone?() or state.slice(0) or state
     fc = solver.failcont
-    solver.trail = trail
     solver.failcont = orcont
     [xcont, null, solver]
 
@@ -73,11 +73,11 @@ exports.ifp = special([2,3], 'ifp', (solver, cont, test, action, else_) ->
     (v, solver) ->
       # at first: make ifp cutable
       cc = solver.cutCont
-      trail = new Trail
+      env = new Env
       state = solver.state
       fc = solver.failcont
       solver.failcont = (v, solver) ->
-        trail.undo()
+        env.undo()
         solver.state = state
         solver.failcont = (v, solver) -> solver.failcont = fc; fc(v, solver)
         elseCont(v, solver)
@@ -93,13 +93,13 @@ exports.notp = special(1, 'notp', (solver, cont, x) ->
     solver.failcont = fc
     [fc, v, solver])
   (v, solver) ->
-    trail = solver.trail
-    solver.trail = new Trail
+    env = solver.env
+    solver.env = new Env
     fc = solver.failcont
     state = solver.state
     solver.failcont = (v, solver) ->
-      solver.trail.undo()
-      solver.trail = trail
+      solver.env.undo()
+      solver.env = env
       solver.state = state
       solver.failcont = fc
       [cont, v, solver]
@@ -121,23 +121,23 @@ exports.once = special(1, 'once', (solver, cont, x) ->
 
 exports.is_ = special(2, 'is_', (solver, cont, vari, exp) ->
   # different from assign in lisp.coffee:
-  # by using vari.bind, this is saved in solver.trail and can be restored in solver.failcont
-  solver.cont(exp, (v, solver) ->  vari.bind(v, solver.trail); [cont, true, solver]))
+  # by using vari.bind, this is saved in solver.env and can be restored in solver.failcont
+  solver.cont(exp, (v, solver) ->  vari.bind(v, solver.env); [cont, true, solver]))
 
 exports.bind = special(2, 'bind', (solver, cont, vari, term) ->
   # different from is_, do not evaluate the exp instead.
-  # by using vari.bind, this is saved in solver.trail and can be restored in solver.failcont
-  (v, solver) ->  vari.bind(term, solver.trail); [cont, true, solver])
+  # by using vari.bind, this is saved in solver.env and can be restored in solver.failcont
+  (v, solver) ->  vari.bind(term, solver.env); [cont, true, solver])
 
 #todo: provide unify function as the third argument
 exports.unifyFun = unifyFun = (solver, cont, x, y) -> (v, solver) ->
-  if solver.trail.unify(x, y) then cont(true, solver)
+  if solver.env.unify(x, y) then cont(true, solver)
   else solver.failcont(false, solver)
 
 exports.unify = special(2, 'unify', unifyFun)
 
 exports.notunifyFun = notunifyFun = (solver, cont, x, y) -> (v, solver) ->
-  if not solver.trail.unify(x, y) then cont(true, solver)
+  if not solver.env.unify(x, y) then cont(true, solver)
   else solver.failcont(false, solver)
 
 exports.notunify = special(2, 'notunify', notunifyFun)
@@ -146,7 +146,7 @@ exports.unifyListFun = unifyListFun = (solver, cont, xs, ys) ->  (v, solver) ->
   xlen = xs.length
   if ys.length isnt xlen then solver.failcont(false, solver)
   else for i in [0...xlen]
-    if not solver.trail.unify(xs[i], ys[i]) then return solver.failcont(false, solver)
+    if not solver.env.unify(xs[i], ys[i]) then return solver.failcont(false, solver)
   cont(true, solver)
 
 exports.unifyList = unifyList = special(2, 'unifyList', unifyListFun)
@@ -155,7 +155,7 @@ exports.notunifyListFun = notunifyListFun = (solver, cont, xs, ys) ->  (v, solve
   xlen = xs.length
   if ys.length isnt xlen then solver.failcont(false, solver)
   else for i in [0...xlen]
-    if solver.trail.unify(xs[i], ys[i]) then return solver.failcont(false, solver)
+    if solver.env.unify(xs[i], ys[i]) then return solver.failcont(false, solver)
   cont(true, solver)
 
 exports.notunifyList = notunifyList = special(2, 'notunifyList', notunifyListFun)
@@ -245,8 +245,8 @@ exports.between = special(3, 'between', (solver, cont, fun, x, y, z) ->
       solver.failcont = (v, solver) ->
         y11++
         if y11>z1 then fc(v, solver)
-        else y1.bind(y11, solver.trail); cont(y11, solver)
-      y1.bind(y11, solver.trail); cont(y11, solver)
+        else y1.bind(y11, solver.env); cont(y11, solver)
+      y1.bind(y11, solver.env); cont(y11, solver)
     else
       if (x1<=y1<=z1) then cont(true, solver)
       else solver.failcont(false, solver))
@@ -282,7 +282,7 @@ exports.nonvarp = special(1, 'varp', (solver, cont, x) ->
 exports.freep = special(1, 'freep', (solver, cont, x) ->
   # x is a free variable?
   (v, solver) ->
-    if solver.trail.deref(x) instanceof Var then cont(true, solver)
+    if solver.env.deref(x) instanceof Var then cont(true, solver)
     else solver.failcont(false, solver))
 
 exports.numberp = special(1, 'numberp', (solver, cont, x) ->
