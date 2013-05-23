@@ -20,13 +20,13 @@ exports.assign = special(2, 'assign', (solver, cont, vari, exp) ->
   # different from is_ in logic.coffee:
   # Because not using vari.bind, this is not saved in solver.trail and so it can NOT be restored in solver.failcont
   # EXCEPT the vari has been in solver.trail in the logic branch before.
-  solver.cont(exp, (v, solver) -> (vari.binding = v; cont(v, solver))))
+  solver.cont(exp, (v, solver) -> (vari.binding = v; solver.vars[vari.name] = [vari,v]; cont(v, solver))))
 
 exports.zero = special(1, 'zero', (solver, cont, vari, exp) ->
-  (v, solver) -> (vari.binding = 0; cont(v, solver)))
+  (v, solver) -> (vari.binding = 0; solver.vars[vari.name] = [vari,0]; cont(v, solver)))
 
 exports.one = special(1, 'one', (solver, cont, vari, exp) ->
- (v, solver) -> (vari.binding = 1; cont(v, solver)))
+ (v, solver) -> (vari.binding = 1; solver.vars[vari.name] = [vari,1]; cont(v, solver)))
 
 exports.begin = special(null, 'begin', (solver, cont, exps...) -> solver.expsCont(exps, cont))
 
@@ -62,16 +62,6 @@ iff_fun = (solver, cont, clauses, else_) ->
     solver.cont(test, action)
 
 exports.iff = special(-2, 'iff', iff_fun)
-
-### iff's macro version
-iff = macro (clauses_, else_) ->
-  length = clauses.length
-  if length is 0 then throw new exports.TypeError(clauses)
-  else if length is 1
-    exports.if_(clauses[0][0], clauses[0][1], else_)
-  else
-     exports.if_(clauses[0][0], clauses[0][1], iff(clauses[1...], else_)
-###
 
 exports.block = block = special(null, 'block', (solver, cont, label, body...) ->
   if not _.isString(label) then (label = ''; body = [label].concat(body))
@@ -155,6 +145,9 @@ exports.protect = special(-1, 'protect', (solver, cont, form, cleanup...) ->
 # todo: need a trampoline for running the current continuation until done or faildone
 
 runner = (solver, cont) -> (v) ->
+  for name, pair in solver.vars
+    vari = pair[0]; value = pair[1]
+    vari.binding = value
   while not solver.done then [cont, v, solver] = cont(v, solver)
   solver.done = false
   return v

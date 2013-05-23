@@ -61,13 +61,11 @@ class exports.Solver
     @exits = {}
     @continues = {}
     @done = false
+    @vars = {}
 
   clone: () ->
-    oldState = @state
-    if _.isArray(oldState) then state = oldState.slice(0)
-    else if oldState.copy? then state = oldState.copy()
-    else if oldState.clone? then state = oldState.clone()
-    else state  = oldState
+    state = @state
+    if state? then state = state.slice?(0) or state.copy?() or state.clone?() or state
     result = new @constructor(@failcont, @trail.copy(), state)
     result.cutCont = @cutCont
     result.catches = _.extend({}, @catches)
@@ -86,7 +84,7 @@ class exports.Solver
       [cont, value, solver] = cont(value, solver)
     value
 
-cont: (exp, cont) -> exp?.cont?(@, cont) or ((v, solver) -> cont(exp, solver))
+  cont: (exp, cont) -> exp?.cont?(@, cont) or ((v, solver) -> cont(exp, solver))
 
   quasiquote: (exp, cont) -> exp?.quasiquote?(@, cont) or ((v, solver) -> cont(exp, solver))
 
@@ -207,10 +205,18 @@ cont: (exp, cont) -> exp?.cont?(@, cont) or ((v, solver) -> cont(exp, solver))
 MAXBINDINGCHAINLENGTH = 200 # to break cylylic binding
 
 Trail = class exports.Trail
-  constructor: (@data={}) ->
-  copy: () -> new Trail(_.extend({}, @data))
-  set: (vari, value) ->  if not @data.hasOwnProperty(vari.name) then @data[vari.name] = [vari, value]
-  undo: () -> for name, pair of @data then pair[0].binding = pair[1]
+  constructor: (solver, data={}) -> _.extend(@, data); @$solver$ = solver
+  copy: () -> new Trail(@)
+  set: (vari, value) ->
+    if not @hasOwnProperty(vari.name)
+      @[vari.name] = [vari, value]
+
+  undo: () -> for name, pair of @
+    vari = pair[0]
+    value = pair[1]
+    vari.binding = value
+    @$solver$.vars[vari.name] = value
+
   deref: (x) -> x?.deref?(@) or x
   getvalue: (x, chainslength=0) -> x?.getvalue?(@, chainslength) or x
   unify: (x, y) -> x?.unify?(y, @) or y?.unify?(x, @) or (x is y)
@@ -232,12 +238,14 @@ Var = class exports.Var
           for i in [0...chains.length-2]
             x = chains[i]
             x.binding = next
+            trail.$solver$.vars[x.name] = [x, next]
             trail.set(x, chains[i+1])
           return next
         else if not next instanceof Var
           for i in [0...chains.length-1]
             x = chains[i]
             x.binding = next
+            trail.$solver$.vars[x.name] = [x, next]
             trail.set(x, chains[i+1])
           return next
         else if length > MAXBINDINGCHAINLENGTH
@@ -245,6 +253,7 @@ Var = class exports.Var
 
   bind: (value, trail) ->
     trail.set(@, @binding)
+    trail.$solver$.vars[@] = value
     @binding = value
 
   unify: (y, trail) ->
@@ -278,6 +287,7 @@ exports.newVar = (name='v') ->
   return new Var(name+index)
 
 exports.DummyVar = class DummyVar extends Var
+  constructor: (name) -> @name = '_$'+name
   deref: (trail) -> @
   bind: (value, trail) -> @binding = value
   _unify: (y, trail) -> @binding = y; true
