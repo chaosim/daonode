@@ -2,8 +2,8 @@
 # lisp know cont only.
 
 _ = require('underscore')
-solve = require "../../src/solve"
-general = require "../../src/builtins/general"
+solve = require "../../lib/solve"
+general = require "../../lib/builtins/general"
 
 special = solve.special
 macro = solve.macro

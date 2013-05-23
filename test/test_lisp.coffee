@@ -2,7 +2,7 @@ _ = require "underscore"
 
 I = require("../test/importer")
 
-base = "../src/"
+base = "../lib/"
 I.use base+"solve: Trail, solve, solver, fun, macro proc vari debug done faildone UnquoteSliceValue"
 I.use base+"builtins/general: add print_ inc dec eq le"
 I.use base+"""builtins/lisp: quote begin if_ iff eval_ block break_ continue_ assign loop_ while_ until_

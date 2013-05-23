@@ -376,7 +376,7 @@ class exports.Proc extends exports.Command
       result = @fun(args...)
       Command.globalSolver = savedSolver
       Command.directRun = false
-      [cont, result, solver]
+      [cont, result,  solver]
 
 exports.proc = commandMaker(exports.Proc)
 
@@ -386,3 +386,8 @@ exports.tofun = (name, cmd) ->
   unless cmd? then (cmd = name; name = 'noname')
   special(cmd.arity, name, (solver, cont, args...) ->
           solver.argsCont(args, (params, solver) -> [solver.cont(cmd(params...), cont), params, solver]))
+
+require("../lib/builtins/general")
+require("../lib/builtins/lisp")
+require("../lib/builtins/logic")
+require("../lib/builtins/parser")

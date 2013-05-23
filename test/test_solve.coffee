@@ -1,6 +1,6 @@
 I = require "../test/importer"
 
-base  =  "../src/"
+base  =  "../lib/"
 
 I.use base+"solve: solve vari Trail fun, macro proc rule, tofun"
 I.use base+"builtins/general: add print_"

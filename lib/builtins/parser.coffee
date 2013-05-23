@@ -1,10 +1,10 @@
 _ = require('underscore')
 
-dao = require "../../src/solve"
+dao = require "../../lib/solve"
 
-logic = require "../../src/builtins/logic"
-general = require "../../src/builtins/general"
-lisp = require "../../src/builtins/lisp"
+logic = require "../../lib/builtins/logic"
+general = require "../../lib/builtins/general"
+lisp = require "../../lib/builtins/lisp"
 
 [Trail, solve, Var,  ExpressionError, TypeError, special] = (dao[name]  for name in\
 "Trail, solve, Var,  ExpressionError, TypeError, special".split(", "))

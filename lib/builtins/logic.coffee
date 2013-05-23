@@ -1,4 +1,4 @@
-solve = require "../../src/solve"
+solve = require "../../lib/solve"
 
 special = solve.special
 macro = solve.macro

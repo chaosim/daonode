@@ -1,6 +1,6 @@
 I = require "../test/importer"
 
-base = "../src/"
+base = "../lib/"
 I.use base+"solve: Trail, solve, fun, macro vari debug dummy"
 I.use base+"builtins/lisp: begin"
 I.use base+"builtins/logic: andp orp notp succeed fail unify findall once "
