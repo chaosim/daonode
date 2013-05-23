@@ -3,23 +3,19 @@
   "description":  "functional logic solver with builtin parser",
   "keywords":     ["javascript", "language", "coffeescript", "daonode", "parser", "evaluator", "logic programming", "functional programming"],
   "author":       "Caoxingming",
-  "version":      "0.1.5",
+  "version":      "0.1.7",
   "licenses":     [{
     "type":       "MIT",
     "url":        "https://raw.github.com/chaosim/daonode/master/LICENSE"
   }],
-  "directories" : {
-     "lib" : "./lib",
-    "test" : "./test"
-  },
-  "main": "./lib/solve.js",
   "engines":      {
     "node":       "*"
   },
+  "main": "./lib/solve",
   "homepage":     "https://github.com/chaosim/daonode",
   "bugs":         "https://github.com/chaosim/daonode/issues",
   "repository":   {
     "type": "git",
-    "url": "git://github.com/chaosim/daonode.git"
+    "url": "https://www.github.com/chaosim/daonode.git"
   }
 }

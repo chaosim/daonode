@@ -233,6 +233,10 @@ exports.Test =
     test.equal(dao.status, dao.SUCCESS);
     test.deepEqual  solve(begin(parsetext(seplist(char(_), {sep:char(','), times:n, result:result, template:_}), 'a,b,c'), result)), ['a', 'b','c']
     test.equal(dao.status, dao.SUCCESS);
+    test.deepEqual  solve(begin(parsetext(andp(seplist(char(_), {sep:char(','), times:n, result:result, template:_}), char(','), char('c')), 'a,b,c'), result)), ['a', 'b']
+    test.equal(dao.status, dao.SUCCESS);
+    test.deepEqual  solve(begin(parsetext(andp(seplist(char(_), {sep:char(','), times:n, result:result, template:_}), char(','), char('b'), char(','), char('c')), 'a,b,c'), result)), ['a']
+    test.equal(dao.status, dao.SUCCESS);
     test.done()
 
 exports.Test =
@@ -241,6 +245,6 @@ exports.Test =
     result = vari('result')
     n = vari('n');
     n.binding = n;
-    test.deepEqual  solve(begin(parsetext(seplist(char(_), {sep:char(','), times:n, result:result, template:_}), 'a,b,c'), result)), ['a', 'b','c']
+    test.deepEqual  solve(begin(parsetext(andp(seplist(char(_), {sep:char(','), times:n, result:result, template:_}), char(','), char('b'), char(','), char('c')), 'a,b,c'), result)), ['a']
     test.equal(dao.status, dao.SUCCESS);
     test.done()

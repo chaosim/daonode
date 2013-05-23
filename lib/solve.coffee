@@ -62,15 +62,31 @@ class exports.Solver
     @continues = {}
     @done = false
 
+  clone: () ->
+    oldState = @state
+    if _.isArray(oldState) then state = oldState.slice(0)
+    else if oldState.copy? then state = oldState.copy()
+    else if oldState.clone? then state = oldState.clone()
+    else state  = oldState
+    result = new @constructor(@failcont, @trail.copy(), state)
+    result.cutCont = @cutCont
+    result.catches = _.extend({}, @catches)
+    result.exits = _.extend({}, @exits)
+    result.continues = _.extend({}, @continues)
+    result
+
   solve: (exp, cont = done) ->
     cont = @cont(exp, cont or done)
+    @run(cont)
+
+  run: (cont) ->
     value = null
     solver = @
     while not solver.done
       [cont, value, solver] = cont(value, solver)
     value
 
-  cont: (exp, cont) -> exp?.cont?(@, cont) or ((v, solver) -> cont(exp, solver))
+cont: (exp, cont) -> exp?.cont?(@, cont) or ((v, solver) -> cont(exp, solver))
 
   quasiquote: (exp, cont) -> exp?.quasiquote?(@, cont) or ((v, solver) -> cont(exp, solver))
 
@@ -192,6 +208,7 @@ MAXBINDINGCHAINLENGTH = 200 # to break cylylic binding
 
 Trail = class exports.Trail
   constructor: (@data={}) ->
+  copy: () -> new Trail(_.extend({}, @data))
   set: (vari, value) ->  if not @data.hasOwnProperty(vari.name) then @data[vari.name] = [vari, value]
   undo: () -> for name, pair of @data then pair[0].binding = pair[1]
   deref: (x) -> x?.deref?(@) or x
@@ -291,7 +308,7 @@ class exports.Apply
       if (arity>=0 and length is arity) or (arity<0 and length>=-arity) then ok = true
     if not ok
       for x in @args
-        if x?.caller?.name? is "unquoteSlice" then return
+        if x?.caller?.name is "unquoteSlice" then return
       throw new ArityError(@)
 
   toString: -> "#{@caller}(#{@args.join(', ')})"
@@ -386,8 +403,8 @@ exports.tofun = (name, cmd) ->
   unless cmd? then (cmd = name; name = 'noname')
   special(cmd.arity, name, (solver, cont, args...) ->
           solver.argsCont(args, (params, solver) -> [solver.cont(cmd(params...), cont), params, solver]))
-
-require("../lib/builtins/general")
-require("../lib/builtins/lisp")
-require("../lib/builtins/logic")
-require("../lib/builtins/parser")
+#
+#require("../lib/builtins/general")
+#require("../lib/builtins/lisp")
+#require("../lib/builtins/logic")
+#require("../lib/builtins/parser")

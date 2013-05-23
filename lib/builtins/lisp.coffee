@@ -153,15 +153,20 @@ exports.protect = special(-1, 'protect', (solver, cont, form, cleanup...) ->
   result)
 
 # todo: need a trampoline for running the current continuation until done or faildone
-exports.callcc = special(1, 'callcc', (solver, cont, fun) -> (v, solver) ->
-  result = fun(cont)[1]
+
+runner = (solver, cont) -> (v) ->
+  while not solver.done then [cont, v, solver] = cont(v, solver)
   solver.done = false
-  cont(result, solver))
+  return v
+
+exports.callcc = special(1, 'callcc', (solver, cont, fun) -> (v, solver) ->
+  cont(fun(runner(solver.clone(), cont)), solver))
 
 exports.callfc = special(1, 'callfc', (solver, cont, fun) -> (v, solver) ->
-  result = fun(solver.failcont)[1]
-  solver.done = false
-  cont(result, solver))
+  cont(fun(runner(solver.clone(), solver.failcont)), solver))
+
+exports.callcs = special(1, 'callcs', (solver, cont, fun) -> (v, solver) ->
+  cont(fun(solver.clone(), cont), solver))
 
 exports.quasiquote = exports.qq = special(1, 'quasiquote', (solver, cont, item) ->
   solver.quasiquote?(item, cont))

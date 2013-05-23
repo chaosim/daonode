@@ -9,6 +9,13 @@ exports.succeed = special(0, 'succeed', (solver, cont) -> cont)()
 
 exports.fail = special(0, 'fail', (solver, cont) -> (v, solver) -> solver.failcont(v, solver))()
 
+exports.appendFailcont = special(1, 'setFailcont', (solver, cont, fun) -> (v, solver) ->
+  fc = solver.failcont
+  solver.failcont = (v, solver) ->
+    fun();
+    fc(v, solver)
+  cont(v, solver))
+
 exports.andp = special(null, 'andp', (solver, cont, args...) -> solver.expsCont(args, cont))
 
 orpFun = (solver, cont, args...) ->

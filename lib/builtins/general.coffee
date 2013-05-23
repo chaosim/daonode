@@ -152,6 +152,14 @@ exports.push = special(2, 'push', (solver, cont, x, y) ->
   xcont = (v, solver) ->  x = v; ycont(null, solver)
   solver.cont(x, xcont))
 
+exports.pushp = special(2, 'pushp', (solver, cont, x, y) ->
+  ycont =  solver.cont(y, (v, solver) ->
+    fc = solver.failcont
+    solver.failcont = (v, solver) -> x.pop(); fc(v, solver)
+    cont(x.push(v), solver))
+  xcont = (v, solver) ->  x = v; ycont(null, solver)
+  solver.cont(x, xcont))
+
 exports.free = special(1, 'freep', (solver, cont, x) ->
   # x is a free variable?
   # this never fail, which is different from logic.freep

@@ -423,16 +423,16 @@ exports.seplist = (exp, options={}) ->
 
   newVar = dao.newVar
   succeed = logic.succeed; andp = logic.andp; bind = logic.bind; is_ = logic.is_
-  freep = logic.freep; ifp = logic.ifp
-  list = general.list; push = general.push; one = lisp.one;
-  inc = general.inc; sub = general.sub; getvalue = general.getvalue
+  freep = logic.freep; ifp = logic.ifp; appendFailcont = logic.appendFailcont
+  list = general.list; push = general.push; pushp = general.pushp
+  one = lisp.one; inc = general.inc; sub = general.sub; getvalue = general.getvalue
 
   if expectTimes is null
     if result is null
       andp(exp, any(andp(sep, exp)))
     else
-       andp(bind(result, []), exp, push(result, getvalue(template)),
-                  any(andp(sep, exp, push(result, getvalue(template)))))
+       andp(bind(result, []), exp, pushp(result, getvalue(template)),
+                  any(andp(sep, exp, pushp(result, getvalue(template)))))
   else if _.isNumber(expectTimes)
     expectTimes = Math.ceil Math.max 0, expectTimes
     if result is null
@@ -444,8 +444,8 @@ exports.seplist = (exp, options={}) ->
       switch expectTimes
         when 0 then bind(result, [])
         when 1 then andp(exp, bind(result, list(getvalue(template))))
-        else andp(bind(result, []), exp, push(result,getvalue(template)),
-                  times(andp(sep, exp, push(result, getvalue(template))), expectTimes-1))
+        else andp(bind(result, []), exp, pushp(result,getvalue(template)),
+                  times(andp(sep, exp, pushp(result, getvalue(template))), expectTimes-1))
   else
     n = newVar('n')
     i = newVar('i')
@@ -457,12 +457,12 @@ exports.seplist = (exp, options={}) ->
            ifp(freep(expectTimes),
                andp(exp, one(i),
                     push(result,getvalue(template)),
-                    any(andp(sep, exp, push(result, getvalue(template)),inc(i))),
+                    any(andp(sep, exp, push(result, getvalue(template)),inc(i), appendFailcont(() -> result.binding.pop(); i.binding--))),
                     bind(expectTimes, i))
                andp(exp,
-                    push(result,getvalue(template)),
+                    pushp(result,getvalue(template)),
                     is_(n, sub(expectTimes, 1)),
-                    times(andp(sep, exp, push(result,getvalue(template))),n))))
+                    times(andp(sep, exp, pushp(result,getvalue(template))),n))))
 
 exports.char = special(1, 'char', (solver, cont, x) ->  (v, solver) ->
   [data, pos] = solver.state

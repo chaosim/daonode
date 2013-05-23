@@ -18,7 +18,7 @@ exports.Test =
     test.equal  solve(begin(assign(a, 1),  block('a', if_(eq(a, 10000000), break_('a', a)), inc(a), continue_('a')))), 10000000
     test.done()
 
-xexports.Test =
+exports.Test =
   "test if_ iff begin": (test) ->
     test.equal  solve(begin(1)), 1
     test.equal  solve(begin(1, 2)), 2
@@ -134,4 +134,11 @@ xexports.Test =
     test.deepEqual  solve(incall(1, 2, 3, 4, 5, 6, 7)), [2, 3, 4, 5, 6, 7, 8]
     test.deepEqual  solve(incall(1, 2, 3, 4, 5, 6, 7, 8)), [2, 3, 4, 5, 6, 7, 8, 9]
     test.deepEqual  solve(incall(1, 2, 3, 4, 5, 6, 7, 8, 9)), [2, 3, 4, 5, 6, 7, 8, 9, 10]
+    test.done()
+
+exports.Test =
+  "test callcc": (test) ->
+    a = null
+    solve(begin(callcc((k) -> a = k), add(1, 2)))
+    test.equal a(null), 3
     test.done()
