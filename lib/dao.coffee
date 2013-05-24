@@ -58,6 +58,7 @@ exports.solve = (exp, cont=done, failcont=faildone, trail=new Trail) ->
 
 exports.solver = (failcont = faildone, trail=new Trail, state) -> new exports.Solver(failcont, trail, state)
 
+### the solver for dao ###
 class exports.Solver
   constructor: (@failcont=faildone, @trail=new Trail, @state) ->
     @cutCont = @failcont
