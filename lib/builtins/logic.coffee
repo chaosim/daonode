@@ -1,4 +1,4 @@
-solve = require "../../lib/solve"
+solve = require "../dao"
 
 special = solve.special
 macro = solve.macro
@@ -9,13 +9,15 @@ exports.succeed = special(0, 'succeed', (solver, cont) -> cont)()
 
 exports.fail = special(0, 'fail', (solver, cont) -> (v, solver) -> solver.failcont(v, solver))()
 
-exports.appendFailcont = special(1, 'setFailcont', (solver, cont, fun) -> (v, solver) ->
+### prepend fun() before solver.failcont ###
+exports.prependFailcont = special(1, 'setFailcont', (solver, cont, fun) -> (v, solver) ->
   fc = solver.failcont
   solver.failcont = (v, solver) ->
     fun();
     fc(v, solver)
   cont(v, solver))
 
+### same as lisp.begin, aka "," in prolog ###
 exports.andp = special(null, 'andp', (solver, cont, args...) -> solver.expsCont(args, cont))
 
 orpFun = (solver, cont, args...) ->
@@ -46,17 +48,22 @@ orpFun = (solver, cont, args...) ->
     solver.failcont = orcont
     [xcont, null, solver]
 
+### logic choices, aka ";" in prolog ###
 exports.orp = special(null, 'orp', orpFun)
 
+###  make the goal x cutable ###
 exports.cutable = special(1, 'cutable', (solver, cont, x) ->
   cc = null
   xcont = solver.cont(x, (v, solver) -> solver.cutCont = cc; [cont, v, solver])
   (v, solver) -> cc = solver.cutCont;  xcont null, solver)
 
+### prolog's cut, aka ! ###
 exports.cut = special(0, 'cut', (solver, cont) -> (v, solver) ->
   solver.failcont = solver.cutCont
   cont(v, solver))()
 
+### prolog's if, aka ->
+  different from lisp.if_ ###
 exports.ifp = special([2,3], 'ifp', (solver, cont, test, action, else_) ->
   #if -> Then; _Else :- If, !, Then.
   #If -> _Then; Else :- !, Else.
@@ -87,6 +94,7 @@ exports.ifp = special([2,3], 'ifp', (solver, cont, test, action, else_) ->
       cc = solver.cutCont
       resultCont(v, solver))
 
+### like in prolog, failure as negation. ###
 exports.notp = special(1, 'notp', (solver, cont, x) ->
   fc = null
   mycont = solver.cont(x, (v, solver) ->
@@ -105,20 +113,24 @@ exports.notp = special(1, 'notp', (solver, cont, x) ->
       [cont, v, solver]
     mycont(v, solver))
 
+### aka repeat in prolog ###
 exports.repeat = special(0, 'repeat', (solver, cont) ->
   (v, solver) -> solver.failcont = cont; [cont, null, solver])()
 
+### find all solution to the goal @exp in prolog  ###
 exports.findall = special(1, 'findall', (solver, cont, exp) ->
   fc = null
   findnext = solver.cont(exp, (v, solver) -> solver.failcont(v, solver))
   findallDone = (v, solver) -> ( solver.failcont = fc; [cont, v, solver])
   (v, solver) -> (fc = solver.failcont; solver.failcont = findallDone; [findnext, v, solver]))
 
+### find only one solution to the goal @x  ###
 exports.once = special(1, 'once', (solver, cont, x) ->
   fc = null
   cont1 = solver.cont(x, (v, solver) -> (solver.failcont = fc; cont(v, solver)))
   (v, solver) -> fc = solver.failcont; [cont1, null, solver])
 
+### evaluate @exp and bind it to vari ###
 exports.is_ = special(2, 'is_', (solver, cont, vari, exp) ->
   # different from assign in lisp.coffee:
   # by using vari.bind, this is saved in solver.trail and can be restored in solver.failcont
@@ -134,12 +146,14 @@ exports.unifyFun = unifyFun = (solver, cont, x, y) -> (v, solver) ->
   if solver.trail.unify(x, y) then cont(true, solver)
   else solver.failcont(false, solver)
 
+### unify two items. ###
 exports.unify = special(2, 'unify', unifyFun)
 
 exports.notunifyFun = notunifyFun = (solver, cont, x, y) -> (v, solver) ->
   if not solver.trail.unify(x, y) then cont(true, solver)
   else solver.failcont(false, solver)
 
+### to prove two items can NOT be unified ###
 exports.notunify = special(2, 'notunify', notunifyFun)
 
 exports.unifyListFun = unifyListFun = (solver, cont, xs, ys) ->  (v, solver) ->
@@ -149,6 +163,7 @@ exports.unifyListFun = unifyListFun = (solver, cont, xs, ys) ->  (v, solver) ->
     if not solver.trail.unify(xs[i], ys[i]) then return solver.failcont(false, solver)
   cont(true, solver)
 
+### unify two lists ###
 exports.unifyList = unifyList = special(2, 'unifyList', unifyListFun)
 
 exports.notunifyListFun = notunifyListFun = (solver, cont, xs, ys) ->  (v, solver) ->
@@ -162,33 +177,50 @@ exports.notunifyList = notunifyList = special(2, 'notunifyList', notunifyListFun
 
 #todo: optimize by using arity and the signature for rules which has many clauses
 # todo: database rules manipulation: abolish, assert, retract
+
+###
+   rule((arguments) ->
+  [[head1, body1]],
+   [head2, body2],
+   ...
+  else_])
+  # the rule's argument should be a function, which return a array, which conains the rule's clauses
+  # a clause of rule is composed of a head and a body. the head of rule will be unified with the arguments.
+  !!! the last clause is the else_ clause, which has not rule head, has only rule body that will always be run.
+  !!! empty clauses means succeed. if fails is need, rule((args..)->[fail]) should be ok.
+###
 exports.rule = (arity, name, fun) ->
   unless fun? then (fun = name; name = 'noname_rule')
   macro(arity, name, (args...) ->
     clauses = fun(args...)
-    clauses = for i in [0...clauses.length] by 2
-      head = clauses[i]
-      body = clauses[i+1]
+    if clauses.length==0 then return succeed
+    result = for i in [0...clauses.length-1]
+      head = clauses[i][0]
+      body = clauses[i][1]
       andp(unifyList(head, args), body)
-    orp(clauses...))
+    result.push(clauses[clauses.length-1])
+    orp(result...))
 
-# borrowed from lisp, same as in lisp.coffee
+### borrowed from lisp, same as in lisp.coffee ###
 # todo: need a trampoline for running the current continuation until done or faildone
 exports.callfc = special(1, 'callfc', (solver, cont, fun) -> (v, solver) ->
                          result = fun(solver.failcont)[1]
                          solver.done = false
                          cont(result, solver))
 
+### if x is true then succeed, else fail ###
 exports.truep = special(1, 'truep', (solver, cont, fun, x) ->
   solver.cont(x, (x1, solver) ->
     if x1 then cont(x1, solver)
     else solver.failcont(x1, solver)))
 
+### if x is false then succeed, else fail ###
 exports.falsep = special(1, 'falsep', (solver, cont, fun, x) ->
   solver.cont(x, (x1, solver) ->
     if not x1 then cont(x1, solver)
     else solver.failcont(x1, solver)))
 
+### if fun(x) is true then succeed, else fail ###
 exports.unaryPredicate = unaryPredicate = (name, fun) ->
   unless fun? then (fun = name; name = 'noname')
   special(1, name, (solver, cont, x) ->
@@ -197,6 +229,7 @@ exports.unaryPredicate = unaryPredicate = (name, fun) ->
       if result then cont(result, solver)
       else solver.failcont(result, solver)))
 
+### if fun(x, y) is true then succeed, else fail  ###
 exports.binaryPredicate = binaryPredicate = (name, fun) ->
   unless fun? then (fun = name; name = 'noname')
   special(2, name, (solver, cont, x, y) ->
@@ -214,6 +247,7 @@ exports.lep = binaryPredicate((x, y) -> x <= y)
 exports.gtp = binaryPredicate((x, y) -> x > y)
 exports.gep = binaryPredicate((x, y) -> x >= y)
 
+### if fun(x, y, z) is true then succeed, else fail  ###
 exports.ternaryPredicate = (name, fun) ->
   unless fun? then (fun = name; name = 'noname')
   special(3, name, (solver, cont, x, y, z) ->
@@ -224,6 +258,7 @@ exports.ternaryPredicate = (name, fun) ->
     ycont = solver.cont(y,  (v, solver) -> y = v; zcont(null, solver)
     solver.cont(x, (v, solver) -> x = v; ycont(null, solver))))
 
+### if fun(args...) is true then succeed, else fail ###
 exports.functionPredicate = (arity, name, fun) ->
   unless fun? then (fun = name; name = 'noname')
   special(arity, name, (solver, cont, args...) ->
@@ -232,9 +267,10 @@ exports.functionPredicate = (arity, name, fun) ->
       if result then cont(result, solver)
       else solver.failcont(result, solver)))
 
+### like "between" in prolog
+if y is number and x<=y<=z then succeed, else fail
+if y is Var, then try all branch by binding y with integer between x and y ###
 exports.between = special(3, 'between', (solver, cont, fun, x, y, z) ->
-  # like "between" in prolog, but should be that y is between [x, z]
-  # after evaluated, is y between x and z if y is not Var? or else try all number between z and z
   y1 = z1 = null
   zcont = solver.cont(z,  (zz, solver) ->
     if x1 instanceof dao.Var then throw dao.TypeError(x)
@@ -253,7 +289,8 @@ exports.between = special(3, 'between', (solver, cont, fun, x, y, z) ->
   ycont = solver.cont(y,  (v, solver) -> y1 = v; zcont(null, solver))
   solver.cont(x, (v, solver) -> x1 = v; ycont(null, solver)))
 
-exports.rangep = special(2, 'rangep', (solver, cont, fun, x, y) ->
+### try all branch by returning integer between x and y ###
+exports.rangep = special(2, 'rangep', (solver, cont, x, y) ->
   # select all of values between x and y as choices
   x1 = null
   ycont = solver.cont(y,  (y, solver) ->
@@ -269,43 +306,51 @@ exports.rangep = special(2, 'rangep', (solver, cont, fun, x, y) ->
     cont(result, solver))
   solver.cont(x, (v, solver) -> x1 = v; ycont(null, solver)))
 
+### if x is Var then succeed else fail ###
 exports.varp = special(1, 'varp', (solver, cont, x) ->
-  solver.cont(x, (x1, solver) ->
-    if (x1 instanceof dao.Var) then cont(true, solver)
-    else solver.failcont(false, solver)))
+   solver.cont(x, (x1, solver) ->
+     if (x1 instanceof dao.Var) then cont(true, solver)
+     else solver.failcont(false, solver)))
 
-exports.nonvarp = special(1, 'varp', (solver, cont, x) ->
+### if x is NOT Var then succeed else fail ###
+exports.nonvarp = special(1, 'notvarp', (solver, cont, x) ->
   solver.cont(x, (x1, solver) ->
     if (x1 not instanceof dao.Var) then cont(true, solver)
     else solver.failcont(false, solver)))
 
+###  if x is Var and is bound to itself then succeed else fail ###
 exports.freep = special(1, 'freep', (solver, cont, x) ->
-  # x is a free variable?
-  (v, solver) ->
-    if solver.trail.deref(x) instanceof Var then cont(true, solver)
-    else solver.failcont(false, solver))
+# x is a free variable?
+ (v, solver) ->
+   if solver.trail.deref(x) instanceof Var then cont(true, solver)
+   else solver.failcont(false, solver))
 
+###  if x is number then succeed else fail ###
 exports.numberp = special(1, 'numberp', (solver, cont, x) ->
   solver.cont(x, (x1, solver) ->
-    if _.isNumber(x1) then cont(true, solver)
-    else solver.failcont(false, solver)))
+  if _.isNumber(x1) then cont(true, solver)
+  else solver.failcont(false, solver)))
 
+###  if x is String then succeed else fail ###
 exports.stringp = special(1, 'stringp', (solver, cont, x) ->
   solver.cont(x, (x1, solver) ->
-    if _.isString(x1) then cont(true, solver)
-    else solver.failcont(false, solver)))
+  if _.isString(x1) then cont(true, solver)
+  else solver.failcont(false, solver)))
 
+###  if x is String or Number then succeed else fail ###
 exports.atomp = special(1, 'atomp', (solver, cont, x) ->
   solver.cont(x, (x1, solver) ->
-    if _.isNumber(x1) or _.isString(x1) then cont(true, solver)
-    else solver.failcont(false, solver)))
+  if _.isNumber(x1) or _.isString(x1) then cont(true, solver)
+  else solver.failcont(false, solver)))
 
+###  if x is Array then succeed else fail ###
 exports.listp = special(1, 'listp', (solver, cont, x) ->
   solver.cont(x, (x1, solver) ->
-    if _.isArray(x1) then cont(true, solver)
-    else solver.failcont(false, solver)))
+  if _.isArray(x1) then cont(true, solver)
+  else solver.failcont(false, solver)))
 
+###  if x is callable then succeed else fail ###
 exports.callablep = special(1, 'callablep', (solver, cont, x) ->
   solver.cont(x, (x1, solver) ->
-    if x1 instanceof dao.Apply then cont(true, solver)
-    else solver.failcont(false, solver)))
+  if x1 instanceof dao.Apply then cont(true, solver)
+  else solver.failcont(false, solver)))

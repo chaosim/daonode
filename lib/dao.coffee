@@ -1,10 +1,14 @@
 _ = require('underscore')
 
-#todo: compile
-# an idea: direct compile by function and compile to function?
-#todo: optimazation: partial evaluation?
-# nottodo: variable's apply_cont:: canceled. lisp1 should be good.
-# nottodo: Apply's apply_cont:: lisp1 should be good.
+### dao: a functional logic sover, with builtin parser.
+  continuation pass style, two continuations, one for succeed, one for fail and backtracking. ###
+
+### todo: compile
+an idea: direct compile by function and compile to function?
+todo: optimazation: partial evaluation?
+nottodo: variable's apply_cont:: canceled. lisp1 should be good.
+nottodo: Apply's apply_cont:: lisp1 should be good.
+###
 
 exports.debug = debug = (items...) ->
   console.log((
@@ -61,7 +65,6 @@ class exports.Solver
     @exits = {}
     @continues = {}
     @done = false
-    @vars = {}
 
   clone: () ->
     state = @state
@@ -205,17 +208,16 @@ class exports.Solver
 MAXBINDINGCHAINLENGTH = 200 # to break cylylic binding
 
 Trail = class exports.Trail
-  constructor: (solver, data={}) -> _.extend(@, data); @$solver$ = solver
-  copy: () -> new Trail(@)
+  constructor: (@data={}) ->
+  copy: () -> new Trail(_.extend({},@data))
   set: (vari, value) ->
-    if not @hasOwnProperty(vari.name)
-      @[vari.name] = [vari, value]
+    if not @data.hasOwnProperty(vari.name)
+      @data[vari.name] = [vari, value]
 
-  undo: () -> for name, pair of @
-    vari = pair[0]
-    value = pair[1]
-    vari.binding = value
-    @$solver$.vars[vari.name] = value
+  undo: () -> for nam, pair of  @data
+      vari = pair[0]
+      value = pair[1]
+      vari.binding = value
 
   deref: (x) -> x?.deref?(@) or x
   getvalue: (x, chainslength=0) -> x?.getvalue?(@, chainslength) or x
@@ -238,14 +240,12 @@ Var = class exports.Var
           for i in [0...chains.length-2]
             x = chains[i]
             x.binding = next
-            trail.$solver$.vars[x.name] = [x, next]
             trail.set(x, chains[i+1])
           return next
-        else if not next instanceof Var
+        else if next not instanceof Var
           for i in [0...chains.length-1]
             x = chains[i]
             x.binding = next
-            trail.$solver$.vars[x.name] = [x, next]
             trail.set(x, chains[i+1])
           return next
         else if length > MAXBINDINGCHAINLENGTH
@@ -253,7 +253,6 @@ Var = class exports.Var
 
   bind: (value, trail) ->
     trail.set(@, @binding)
-    trail.$solver$.vars[@] = value
     @binding = value
 
   unify: (y, trail) ->
@@ -413,8 +412,8 @@ exports.tofun = (name, cmd) ->
   unless cmd? then (cmd = name; name = 'noname')
   special(cmd.arity, name, (solver, cont, args...) ->
           solver.argsCont(args, (params, solver) -> [solver.cont(cmd(params...), cont), params, solver]))
-#
-#require("../lib/builtins/general")
-#require("../lib/builtins/lisp")
-#require("../lib/builtins/logic")
-#require("../lib/builtins/parser")
+
+require("./builtins/general")
+require("./builtins/lisp")
+require("./builtins/logic")
+require("./builtins/parser")

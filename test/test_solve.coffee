@@ -1,8 +1,8 @@
-I = require "../test/importer"
+I = require "./importer"
 
 base  =  "../lib/"
 
-I.use base+"solve: solve vari Trail fun, macro proc rule, tofun"
+I.use base+"dao: solve vari Trail fun, macro proc rule, tofun"
 I.use base+"builtins/general: add print_"
 I.use base+"builtins/lisp: quote eval_"
 I.use base+"builtins/logic: andp orp notp succeed fail unify findall once"

@@ -1,11 +1,12 @@
 # daonode
-this is an porting and rewriting from python to javascript of the dao project. 
+Daonode is a porting and rewriting from python to coffeecript(so just javscript) of the dao project. 
 What would happen when lisp meets prolog in javascript?  
 Dao is the new generation programming system implemented by a functional logic solver, unifying code with data, grammar with program, logic with functional, compiling with running.
 
 ## Documentation
 See <https://github.com/chaosim/daonode/wiki>
 See the tests, and you'll get some information about the api and use cases.
+Some old document is on http://pythonhosted.org/daot/ (out of date).
 
 ## Web sites
 the project's repository is on github <https://github.com/chaosim/daonode>. 
@@ -23,7 +24,5 @@ To report or search for bugs, please goto <https://github.com/chaosim/daonode>, 
 daonode is developed and tested on Windows 7, node.js 0.10.0, coffeescript 1.6.2.
 
 ## License
-mit license: see LICENSE
-
-That's all, folks!
+MIT: see LICENSE
 

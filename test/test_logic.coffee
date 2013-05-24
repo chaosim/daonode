@@ -1,8 +1,8 @@
-I = require "../test/importer"
+I = require "./importer"
 
 base  =  "../lib/"
 
-I.use base+"solve: Trail, solve, fun, macro vari"
+I.use base+"dao: Trail, solve, fun, macro vari"
 I.use base+"builtins/general: add print_"
 I.use base+"builtins/lisp: quote eval_"
 I.use base+"builtins/logic: andp orp notp succeed fail unify findall once rule"
@@ -89,7 +89,7 @@ exports.Test =
 
   "test rule": (test) ->
     r = rule(2, (x, y)->
-      [[x,y], 1])
+      [[[x,y], 1], null])
     test.equal  solve(r(1,1)), 1
     test.done()
 

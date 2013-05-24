@@ -1,10 +1,11 @@
 _ = require "underscore"
 
-I = require("../test/importer")
+I = require("./importer")
 
 base = "../lib/"
 I.use base+"solve: Trail, solve, solver, fun, macro proc vari debug done faildone UnquoteSliceValue"
 I.use base+"builtins/general: add print_ inc dec eq le"
+I.use base+"builtins/logic: orp"
 I.use base+"""builtins/lisp: quote begin if_ iff eval_ block break_ continue_ assign loop_ while_ until_
           catch_ throw_ protect callcc callfc qq uq uqs
           """
@@ -88,30 +89,20 @@ exports.Test =
     test.equal  solve(begin(assign(a, 1),  until_('a', print_(a), inc(a), eq(a, 5)))), null
     test.done()
 
-  "test callcc": (test) ->
-    a = 0
-    solver1 = solver()
-    result = solver1.solve(callcc((k) ->
-      a = k;
-      test.equal(a, done);
-      test.equal(1,1);
-      k(2, solver1)))
-    test.equal result, 2
-    test.equal a(2, solver1)[1], 2
-    test.deepEqual  a(2, solver1), done(2, solver1)
+  "test callcc2": (test) ->
+    a = null
+    solve(begin(callcc((k) -> a = k), add(1, 2)))
+    test.equal a(null), 3
     test.done()
 
   "test callfc": (test) ->
-    a = 0
-    solver1 = solver()
-    result = solver1.solve(callfc((k) ->
-      a = k;
-      test.equal(a, faildone);
-      test.equal(1,1);
-      k(2, solver1)))
-    test.equal result, 2
-    test.equal a(2, solver1)[1], 2
-    test.deepEqual  a(2, solver1), faildone(2, solver1)
+    a = null
+    solve(orp(callfc((k) -> a = k), add(1, 2)))
+    test.equal a(null), 3
+    x = vari('x')
+    x.binding = 5
+    solve(orp(callfc((k) -> a = k), add(x, 2)))
+    test.equal a(null), 7
     test.done()
 
   "test quasiquote": (test) ->
@@ -136,7 +127,7 @@ exports.Test =
     test.deepEqual  solve(incall(1, 2, 3, 4, 5, 6, 7, 8, 9)), [2, 3, 4, 5, 6, 7, 8, 9, 10]
     test.done()
 
-exports.Test =
+xexports.Test =
   "test callcc": (test) ->
     a = null
     solve(begin(callcc((k) -> a = k), add(1, 2)))

@@ -1,14 +1,15 @@
 _ = require('underscore')
 
-dao = require "../../lib/solve"
+dao = require "../dao"
 
-logic = require "../../lib/builtins/logic"
-general = require "../../lib/builtins/general"
-lisp = require "../../lib/builtins/lisp"
+logic = require "./logic"
+general = require "./general"
+lisp = require "./lisp"
 
 [Trail, solve, Var,  ExpressionError, TypeError, special] = (dao[name]  for name in\
 "Trail, solve, Var,  ExpressionError, TypeError, special".split(", "))
 
+### parse @exp on @state ###
 exports.parse = special(2, 'parse', (solver, cont, exp, state) ->
   oldState = null
   expCont = solver.cont(exp, (v, solver) ->
@@ -19,49 +20,79 @@ exports.parse = special(2, 'parse', (solver, cont, exp, state) ->
     solver.state = state
     expCont(v, solver))
 
+### parse @exp on [@sequence, 0] ###
 exports.parsetext = exports.parsesequence = (exp, sequence) -> exports.parse(exp, [sequence, 0])
 
+### solver.state = @state ###
 exports.setstate = special(1, 'setstate', (solver, cont, state) -> (v, solver) ->
   solver.state = state
   cont(v, solver))
 
+### solver.state = [@sequence, 0] ###
 exports.settext = exports.setsequence = (sequence) -> exports.setstate([sequence, 0])
 
+### get solver.state ###
 exports.getstate = special(0, 'getstate', (solver, cont) -> (v, solver) ->
   cont(solver.state, solver))()
 
+### get solver.state[0] ###
 exports.gettext = exports.getsequence = special(0, 'gettext', (solver, cont) -> (v, solver) ->
   cont(solver.state[0], solver))()
 
+### get solver.state[1] ###
 exports.getpos =special(0, 'getpos', (solver, cont) -> (v, solver) ->
   cont(solver.state[1], solver))()
 
+### end of input, means pos>=text.length ###
 exports.eoi = special(0, 'eoi', (solver, cont) -> (v, solver) ->
   [data, pos] = solver.state
   if pos>=data.length then cont(true, solver) else solver.failcont(v, solver))()
 
+### begin of input, means pos==0 ###
 exports.boi = special(0, 'boi', (solver, cont) -> (v, solver) ->
   if solver.state[1] is 0 then cont(true, solver) else solver.failcont(v, solver))()
 
+### end of line text[pos] in "\r\n" ###
+exports.eol = special(0, 'eol', (solver, cont) -> (v, solver) ->
+  [data, pos] = solver.state
+  if pos>=data.length then cont(true, solver)
+  else
+    [text, pos] = solver.state
+    if text[pos] in "\r\n" then cont(true, solver)
+    else solver.failcont(v, solver))()
+
+### begin of line text[pos-1] in "\r\n" ###
+exports.bol = special(0, 'bol', (solver, cont) -> (v, solver) ->
+  if solver.state[1] is 0 then cont(true, solver)
+  else
+    [text, pos] = solver.state
+    if text[pos-1] in "\r\n" then cont(true, solver)
+    else solver.failcont(v, solver))()
+
+### step to next char in text ###
 exports.step = special([0,1], 'step', (solver, cont, n=1) -> (v, solver) ->
   [text, pos] = solver.state
   solver.state = [text, pos+n]
   cont(pos+n, solver))
 
+### return left text ###
 exports.lefttext =  special(0, 'lefttext', (solver, cont) -> (v, solver) ->
   [text, pos] = solver.state
   cont(text[pos...], solver))()
 
+### return text[start...start+length]  ###
 exports.subtext =  exports.subsequence =  special([0,1,2], 'subtext', (solver, cont, length, start) -> (v, solver) ->
   [text, pos] = solver.state
   start = start? or pos
   length = length? or text.length
   cont(text[start...start+length], solver))
 
+### text[pos] ###
 exports.nextchar =  special(0, 'nextchar', (solver, cont) -> (v, solver) ->
   [text, pos] = solver.state
   cont(text[pos], solver))()
 
+### if item is followed, succeed, else fail. after eval, state is restored  ###
 exports.follow = special(1, 'follow', (solver, cont, item) ->
   state = null
   itemCont =  solver.cont(item, (v, solver) ->
@@ -71,6 +102,7 @@ exports.follow = special(1, 'follow', (solver, cont, item) ->
     state = solver.state
     itemCont(v, solver))
 
+### if item is NOT followed, succeed, else fail. after eval, state is restored  ###
 exports.notfollow = special(1, 'notfollow', (solver, cont, item) ->
   fc = state = null
   itemCont =  solver.cont(item, (v, solver) ->
@@ -94,6 +126,9 @@ parallelFun = (solver, cont, state, args) ->
 
 exports.checkParallel = checkFunction = (state, baseState) -> state[1] is baseState[1]
 
+### between current state and right, all args succeed,
+  and reach the right where checkParallel(solver.state, right) is true
+  in a simple way: in same length of piece pass all clauses. ###
 exports.parallel = special(null, 'parallel', (solver, cont, args...) ->
   # from current position to right pass all of args
   length = args.length
@@ -117,12 +152,20 @@ exports.parallel = special(null, 'parallel', (solver, cont, args...) ->
       ycont(v, solver))
     xcont)
 
+###
+normal goal try the goal at first, after succeed, if need, backtracking happens to the goal's choices.
+greedy goal goes forward at first, after succeed, no backtracking happens.
+lazy goal goes foward without trying the goal, if backtracking, try goal and go on.
+###
+
+### aka optional ###
 exports.may = special(1, 'may', (solver, cont, exp) ->
   exp_cont = solver.cont(exp, cont)
   (v, solver) ->
     solver.appendFailcont(cont)
     exp_cont(v, solver))
 
+### lazy optional ###
 exports.lazymay = special(1, 'lazymay', (solver, cont, exp) ->
   expCont = solver.cont(exp, cont)
   (v, solver) ->
@@ -423,7 +466,7 @@ exports.seplist = (exp, options={}) ->
 
   newVar = dao.newVar
   succeed = logic.succeed; andp = logic.andp; bind = logic.bind; is_ = logic.is_
-  freep = logic.freep; ifp = logic.ifp; appendFailcont = logic.appendFailcont
+  freep = logic.freep; ifp = logic.ifp; prependFailcont = logic.prependFailcont
   list = general.list; push = general.push; pushp = general.pushp
   one = lisp.one; inc = general.inc; sub = general.sub; getvalue = general.getvalue
 
@@ -457,7 +500,7 @@ exports.seplist = (exp, options={}) ->
            ifp(freep(expectTimes),
                andp(exp, one(i),
                     push(result,getvalue(template)),
-                    any(andp(sep, exp, push(result, getvalue(template)),inc(i), appendFailcont(() -> result.binding.pop(); i.binding--))),
+                    any(andp(sep, exp, push(result, getvalue(template)),inc(i), prependFailcont(() -> result.binding.pop(); i.binding--))),
                     bind(expectTimes, i))
                andp(exp,
                     pushp(result,getvalue(template)),
