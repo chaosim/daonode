@@ -165,8 +165,6 @@ exports.protect = special(-1, 'protect', (solver, cont, form, cleanup...) ->
   result = solver.cont(form, cleanupCont)
   result)
 
-# todo: need a trampoline for running the current continuation until done or faildone
-
 ### used by callcc and callfc ###
 runner = (solver, cont) -> (v) ->
   while not solver.done then [cont, v, solver] = cont(v, solver)

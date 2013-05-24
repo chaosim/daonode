@@ -3,70 +3,40 @@ _ = require('underscore')
 ### dao: a functional logic sover, with builtin parser.
   continuation pass style, two continuations, one for succeed, one for fail and backtracking. ###
 
-### todo: compile
+###
+todo: compile
 an idea: direct compile by function and compile to function?
 todo: optimazation: partial evaluation?
 nottodo: variable's apply_cont:: canceled. lisp1 should be good.
 nottodo: Apply's apply_cont:: lisp1 should be good.
 ###
 
-exports.debug = debug = (items...) ->
-  console.log((
-      (for x in items
-              if (x not instanceof Function)
-                s = x.toString()
-                if s=='[object Object]' then JSON.stringify(x) else s
-              else '[Function]') )...)
-
-class Error
-  constructor: (@exp, @message='', @stack = @) ->  # @stack: to make webstorm nodeunit happy.
-  toString: () -> "#{@constructor.name}: #{@exp} >>> #{@message}"
-
-class BindingError extends Error
-class TypeError extends Error
-class ExpressionError extends Error
-class ArgumentError extends Error
-class ArityError extends Error
-
-exports.checkArity1 = (args, n) ->
-  if arguments.length isnt n then throw new ArityError(args)
-
-exports.checkArity2 = (args, n) ->
-  if arguments.length < n then throw new ArityError(args)
-
-exports.checkArity3 = (args, arities...) ->
-  if arguments.length not in arities then throw new ArityError(args)
-
-exports.SUCCESS = 1
-exports.UNKNOWN = 0
-exports.FAIL = -1
-exports.status = exports.UNKNOWN
-
-exports.done = done =(v, solver) ->
-  solver.done = true
-  exports.status = exports.SUCCESS
-  [null, solver.trail.getvalue(v), solver]
-
-exports.faildone = faildone = (v, solver) ->
-  solver.done = true
-  exports.status = exports.FAIL
-  [null, solver.trail.getvalue(v), solver]
-
-exports.solve = (exp, cont=done, failcont=faildone, trail=new Trail) ->
+### the utility function: use this utlity to solve an dao expression @exp
+  @cont: (v, solver) -> body # in coffeescript
+         function(v, solver){ body } # in javascript
+    # when solver succeed at last, @cont isexecuted.
+  @failcont: (v, solver) -> body  # in coffeescript
+         function(v, solver){ body } # in javascript
+     # when solver fails at last, @failcont is executed.
+  @state: the state of solver, mainly used for parsing
+   ###
+exports.solve = (exp, cont=done, failcont=faildone, state) ->
   exports.status = exports.UNKNOWN
-  new exports.Solver(failcont, trail).solve(exp, cont)
+  exports.solver(failcont, state).solve(exp, cont)
 
-exports.solver = (failcont = faildone, trail=new Trail, state) -> new exports.Solver(failcont, trail, state)
+exports.solver = (failcont = faildone, state) -> new exports.Solver(failcont, state)
 
 ### the solver for dao ###
 class exports.Solver
-  constructor: (@failcont=faildone, @trail=new Trail, @state) ->
-    @cutCont = @failcont
-    @catches = {}
-    @exits = {}
-    @continues = {}
-    @done = false
+  constructor: (@failcont=faildone, @state) ->
+    @trail=new Trail  # used  to restore varibale's binding. for backtracking multiple logic choices
+    @cutCont = @failcont # used for cut like in prolog.
+    @catches = {}  # used for lisp style catch/throw
+    @exits = {}  # used for block/break
+    @continues = {} # like above, play with block/continue
+    @done = false # stop flag for the trampoline loop.
 
+  ### in callcc, callfc, callcs, the solver is needed to be cloned.###
   clone: () ->
     state = @state
     if state? then state = state.slice?(0) or state.copy?() or state.clone?() or state
@@ -77,10 +47,12 @@ class exports.Solver
     result.continues = _.extend({}, @continues)
     result
 
+  ### use this solver to solve @exp, @cont=done is the succeed continuation.###
   solve: (exp, cont = done) ->
-    cont = @cont(exp, cont or done)
-    @run(cont)
+    cont = @cont(exp, cont or done)  # first generate the continuation to get start.
+    @run(cont) # the trampoline loop
 
+  ### the trampoline from cont until solver.done is true. ###
   run: (cont) ->
     value = null
     solver = @
@@ -88,28 +60,17 @@ class exports.Solver
       [cont, value, solver] = cont(value, solver)
     value
 
+  ### generate the continuation to get start ###
   cont: (exp, cont) -> exp?.cont?(@, cont) or ((v, solver) -> cont(exp, solver))
 
-  quasiquote: (exp, cont) -> exp?.quasiquote?(@, cont) or ((v, solver) -> cont(exp, solver))
-
-  appendFailcont: (fun) ->
-    trail = @trail
-    @trail = new Trail
-    state = @state
-    fc = @failcont
-    @failcont = (v, solver) ->
-      solver.trail.undo()
-      solver.trail = trail
-      solver.state = state
-      solver.failcont = fc;
-      fun(v, solver)
-
+  ### used for lisp.begin, logic.andp, generate the continuation for an expression array ###
   expsCont: (exps, cont) ->
     length = exps.length
     if length is 0 then throw exports.TypeError(exps)
     else if length is 1 then @cont(exps[0], cont)
     else @cont(exps[0], @expsCont(exps[1...], cont))
 
+  ### evaluate an expression array to a array. ###
   argsCont: (args, cont) ->
     length = args.length
     solver = @
@@ -193,6 +154,24 @@ class exports.Solver
             solver.cont(args[i], _cont)
         cont
 
+  ### used by lisp style quasiquote, unquote, unquoteSlice ###
+  quasiquote: (exp, cont) -> exp?.quasiquote?(@, cont) or ((v, solver) -> cont(exp, solver))
+
+  ### an utility that is useful for some logic builtins
+      when backtracking, execute fun at first, and then go to original failcont ###
+  appendFailcont: (fun) ->
+    trail = @trail
+    @trail = new Trail
+    state = @state
+    fc = @failcont
+    @failcont = (v, solver) ->
+      solver.trail.undo()
+      solver.trail = trail
+      solver.state = state
+      solver.failcont = fc;
+      fun(v, solver)
+
+  ### pushCatch/popCatch/findCatch: utlities for lisp style catch/throw ###
   pushCatch: (value, cont) ->
     catches = @catches[value] ?= []
     catches.push(cont)
@@ -204,10 +183,26 @@ class exports.Solver
     if not catches? or catches.length is 0 then throw new NotCatched
     catches[catches.length-1]
 
+  ### utility for lisp style unwind-protect, play with block/break/continue, catch/throw and lisp.protect ###
   protect: (fun) -> fun
+
+### default last continuation when succeed ###
+exports.done = done =(v, solver) ->
+  solver.done = true
+  exports.status = exports.SUCCESS
+  [null, solver.trail.getvalue(v), solver]
+
+### default last continuation when fail ###
+exports.faildone = faildone = (v, solver) ->
+  solver.done = true
+  exports.status = exports.FAIL
+  [null, solver.trail.getvalue(v), solver]
 
 MAXBINDINGCHAINLENGTH = 200 # to break cylylic binding
 
+### record the trail for variable binding
+  when multiple choices exist, a new Trail for current branch is constructored,
+  when backtracking, undo the trail to restore the previous variable binding ###
 Trail = class exports.Trail
   constructor: (@data={}) ->
   copy: () -> new Trail(_.extend({},@data))
@@ -224,6 +219,7 @@ Trail = class exports.Trail
   getvalue: (x, chainslength=0) -> x?.getvalue?(@, chainslength) or x
   unify: (x, y) -> x?.unify?(y, @) or y?.unify?(x, @) or (x is y)
 
+### Var for logic bindings, used in unify, lisp.assign, inc/dec, parser operation, etc. ###
 Var = class exports.Var
   constructor: (@name, @binding = @) ->
   deref: (trail) ->
@@ -280,12 +276,14 @@ reElements = /\s*,\s*|\s+/
 exports.vari = (name) -> new exports.Var(name)
 exports.vars = (names) -> new Var(name) for name in split names,  reElements
 
+### in macro, we need unique var to avoid conflicting ###
 nameToIndexMap = {}
 exports.newVar = (name='v') ->
   index = nameToIndexMap[name]? or 1
   nameToIndexMap[name] = index+1
   return new Var(name+index)
 
+### DummyVar never fail when it need unify. see tests about any/some/times for examples ###
 exports.DummyVar = class DummyVar extends Var
   constructor: (name) -> @name = '_$'+name
   deref: (trail) -> @
@@ -303,6 +301,7 @@ exports.DummyVar = class DummyVar extends Var
 exports.dummy = (name) -> new exports.DummyVar(name)
 exports.dummies = (names) -> new DummyVar(name) for name in split names,  reElements
 
+### the apply to some Command(special, fun, macro, proc, etc) ###
 class exports.Apply
   constructor: (@caller, @args) ->
     # null: (...)
@@ -342,9 +341,12 @@ class exports.Apply
           cont(null, solver))
     cont
 
+### flag class to process unquoteSlice ###
 UnquoteSliceValue = class exports.UnquoteSliceValue
   constructor: (@value) ->
 
+### dao command that can be applied
+  Special, Fun, Macro, Proc is subclass of Command. ###
 Command = class exports.Command
   @directRun = false
   @done = (v, solver) -> (solver.done = true; [null, solver.trail.getvalue(v), solver])
@@ -366,34 +368,66 @@ commandMaker = (klass) -> (arity, name_or_fun, fun) ->
   if not _.isNumber(arity) and arity isnt null and not _.isArray(arity) then throw new ArgumentError(arity)
   (if fun? then new klass(fun, name_or_fun, arity) else new klass(name_or_fun, 'noname', arity)).callable
 
+### Speical knows solver and cont, with them the special function has full control of things. ###
 class exports.Special extends exports.Command
   apply_cont: (solver, cont, args) -> @fun(solver, cont, args...)
 
+### generate an instance of Special from a function
+  example:
+  begin = special(null, 'begin', (solver, cont, exps...) -> solver.expsCont(exps, cont))  # coffeescript
+  exports.begin = special(null, 'begin', function() { # javascript
+    var cont, exps, solver;
+
+    solver = arguments[0], cont = arguments[1], exps = 3 <= arguments.length ? __slice.call(arguments, 2) : [];
+    return solver.expsCont(exps, cont);
+  });
+  exports.fail = special(0, 'fail', (solver, cont) -> (v, solver) -> solver.failcont(v, solver))() #coffescript
+  exports.fail = special(0, 'fail', function(solver, cont) { # javascript
+    return function(v, solver) {
+      return solver.failcont(v, solver);
+    };
+  })();
+   ###
 exports.special = special = commandMaker(exports.Special)
 
-# to keep it simple, not to implmenting the apply_cont in Var and Apply
+### KISS: to keep it simple, not to implmenting the apply_cont in Var and Apply ###
+###  call goal with args...###
 exports.call = special(-1, 'call', (solver, cont, goal, args...) ->
   goal1 = null
   argsCont =  solver.argsCont(args, (params,  solver) ->
     solver.cont(goal1(params...), cont)(null, solver))
   solver.cont(goal, (v, solver) -> goal1 = goal; argsCont(null, solver)))
 
+### apply goal with args ###
 exports.apply  = special(2, 'apply', (solver, cont, goal, args) ->
   goal1 = null
   argsCont =  solver.argsCont(args, (params,  solver) ->
     solver.cont(goal1(params...), cont)(null, solver))
   solver.cont(goal, (v, solver) -> goal1 = goal; argsCont(null, solver)))
 
+### Fun evaluate its arguments, and return the result to fun(params...) to cont directly. ###
 class exports.Fun extends exports.Command
   apply_cont: (solver, cont, args) ->  solver.argsCont(args, (params, solver) => [cont, @fun(params...), solver])
 
+### generate an instance of Fun from a function
+  example:
+  add = fun((x, y) -> x+y ) # coffeescript
+  add = fun(function(x,y){ return x+y; } # javascript
+  ###
 exports.fun = commandMaker(exports.Fun)
 
+### similar to lisp'macro, Macro does NOT evaluate its arguments, but evaluate the result to fun(args). ###
 class exports.Macro extends exports.Command
   apply_cont: (solver, cont, args) -> solver.cont(@fun(args...), cont)
 
+### generate a instance of Macro from a function
+  example:
+  orpm = fun((x, y) -> orp(x,y ) # coffeescript
+  orpm = fun(function(x,y){  return orp(x,y ); } # javascript
+  ###
 exports.macro = commandMaker(exports.Macro)
 
+### In Porc's function, the dao's expressions can be directed evaluated ###
 class exports.Proc extends exports.Command
   apply_cont:  (solver, cont, args) ->
     (v, solver) =>
@@ -407,14 +441,43 @@ class exports.Proc extends exports.Command
 
 exports.proc = commandMaker(exports.Proc)
 
+
 exports.tofun = (name, cmd) ->
-  # cmd can be an instance of subclass of Command, especially macro(macro don't eval its arguments)
-  # and specials that don't eval their arguments.
+  ### evaluate the arguments of a command before execute it.
+    with tofun, Special and Macro can behaviour like a Fun.
+    cmd can be an instance of subclass of Command,
+     especially macro(macro don't eval its arguments)
+     and specials that don't eval their arguments. ###
   unless cmd? then (cmd = name; name = 'noname')
   special(cmd.arity, name, (solver, cont, args...) ->
           solver.argsCont(args, (params, solver) -> [solver.cont(cmd(params...), cont), params, solver]))
 
-require("./builtins/general")
-require("./builtins/lisp")
-require("./builtins/logic")
-require("./builtins/parser")
+class Error
+  constructor: (@exp, @message='', @stack = @) ->  # @stack: to make webstorm nodeunit happy.
+  toString: () -> "#{@constructor.name}: #{@exp} >>> #{@message}"
+
+class BindingError extends Error
+class TypeError extends Error
+class ExpressionError extends Error
+class ArgumentError extends Error
+class ArityError extends Error
+
+### solver's status is set to UNKNOWN when start to solve,
+  if solver successfully run to solver'last continuation, status is set SUCCESS,
+  else if solver run to solver's failcont, status is set to FAIL.###
+exports.SUCCESS = 1
+exports.UNKNOWN = 0
+exports.FAIL = -1
+exports.status = exports.UNKNOWN
+
+exports.debug = debug = (items...) ->
+  console.log(((for x in items
+      if (x not instanceof Function)
+        s = x.toString()
+        if s=='[object Object]' then JSON.stringify(x) else s
+      else '[Function]') )...)
+
+#require("./builtins/general")
+#require("./builtins/lisp")
+#require("./builtins/logic")
+#require("./builtins/parser")
