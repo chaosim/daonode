@@ -2,6 +2,7 @@ I = require "./importer"
 
 base  =  "../lib/"
 
+dao  = require base+"dao"
 I.use base+"dao: Trail, solve, fun, macro vari"
 I.use base+"builtins/general: add print_"
 I.use base+"builtins/lisp: quote eval_"
@@ -89,8 +90,9 @@ exports.Test =
 
   "test rule": (test) ->
     r = rule(2, (x, y)->
-      [[[x,y], 1], null])
+      [[x,y], 1, null])
     test.equal  solve(r(1,1)), 1
+    test.equal dao.status, dao.SUCCESS
     test.done()
 
 

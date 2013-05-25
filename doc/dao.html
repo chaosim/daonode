@@ -1,0 +1,1192 @@
+<!DOCTYPE html>
+
+<html>
+<head>
+  <title>dao.coffee</title>
+  <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+  <meta name="viewport" content="width=device-width, target-densitydpi=160dpi, initial-scale=1.0; maximum-scale=1.0; user-scalable=0;">
+  <link rel="stylesheet" media="all" href="docco.css" />
+</head>
+<body>
+  <div id="container">
+    <div id="background"></div>
+    
+    <ul class="sections">
+        
+          <li id="title">
+              <div class="annotation">
+                  <h1>dao.coffee</h1>
+              </div>
+          </li>
+        
+        
+        
+        <li id="section-1">
+            <div class="annotation">
+              
+              <div class="pilwrap for-h2">
+                <a class="pilcrow" href="#section-1">&#182;</a>
+              </div>
+              <h2>dao</h2>
+<h3>a functional logic sover, with builtin parser.</h3>
+<p>continuation pass style, two continuations, one for succeed, one for fail and backtracking.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>_ = require(<span class="string">'underscore'</span>)</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-2">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-2">&#182;</a>
+              </div>
+              <ul>
+<li><strong>todo</strong>: compile</li>
+<li>#an idea: direct compile by function and compile to function?</li>
+<li><strong>todo</strong>: optimazation: partial evaluation?</li>
+<li><strong>nottodo</strong>: variable&#39;s apply_cont:: canceled. lisp1 should be good.</li>
+<li><strong>nottodo</strong>: Apply&#39;s apply_cont:: lisp1 should be good.</li>
+</ul>
+
+            </div>
+            
+        </li>
+        
+        
+        <li id="section-3">
+            <div class="annotation">
+              
+              <div class="pilwrap for-h4">
+                <a class="pilcrow" href="#section-3">&#182;</a>
+              </div>
+              <h4>solve</h4>
+<p>use this utlity to solve a dao expression exp<br/>
+cont: (v, solver) -&gt; body # in coffeescript <br/>
+function(v, solver){ body } # in javascript<br/>
+when solver succeed at last, @cont is executed.<br/>
+failcont: (v, solver) -&gt; body  # in coffeescript<br/>
+function(v, solver){ body } # in javascript<br/>
+when solver fails at last, @failcont is executed.<br/>
+state: the state of solver, mainly used for parsing <br/></p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>
+exports.<span class="function"><span class="title">solve</span></span> = (exp, cont=done, failcont=faildone, state) -&gt;
+  exports.status = exports.UNKNOWN
+  exports.solver(failcont, state).solve(exp, cont)</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-4">
+            <div class="annotation">
+              
+              <div class="pilwrap for-h4">
+                <a class="pilcrow" href="#section-4">&#182;</a>
+              </div>
+              <h4>solver</h4>
+<p>utility for new Solver</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.<span class="function"><span class="title">solver</span></span> = (failcont = faildone, state) -&gt; <span class="keyword">new</span> exports.Solver(failcont, state)</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-5">
+            <div class="annotation">
+              
+              <div class="pilwrap for-h4">
+                <a class="pilcrow" href="#section-5">&#182;</a>
+              </div>
+              <h4>class Solver</h4>
+<p>the solver for dao expression</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="class"><span class="keyword">class</span> <span class="title">exports</span>.<span class="title">Solver</span></span></pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-6">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-6">&#182;</a>
+              </div>
+              <p>@failcont is for backtracking in logic operation
+@state is mainly used in parsing.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>  constructor: (<span class="property">@failcont</span>=faildone, <span class="property">@state</span>) -&gt;</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-7">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-7">&#182;</a>
+              </div>
+              <p>@trail is used to restore varibale&#39;s binding for backtracking multiple logic choices</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>    <span class="property">@trail</span>=<span class="keyword">new</span> Trail</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-8">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-8">&#182;</a>
+              </div>
+              <p>@cutCont is used for cut like in prolog.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>    <span class="property">@cutCont</span> = <span class="property">@failcont</span></pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-9">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-9">&#182;</a>
+              </div>
+              <p>@catches is used for lisp style catch/throw</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>    <span class="property">@catches</span> = {}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-10">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-10">&#182;</a>
+              </div>
+              <p>@exits is used for block/break</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>    <span class="property">@exits</span> = {}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-11">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-11">&#182;</a>
+              </div>
+              <p>like above, @continues play with block/continue</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>    <span class="property">@continues</span> = {}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-12">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-12">&#182;</a>
+              </div>
+              <p>when @done is true, stop the the trampoline loop on continuation.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>    <span class="property">@done</span> = <span class="literal">false</span></pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-13">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-13">&#182;</a>
+              </div>
+              <p>in callcc, callfc, callcs, the solver is needed to be cloned.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>  clone: () -&gt;
+    state = <span class="property">@state</span>
+    <span class="keyword">if</span> state? <span class="keyword">then</span> state = state.slice?(<span class="number">0</span>) <span class="keyword">or</span> state.copy?() <span class="keyword">or</span> state.clone?() <span class="keyword">or</span> state
+    result = <span class="keyword">new</span> <span class="property">@constructor</span>(<span class="property">@failcont</span>, <span class="property">@trail</span>.copy(), state)
+    result.cutCont = <span class="property">@cutCont</span>
+    result.catches = _.extend({}, <span class="property">@catches</span>)
+    result.exits = _.extend({}, <span class="property">@exits</span>)
+    result.continues = _.extend({}, <span class="property">@continues</span>)
+    result</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-14">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-14">&#182;</a>
+              </div>
+              <p>use this solver to solve exp, cont=done is the succeed continuation.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>  solve: (exp, cont = done) -&gt;</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-15">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-15">&#182;</a>
+              </div>
+              <p>first generate the continuation to get start.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>    cont = <span class="property">@cont</span>(exp, cont <span class="keyword">or</span> done)</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-16">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-16">&#182;</a>
+              </div>
+              <p>and then run the trampoline loop on continuation.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>    <span class="property">@run</span>(cont)</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-17">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-17">&#182;</a>
+              </div>
+              <p>run the trampoline from cont until @done is true.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>  run: (cont) -&gt;
+    value = <span class="literal">null</span>
+    solver = @
+    <span class="keyword">while</span> <span class="keyword">not</span> solver.done
+      [cont, value, solver] = cont(value, solver)
+    value</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-18">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-18">&#182;</a>
+              </div>
+              <p>generate the continuation to get start with.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>  cont: (exp, cont) -&gt; exp?.cont?(@, cont) <span class="keyword">or</span> ((v, solver) -&gt; cont(exp, solver))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-19">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-19">&#182;</a>
+              </div>
+              <p>used for lisp.begin, logic.andp, etc., to generate the continuation for an expression array</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>  expsCont: (exps, cont) -&gt;
+    length = exps.length
+    <span class="keyword">if</span> length <span class="keyword">is</span> <span class="number">0</span> <span class="keyword">then</span> <span class="keyword">throw</span> exports.TypeError(exps)
+    <span class="keyword">else</span> <span class="keyword">if</span> length <span class="keyword">is</span> <span class="number">1</span> <span class="keyword">then</span> <span class="property">@cont</span>(exps[<span class="number">0</span>], cont)
+    <span class="keyword">else</span> <span class="property">@cont</span>(exps[<span class="number">0</span>], <span class="property">@expsCont</span>(exps[<span class="number">1.</span>..], cont))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-20">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-20">&#182;</a>
+              </div>
+              <p>evaluate an array of expression to a array.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>  argsCont: (args, cont) -&gt;
+    length = args.length
+    solver = @</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-21">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-21">&#182;</a>
+              </div>
+              <p>switch is an optimization for speed on frequent cases.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>    <span class="keyword">switch</span> length
+      <span class="keyword">when</span> <span class="number">0</span>
+        (v, solver) -&gt; cont([], solver)
+      <span class="keyword">when</span> <span class="number">1</span>
+        <span class="function"><span class="title">cont0</span></span> = (v, solver) -&gt; cont([v], solver)
+        solver.cont(args[<span class="number">0</span>],cont0)
+      <span class="keyword">when</span> <span class="number">2</span>
+        arg0 = <span class="literal">null</span>
+        <span class="function"><span class="title">_cont1</span></span> = (arg1, solver) -&gt; cont([arg0, arg1], solver)
+        cont1 = solver.cont(args[<span class="number">1</span>], _cont1)
+        <span class="function"><span class="title">cont0</span></span> = (v, solver) -&gt; arg0 = v; cont1(<span class="literal">null</span>, solver)
+        solver.cont(args[<span class="number">0</span>], cont0)
+      <span class="keyword">when</span> <span class="number">3</span>
+        arg0 = <span class="literal">null</span>; arg1 = <span class="literal">null</span>
+        <span class="function"><span class="title">_cont2</span></span> = (arg2, solver) -&gt; cont([arg0, arg1, arg2], solver)
+        cont2 = solver.cont(args[<span class="number">2</span>], _cont2)
+        <span class="function"><span class="title">_cont1</span></span> = (v, solver) -&gt; arg1 = v; cont2(<span class="literal">null</span>, solver)
+        cont1 = solver.cont(args[<span class="number">1</span>], _cont1)
+        <span class="function"><span class="title">cont0</span></span> = (v, solver) -&gt; arg0 = v; cont1(<span class="literal">null</span>, solver)
+        solver.cont(args[<span class="number">0</span>], cont0)
+      <span class="keyword">when</span> <span class="number">4</span>
+        arg0 = <span class="literal">null</span>; arg1 = <span class="literal">null</span>; arg2 = <span class="literal">null</span>
+        <span class="function"><span class="title">_cont3</span></span> = (arg3, solver) -&gt; cont([arg0, arg1, arg2, arg3], solver)
+        cont3 = solver.cont(args[<span class="number">3</span>], _cont3)
+        <span class="function"><span class="title">_cont2</span></span> = (v, solver) -&gt; arg2 = v; cont3(<span class="literal">null</span>, solver)
+        cont2 = solver.cont(args[<span class="number">2</span>], _cont2)
+        <span class="function"><span class="title">_cont1</span></span> = (v, solver) -&gt; arg1 = v; cont2(<span class="literal">null</span>, solver)
+        cont1 = solver.cont(args[<span class="number">1</span>], _cont1)
+        <span class="function"><span class="title">cont0</span></span> = (v, solver) -&gt; arg0 = v; cont1(<span class="literal">null</span>, solver)
+        solver.cont(args[<span class="number">0</span>], cont0)
+      <span class="keyword">when</span> <span class="number">5</span>
+        arg0 = <span class="literal">null</span>; arg1 = <span class="literal">null</span>; arg2 = <span class="literal">null</span>; arg3 = <span class="literal">null</span>
+        <span class="function"><span class="title">_cont4</span></span> = (arg4, solver) -&gt; cont([arg0, arg1, arg2, arg3, arg4], solver)
+        cont4 = solver.cont(args[<span class="number">4</span>], _cont4)
+        <span class="function"><span class="title">_cont3</span></span> = (v, solver) -&gt; arg3 = v; cont4(<span class="literal">null</span>, solver)
+        cont3 = solver.cont(args[<span class="number">3</span>], _cont3)
+        <span class="function"><span class="title">_cont2</span></span> = (v, solver) -&gt; arg2 = v; cont3(<span class="literal">null</span>, solver)
+        cont2 = solver.cont(args[<span class="number">2</span>], _cont2)
+        <span class="function"><span class="title">_cont1</span></span> = (v, solver) -&gt; arg1 = v; cont2(<span class="literal">null</span>, solver)
+        cont1 = solver.cont(args[<span class="number">1</span>], _cont1)
+        <span class="function"><span class="title">cont0</span></span> = (v, solver) -&gt; arg0 = v; cont1(<span class="literal">null</span>, solver)
+        solver.cont(args[<span class="number">0</span>], cont0)
+      <span class="keyword">when</span> <span class="number">6</span>
+        arg0 = <span class="literal">null</span>; arg1 = <span class="literal">null</span>; arg2 = <span class="literal">null</span>; arg3 = <span class="literal">null</span>; arg4 = <span class="literal">null</span>
+        <span class="function"><span class="title">_cont5</span></span> = (arg5, solver) -&gt; cont([arg0, arg1, arg2, arg3, arg4, arg5], solver)
+        cont5 = solver.cont(args[<span class="number">5</span>], _cont5)
+        <span class="function"><span class="title">_cont4</span></span> = (v, solver) -&gt; arg4 = v; cont5(<span class="literal">null</span>, solver)
+        cont4 = solver.cont(args[<span class="number">4</span>], _cont4)
+        <span class="function"><span class="title">_cont3</span></span> = (v, solver) -&gt; arg3 = v; cont4(<span class="literal">null</span>, solver)
+        cont3 = solver.cont(args[<span class="number">3</span>], _cont3)
+        <span class="function"><span class="title">_cont2</span></span> = (v, solver) -&gt; arg2 = v; cont3(<span class="literal">null</span>, solver)
+        cont2 = solver.cont(args[<span class="number">2</span>], _cont2)
+        <span class="function"><span class="title">_cont1</span></span> = (v, solver) -&gt; arg1 = v; cont2(<span class="literal">null</span>, solver)
+        cont1 = solver.cont(args[<span class="number">1</span>], _cont1)
+        <span class="function"><span class="title">cont0</span></span> = (v, solver) -&gt; arg0 = v; cont1(<span class="literal">null</span>, solver)
+        solver.cont(args[<span class="number">0</span>], cont0)
+      <span class="keyword">when</span> <span class="number">7</span>
+        arg0 = <span class="literal">null</span>; arg1 = <span class="literal">null</span>; arg2 = <span class="literal">null</span>; arg3 = <span class="literal">null</span>; arg4 = <span class="literal">null</span>; arg5 = <span class="literal">null</span>
+        <span class="function"><span class="title">_cont6</span></span> = (arg6, solver) -&gt; cont([arg0, arg1, arg2, arg3, arg4, arg5, arg6], solver)
+        cont6 = solver.cont(args[<span class="number">6</span>], _cont6)
+        <span class="function"><span class="title">_cont5</span></span> = (v, solver) -&gt; arg5 = v; cont6(<span class="literal">null</span>, solver)
+        cont5 = solver.cont(args[<span class="number">5</span>], _cont5)
+        <span class="function"><span class="title">_cont4</span></span> = (v, solver) -&gt; arg4 = v; cont5(<span class="literal">null</span>, solver)
+        cont4 = solver.cont(args[<span class="number">4</span>], _cont4)
+        <span class="function"><span class="title">_cont3</span></span> = (v, solver) -&gt; arg3 = v; cont4(<span class="literal">null</span>, solver)
+        cont3 = solver.cont(args[<span class="number">3</span>], _cont3)
+        <span class="function"><span class="title">_cont2</span></span> = (v, solver) -&gt; arg2 = v; cont3(<span class="literal">null</span>, solver)
+        cont2 = solver.cont(args[<span class="number">2</span>], _cont2)
+        <span class="function"><span class="title">_cont1</span></span> = (v, solver) -&gt; arg1 = v; cont2(<span class="literal">null</span>, solver)
+        cont1 = solver.cont(args[<span class="number">1</span>], _cont1)
+        <span class="function"><span class="title">cont0</span></span> = (v, solver) -&gt; arg0 = v; cont1(<span class="literal">null</span>, solver)
+        solver.cont(args[<span class="number">0</span>], cont0)
+      <span class="keyword">else</span>
+        params = []
+        <span class="keyword">for</span> i <span class="keyword">in</span> [args.length-<span class="number">1.</span><span class="number">.0</span>] <span class="keyword">by</span> -<span class="number">1</span>
+          cont = <span class="keyword">do</span> (i=i, cont=cont) -&gt;
+            <span class="function"><span class="title">_cont</span></span> = (argi, solver) -&gt;  (params.push(argi); cont(params, solver))
+            solver.cont(args[i], _cont)
+        cont</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-22">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-22">&#182;</a>
+              </div>
+              <p>used by lisp style quasiquote, unquote, unquoteSlice</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>  quasiquote: (exp, cont) -&gt; exp?.quasiquote?(@, cont) <span class="keyword">or</span> ((v, solver) -&gt; cont(exp, solver))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-23">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-23">&#182;</a>
+              </div>
+              <p>an utility that is useful for some logic builtins<br/>
+when backtracking, execute fun at first, and then go to original failcont</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>  appendFailcont: (fun) -&gt;
+    trail = <span class="property">@trail</span>
+    <span class="property">@trail</span> = <span class="keyword">new</span> Trail
+    state = <span class="property">@state</span>
+    fc = <span class="property">@failcont</span>
+    <span class="property">@failcont</span> = (v, solver) -&gt;
+      solver.trail.undo()
+      solver.trail = trail
+      solver.state = state
+      solver.failcont = fc;
+      fun(v, solver)</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-24">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-24">&#182;</a>
+              </div>
+              <p>pushCatch/popCatch/findCatch: utlities for lisp style catch/throw</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>  pushCatch: (value, cont) -&gt;
+    catches = <span class="property">@catches</span>[value] ?= []
+    catches.push(cont)
+
+  popCatch: (value) -&gt; catches = <span class="property">@catches</span>[value]; catches.pop(); <span class="keyword">if</span> catches.length <span class="keyword">is</span> <span class="number">0</span> <span class="keyword">then</span> <span class="keyword">delete</span> <span class="property">@catches</span>[value]
+
+  findCatch: (value) -&gt;
+    catches = <span class="property">@catches</span>[value]
+    <span class="keyword">if</span> <span class="keyword">not</span> catches? <span class="keyword">or</span> catches.length <span class="keyword">is</span> <span class="number">0</span> <span class="keyword">then</span> <span class="keyword">throw</span> <span class="keyword">new</span> NotCatched
+    catches[catches.length-<span class="number">1</span>]</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-25">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-25">&#182;</a>
+              </div>
+              <p>utility for lisp style unwind-protect, play with block/break/continue, catch/throw and lisp.protect</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>  protect: (fun) -&gt; fun</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-26">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-26">&#182;</a>
+              </div>
+              <p>default stop continuation when succeed</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.done = <span class="function"><span class="title">done</span></span> =(v, solver) -&gt;
+  solver.done = <span class="literal">true</span>
+  exports.status = exports.SUCCESS
+  [<span class="literal">null</span>, solver.trail.getvalue(v), solver]</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-27">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-27">&#182;</a>
+              </div>
+              <p>default stop continuation when fail</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.faildone = <span class="function"><span class="title">faildone</span></span> = (v, solver) -&gt;
+  solver.done = <span class="literal">true</span>
+  exports.status = exports.FAIL
+  [<span class="literal">null</span>, solver.trail.getvalue(v), solver]</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-28">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-28">&#182;</a>
+              </div>
+              <p>to break cylylic binding of logic variables</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>MAXBINDINGCHAINLENGTH = <span class="number">200</span></pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-29">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-29">&#182;</a>
+              </div>
+              <p>record the trail for variable binding <br/>
+ when multiple choices exist, a new Trail for current branch is constructored, <br/>
+ when backtracking, undo the trail to restore the previous variable binding</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>Trail = <span class="class"><span class="keyword">class</span> <span class="title">exports</span>.<span class="title">Trail</span></span>
+  constructor: (<span class="property">@data</span>={}) -&gt;
+  copy: () -&gt; <span class="keyword">new</span> Trail(_.extend({},<span class="property">@data</span>))
+  set: (vari, value) -&gt;
+    <span class="keyword">if</span> <span class="keyword">not</span> <span class="property">@data</span>.hasOwnProperty(vari.name)
+      <span class="property">@data</span>[vari.name] = [vari, value]
+
+  undo: () -&gt; <span class="keyword">for</span> nam, pair <span class="keyword">of</span>  <span class="property">@data</span>
+      vari = pair[<span class="number">0</span>]
+      value = pair[<span class="number">1</span>]
+      vari.binding = value
+
+  deref: (x) -&gt; x?.deref?(@) <span class="keyword">or</span> x
+  getvalue: (x, chainslength=<span class="number">0</span>) -&gt; x?.getvalue?(@, chainslength) <span class="keyword">or</span> x
+  unify: (x, y) -&gt; x?.unify?(y, @) <span class="keyword">or</span> y?.unify?(x, @) <span class="keyword">or</span> (x <span class="keyword">is</span> y)</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-30">
+            <div class="annotation">
+              
+              <div class="pilwrap for-h4">
+                <a class="pilcrow" href="#section-30">&#182;</a>
+              </div>
+              <h4>class Var</h4>
+<p>Var for logic bindings, used in unify, lisp.assign, inc/dec, parser operation, etc.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>Var = <span class="class"><span class="keyword">class</span> <span class="title">exports</span>.<span class="title">Var</span></span>
+  constructor: (<span class="property">@name</span>, <span class="property">@binding</span> = @) -&gt;
+  deref: (trail) -&gt;
+    v = @
+    next = <span class="property">@binding</span>
+    <span class="keyword">if</span> next <span class="keyword">is</span> @ <span class="keyword">or</span> next <span class="keyword">not</span> <span class="keyword">instanceof</span> Var <span class="keyword">then</span> next
+    <span class="keyword">else</span>
+      chains = [v]
+      length = <span class="number">1</span>
+      <span class="keyword">while</span> <span class="number">1</span>
+        chains.push(next)
+        v = next; next = v.binding
+        length++
+        <span class="keyword">if</span> next <span class="keyword">is</span> v
+          <span class="keyword">for</span> i <span class="keyword">in</span> [<span class="number">0.</span>..chains.length-<span class="number">2</span>]
+            x = chains[i]
+            x.binding = next
+            trail.set(x, chains[i+<span class="number">1</span>])
+          <span class="keyword">return</span> next
+        <span class="keyword">else</span> <span class="keyword">if</span> next <span class="keyword">not</span> <span class="keyword">instanceof</span> Var
+          <span class="keyword">for</span> i <span class="keyword">in</span> [<span class="number">0.</span>..chains.length-<span class="number">1</span>]
+            x = chains[i]
+            x.binding = next
+            trail.set(x, chains[i+<span class="number">1</span>])
+          <span class="keyword">return</span> next
+        <span class="keyword">else</span> <span class="keyword">if</span> length &gt; MAXBINDINGCHAINLENGTH
+          <span class="keyword">throw</span> BindingError(v, <span class="string">"Binding chains is too long!"</span>)
+
+  bind: (value, trail) -&gt;
+    trail.set(@, <span class="property">@binding</span>)
+    <span class="property">@binding</span> = value
+
+  unify: (y, trail) -&gt;
+    x = <span class="property">@deref</span>(trail)
+    y = trail.deref(y)
+    <span class="keyword">if</span> x <span class="keyword">instanceof</span> exports.Var <span class="keyword">then</span> (x.bind(y, trail); <span class="literal">true</span>)
+    <span class="keyword">else</span> <span class="keyword">if</span> y <span class="keyword">instanceof</span> exports.Var <span class="keyword">then</span> (y.bind(x,  trail); <span class="literal">true</span>)
+    <span class="keyword">else</span> x._unify?(y, trail) <span class="keyword">or</span> y._unify?(x, trail) <span class="keyword">or</span> x <span class="keyword">is</span> y
+
+  _unify: (y, trail) -&gt; <span class="property">@bind</span>(y, trail); <span class="literal">true</span>
+
+  getvalue: (trail, chainslength=<span class="number">0</span>) -&gt;
+    result = <span class="property">@deref</span>(trail)
+    <span class="keyword">if</span> result <span class="keyword">instanceof</span> exports.Var <span class="keyword">then</span> result
+    <span class="keyword">else</span> trail.getvalue(result, chainslength+<span class="number">1</span>)
+
+  cont: (solver, cont) -&gt; (v, solver) =&gt; cont(<span class="property">@deref</span>(solver.trail), solver)</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-31">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-31">&#182;</a>
+              </div>
+              <p>nottodo: variable&#39;s apply_cont:: canceled. lisp1 should be good.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>
+  toString:() -&gt; <span class="string">"vari(<span class="subst">#{@name}</span>)"</span>
+
+reElements = <span class="regexp">/\s*,\s*|\s+/</span></pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-32">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-32">&#182;</a>
+              </div>
+              <p>utilities for new variables</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.<span class="function"><span class="title">vari</span></span> = (name) -&gt; <span class="keyword">new</span> exports.Var(name)
+exports.<span class="function"><span class="title">vars</span></span> = (names) -&gt; <span class="keyword">new</span> Var(name) <span class="keyword">for</span> name <span class="keyword">in</span> split names,  reElements</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-33">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-33">&#182;</a>
+              </div>
+              <p>sometiems, say in macro, we need unique var to avoid name conflict</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>nameToIndexMap = {}
+exports.<span class="function"><span class="title">newVar</span></span> = (name=<span class="string">'v'</span>) -&gt;
+  index = nameToIndexMap[name]? <span class="keyword">or</span> <span class="number">1</span>
+  nameToIndexMap[name] = index+<span class="number">1</span>
+  <span class="keyword">return</span> <span class="keyword">new</span> Var(name+index)</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-34">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-34">&#182;</a>
+              </div>
+              <p>DummyVar never fail when it unify. see tests on any/some/times in test_parser for examples</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.DummyVar = <span class="class"><span class="keyword">class</span> <span class="title">DummyVar</span> <span class="keyword">extends</span> <span class="title">Var</span></span>
+  constructor: (name) -&gt; <span class="property">@name</span> = <span class="string">'_$'</span>+name
+  deref: (trail) -&gt; @
+  bind: (value, trail) -&gt; <span class="property">@binding</span> = value
+  _unify: (y, trail) -&gt; <span class="property">@binding</span> = y; <span class="literal">true</span>
+  getvalue: (trail, chainslength=<span class="number">1</span>) -&gt;
+    result = <span class="property">@binding</span>
+    <span class="keyword">if</span> result <span class="keyword">is</span> @
+    <span class="keyword">else</span> <span class="keyword">if</span> chainslength&gt;MAXBINDINGCHAINLENGTH
+      <span class="keyword">throw</span> <span class="keyword">new</span> BindingError(result, <span class="string">"Binding chains is too long!"</span>)
+    <span class="keyword">else</span> trail.getvalue(result, chainslength+<span class="number">1</span>)</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-35">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-35">&#182;</a>
+              </div>
+              <p>nottodo: variable&#39;s apply_cont:: canceled. lisp1 should be good.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>
+exports.<span class="function"><span class="title">dummy</span></span> = (name) -&gt; <span class="keyword">new</span> exports.DummyVar(name)
+exports.<span class="function"><span class="title">dummies</span></span> = (names) -&gt; <span class="keyword">new</span> DummyVar(name) <span class="keyword">for</span> name <span class="keyword">in</span> split names,  reElements</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-36">
+            <div class="annotation">
+              
+              <div class="pilwrap for-h4">
+                <a class="pilcrow" href="#section-36">&#182;</a>
+              </div>
+              <h4>class Apply</h4>
+<p>Apply to some Command(special, fun, macro, proc, etc)</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="class"><span class="keyword">class</span> <span class="title">exports</span>.<span class="title">Apply</span></span>
+  constructor: (<span class="property">@caller</span>, <span class="property">@args</span>) -&gt;</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-37">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-37">&#182;</a>
+              </div>
+              <p>declare the command&#39;s arity when define the command. <br/>
+see builtins/*.coffee for examples.<br/>
+null: (...)<br/>
+[2, 4]: (a, b), (a, b, c, d)<br/>
+-1: (a, b...);   -2: (a, b, c...)<br/>
+1: (a);      3: (a, b, c)<br/></p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>    length = args.length; arity = <span class="property">@caller</span>.arity
+    ok = <span class="literal">false</span>
+    <span class="keyword">if</span> arity <span class="keyword">is</span> <span class="literal">null</span> <span class="keyword">then</span> ok = <span class="literal">true</span>
+    <span class="keyword">if</span> _.isArray(arity)
+      <span class="keyword">if</span> length <span class="keyword">in</span> arity <span class="keyword">then</span> ok = <span class="literal">true</span>
+    <span class="keyword">else</span> <span class="keyword">if</span> _.isNumber(arity)
+      <span class="keyword">if</span> (arity&gt;=<span class="number">0</span> <span class="keyword">and</span> length <span class="keyword">is</span> arity) <span class="keyword">or</span> (arity&lt;<span class="number">0</span> <span class="keyword">and</span> length&gt;=-arity) <span class="keyword">then</span> ok = <span class="literal">true</span>
+    <span class="keyword">if</span> <span class="keyword">not</span> ok
+      <span class="keyword">for</span> x <span class="keyword">in</span> <span class="property">@args</span>
+        <span class="keyword">if</span> x?.caller?.name <span class="keyword">is</span> <span class="string">"unquoteSlice"</span> <span class="keyword">then</span> <span class="keyword">return</span>
+      <span class="keyword">throw</span> <span class="keyword">new</span> ArityError(@)
+
+  toString: -&gt; <span class="string">"<span class="subst">#{@caller}</span>(<span class="subst">#{@args.join(', ')}</span>)"</span></pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-38">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-38">&#182;</a>
+              </div>
+              <p>get the continuation of an instance of Apply based on cont</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>  cont: (solver, cont) -&gt; <span class="property">@caller</span>.apply_cont(solver, cont, <span class="property">@args</span>)</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-39">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-39">&#182;</a>
+              </div>
+              <p>play with lisp style quasiquote/unquote/unquoteSlice</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>  quasiquote:  (solver, cont) -&gt;
+    <span class="keyword">if</span> <span class="property">@caller</span>.name <span class="keyword">is</span> <span class="string">"unquote"</span>
+      <span class="keyword">return</span>  solver.cont(<span class="property">@args</span>[<span class="number">0</span>], (v, solver) -&gt; cont(v, solver))
+    <span class="keyword">else</span> <span class="keyword">if</span> <span class="property">@caller</span>.name <span class="keyword">is</span> <span class="string">"unquoteSlice"</span></pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-40">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-40">&#182;</a>
+              </div>
+              <p>use the flag class UnquoteSliceValue to find unquoteSlice expression</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>      <span class="keyword">return</span> solver.cont(<span class="property">@args</span>[<span class="number">0</span>], (v, solver) -&gt; cont(<span class="keyword">new</span> UnquoteSliceValue(v), solver))
+    params = []
+    cont = <span class="keyword">do</span> (cont=cont) =&gt; ((v, solver) =&gt; [cont, <span class="keyword">new</span> <span class="property">@constructor</span>(<span class="property">@caller</span>, params), solver])
+    args = <span class="property">@args</span>
+    <span class="keyword">for</span> i <span class="keyword">in</span> [args.length-<span class="number">1.</span><span class="number">.0</span>] <span class="keyword">by</span> -<span class="number">1</span>
+      cont = <span class="keyword">do</span> (i=i, cont=cont) -&gt;
+        solver.quasiquote(args[i], (v, solver) -&gt;
+          <span class="keyword">if</span> v <span class="keyword">instanceof</span> UnquoteSliceValue
+            <span class="keyword">for</span> x <span class="keyword">in</span> v.value <span class="keyword">then</span> params.push x
+          <span class="keyword">else</span> params.push(v);
+          cont(<span class="literal">null</span>, solver))
+    cont</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-41">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-41">&#182;</a>
+              </div>
+              <p>A flag class is used to process unquoteSlice</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>UnquoteSliceValue = <span class="class"><span class="keyword">class</span> <span class="title">exports</span>.<span class="title">UnquoteSliceValue</span></span>
+  constructor: (<span class="property">@value</span>) -&gt;</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-42">
+            <div class="annotation">
+              
+              <div class="pilwrap for-h4">
+                <a class="pilcrow" href="#section-42">&#182;</a>
+              </div>
+              <h4>class Command</h4>
+<p>dao command that can be applied <br/>
+ Special, Fun, Macro, Proc is subclass of Command.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>Command = <span class="class"><span class="keyword">class</span> <span class="title">exports</span>.<span class="title">Command</span></span>
+  <span class="property">@directRun</span> = <span class="literal">false</span>
+  <span class="property">@done</span> = (v, solver) -&gt; (solver.done = <span class="literal">true</span>; [<span class="literal">null</span>, solver.trail.getvalue(v), solver])
+  <span class="property">@faildone</span> = (v, solver) -&gt; (solver.done = <span class="literal">true</span>; [<span class="literal">null</span>, solver.trail.getvalue(v), solver])
+  constructor: (<span class="property">@fun</span>, <span class="property">@name</span>, <span class="property">@arity</span>) -&gt;
+    <span class="property">@callable</span> = (args...) =&gt;
+      applied = <span class="keyword">new</span> exports.Apply(@, args)
+      <span class="keyword">if</span> Command.directRun
+        result = Command.globalSolver.solve(applied, Command.done)
+        Command.globalSolver.done = <span class="literal">false</span>
+        result
+      <span class="keyword">else</span> applied
+    <span class="property">@callable</span>.arity = <span class="property">@arity</span>
+
+  register: (exports) -&gt; exports[<span class="property">@name</span>] = <span class="property">@callable</span>
+  toString: () -&gt; <span class="property">@name</span>
+
+<span class="function"><span class="title">commandMaker</span></span> = (klass) -&gt; (arity, name_or_fun, fun) -&gt;
+  <span class="keyword">if</span> <span class="keyword">not</span> _.isNumber(arity) <span class="keyword">and</span> arity <span class="keyword">isnt</span> <span class="literal">null</span> <span class="keyword">and</span> <span class="keyword">not</span> _.isArray(arity) <span class="keyword">then</span> <span class="keyword">throw</span> <span class="keyword">new</span> ArgumentError(arity)
+  (<span class="keyword">if</span> fun? <span class="keyword">then</span> <span class="keyword">new</span> klass(fun, name_or_fun, arity) <span class="keyword">else</span> <span class="keyword">new</span> klass(name_or_fun, <span class="string">'noname'</span>, arity)).callable</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-43">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-43">&#182;</a>
+              </div>
+              <p>Speical knows solver and cont, with them the special function has full control of things.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="class"><span class="keyword">class</span> <span class="title">exports</span>.<span class="title">Special</span> <span class="keyword">extends</span> <span class="title">exports</span>.<span class="title">Command</span></span>
+  apply_cont: (solver, cont, args) -&gt; <span class="property">@fun</span>(solver, cont, args...)</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-44">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-44">&#182;</a>
+              </div>
+              <p>generate an instance of Special from a function <br/>
+ example:<br/>
+ begin = special(null, &#39;begin&#39;, (solver, cont, exps...) -&gt; solver.expsCont(exps, cont))  # coffeescript <br/>
+ exports.begin = special(null, &#39;begin&#39;, function() { # javascript <br/>
+   var cont, exps, solver; <br/>
+   <br/>
+   solver = arguments[0], cont = arguments[1], exps = 3 &lt;= arguments.length ? __slice.call(arguments, 2) : [];<br/>
+   return solver.expsCont(exps, cont);<br/>
+ });<br/>
+ exports.fail = special(0, &#39;fail&#39;, (solver, cont) -&gt; (v, solver) -&gt; solver.failcont(v, solver))() #coffescript <br/>
+ exports.fail = special(0, &#39;fail&#39;, function(solver, cont) { # javascript <br/>
+   return function(v, solver) { <br/>
+     return solver.failcont(v, solver);<br/>
+   }; <br/>
+ })();<br/></p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.special = special = commandMaker(exports.Special)</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-45">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-45">&#182;</a>
+              </div>
+              <p>KISS: to keep it simple, not to implmenting the apply_cont in Var and Apply<br/>
+call goal with args...</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.call = special(-<span class="number">1</span>, <span class="string">'call'</span>, (solver, cont, goal, args...) -&gt;
+  goal1 = <span class="literal">null</span>
+  argsCont =  solver.argsCont(args, (params,  solver) -&gt;
+    solver.cont(goal1(params...), cont)(<span class="literal">null</span>, solver))
+  solver.cont(goal, (v, solver) -&gt; goal1 = goal; argsCont(<span class="literal">null</span>, solver)))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-46">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-46">&#182;</a>
+              </div>
+              <p>apply goal with args</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.apply  = special(<span class="number">2</span>, <span class="string">'apply'</span>, (solver, cont, goal, args) -&gt;
+  goal1 = <span class="literal">null</span>
+  argsCont =  solver.argsCont(args, (params,  solver) -&gt;
+    solver.cont(goal1(params...), cont)(<span class="literal">null</span>, solver))
+  solver.cont(goal, (v, solver) -&gt; goal1 = goal; argsCont(<span class="literal">null</span>, solver)))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-47">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-47">&#182;</a>
+              </div>
+              <p>Fun evaluate its arguments, and return the result to fun(params...) to cont directly.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="class"><span class="keyword">class</span> <span class="title">exports</span>.<span class="title">Fun</span> <span class="keyword">extends</span> <span class="title">exports</span>.<span class="title">Command</span></span>
+  apply_cont: (solver, cont, args) -&gt;  solver.argsCont(args, (params, solver) =&gt; [cont, <span class="property">@fun</span>(params...), solver])</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-48">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-48">&#182;</a>
+              </div>
+              <p>generate an instance of Fun from a function <br/>
+ example:  <br/>
+ add = fun((x, y) -&gt; x+y ) # coffeescript <br/>
+ add = fun(function(x,y){ return x+y; } # javascript <br/></p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.fun = commandMaker(exports.Fun)</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-49">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-49">&#182;</a>
+              </div>
+              <p>similar to lisp&#39;macro, Macro does NOT evaluate its arguments, but evaluate the result to fun(args).</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="class"><span class="keyword">class</span> <span class="title">exports</span>.<span class="title">Macro</span> <span class="keyword">extends</span> <span class="title">exports</span>.<span class="title">Command</span></span>
+  apply_cont: (solver, cont, args) -&gt; solver.cont(<span class="property">@fun</span>(args...), cont)</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-50">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-50">&#182;</a>
+              </div>
+              <p>generate a instance of Macro from a function <br/>
+ example:   <br/>
+ orpm = fun((x, y) -&gt; orp(x,y ) # coffeescript<br/>
+ orpm = fun(function(x,y){  return orp(x,y ); } # javascript</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.macro = commandMaker(exports.Macro)</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-51">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-51">&#182;</a>
+              </div>
+              <p>In Proc&#39;s function, the dao&#39;s expressions can be directly evaluated</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="class"><span class="keyword">class</span> <span class="title">exports</span>.<span class="title">Proc</span> <span class="keyword">extends</span> <span class="title">exports</span>.<span class="title">Command</span></span>
+  apply_cont:  (solver, cont, args) -&gt;
+    (v, solver) =&gt;
+      Command.directRun = <span class="literal">true</span>
+      savedSolver = Command.globalSolver
+      Command.globalSolver = solver
+      result = <span class="property">@fun</span>(args...)
+      Command.globalSolver = savedSolver
+      Command.directRun = <span class="literal">false</span>
+      [cont, result,  solver]
+
+exports.proc = commandMaker(exports.Proc)
+
+
+exports.<span class="function"><span class="title">tofun</span></span> = (name, cmd) -&gt;</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-52">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-52">&#182;</a>
+              </div>
+              <p>evaluate the arguments of a command before execute it<br/>.
+   with tofun, Special and Macro can behaviour like a Fun.<br/>
+   cmd can be an instance of subclass of Command, <br/>
+    especially macro(macro don&#39;t eval its arguments) <br/>
+    and specials that don&#39;t eval their arguments.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>  <span class="keyword">unless</span> cmd? <span class="keyword">then</span> (cmd = name; name = <span class="string">'noname'</span>)
+  special(cmd.arity, name, (solver, cont, args...) -&gt;
+          solver.argsCont(args, (params, solver) -&gt; [solver.cont(cmd(params...), cont), params, solver]))
+
+<span class="class"><span class="keyword">class</span> <span class="title">Error</span></span>
+  constructor: (<span class="property">@exp</span>, <span class="property">@message</span>=<span class="string">''</span>, <span class="property">@stack</span> = @) -&gt;  <span class="comment"># @stack: to make webstorm nodeunit happy.</span>
+  toString: () -&gt; <span class="string">"<span class="subst">#{@constructor.name}</span>: <span class="subst">#{@exp}</span> &gt;&gt;&gt; <span class="subst">#{@message}</span>"</span>
+
+<span class="class"><span class="keyword">class</span> <span class="title">BindingError</span> <span class="keyword">extends</span> <span class="title">Error</span></span>
+<span class="class"><span class="keyword">class</span> <span class="title">TypeError</span> <span class="keyword">extends</span> <span class="title">Error</span></span>
+<span class="class"><span class="keyword">class</span> <span class="title">ExpressionError</span> <span class="keyword">extends</span> <span class="title">Error</span></span>
+<span class="class"><span class="keyword">class</span> <span class="title">ArgumentError</span> <span class="keyword">extends</span> <span class="title">Error</span></span>
+<span class="class"><span class="keyword">class</span> <span class="title">ArityError</span> <span class="keyword">extends</span> <span class="title">Error</span></span></pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-53">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-53">&#182;</a>
+              </div>
+              <p>solver&#39;s status is set to UNKNOWN when start to solve, <br/>
+ if solver successfully run to solver&#39;last continuation, status is set SUCCESS,<br/>
+ else if solver run to solver&#39;s failcont, status is set to FAIL.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.SUCCESS = <span class="number">1</span>
+exports.UNKNOWN = <span class="number">0</span>
+exports.FAIL = -<span class="number">1</span>
+exports.status = exports.UNKNOWN
+
+exports.debug = <span class="function"><span class="title">debug</span></span> = (items...) -&gt;
+  console.log(((<span class="keyword">for</span> x <span class="keyword">in</span> items
+      <span class="keyword">if</span> (x <span class="keyword">not</span> <span class="keyword">instanceof</span> Function)
+        s = x.toString()
+        <span class="keyword">if</span> s==<span class="string">'[object Object]'</span> <span class="keyword">then</span> JSON.stringify(x) <span class="keyword">else</span> s
+      <span class="keyword">else</span> <span class="string">'[Function]'</span>) )...)</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-54">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-54">&#182;</a>
+              </div>
+              <p>require(&quot;./builtins/general&quot;) <br/>
+require(&quot;./builtins/lisp&quot;) <br/>
+require(&quot;./builtins/logic&quot;)  <br/>
+require(&quot;./builtins/parser&quot;)</p>
+
+            </div>
+            
+        </li>
+        
+    </ul>
+  </div>
+</body>
+</html>

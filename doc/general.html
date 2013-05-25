@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+
+<html>
+<head>
+  <title>general.coffee</title>
+  <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+  <meta name="viewport" content="width=device-width, target-densitydpi=160dpi, initial-scale=1.0; maximum-scale=1.0; user-scalable=0;">
+  <link rel="stylesheet" media="all" href="docco.css" />
+</head>
+<body>
+  <div id="container">
+    <div id="background"></div>
+    
+    <ul class="sections">
+        
+          <li id="title">
+              <div class="annotation">
+                  <h1>general.coffee</h1>
+              </div>
+          </li>
+        
+        
+        
+        <li id="section-1">
+            <div class="annotation">
+              
+              <div class="pilwrap for-h4">
+                <a class="pilcrow" href="#section-1">&#182;</a>
+              </div>
+              <h4>general builtins</h4>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>
+solve = require <span class="string">"../dao"</span>
+fun = solve.fun
+special = solve.special</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-2">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-2">&#182;</a>
+              </div>
+              <p>console.log(arguments) </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.print_ = special(<span class="literal">null</span>, <span class="string">'eq'</span>, (solver, cont, args...) -&gt;
+  solver.argsCont(args, (args,  solver) -&gt; console.log(args...); cont(<span class="literal">null</span>, solver)))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-3">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-3">&#182;</a>
+              </div>
+              <p>x === y </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.eq = special(<span class="number">2</span>, <span class="string">'eq'</span>, (solver, cont, x, y) -&gt;
+  ycont =  solver.cont(y, (v, solver) -&gt; cont(x==v, solver))
+  <span class="function"><span class="title">xcont</span></span> = (v, solver) -&gt;  x = v; ycont(<span class="literal">null</span>, solver)
+  solver.cont(x, xcont))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-4">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-4">&#182;</a>
+              </div>
+              <p>x !== y </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.ne = special(<span class="number">2</span>, <span class="string">'ne'</span>, (solver, cont, x, y) -&gt;
+  ycont =  solver.cont(y, (v, solver) -&gt; cont(x!=v, solver))
+  <span class="function"><span class="title">xcont</span></span> = (v, solver) -&gt;  x = v; ycont(<span class="literal">null</span>, solver)
+  solver.cont(x, xcont))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-5">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-5">&#182;</a>
+              </div>
+              <p>x &lt; y </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.lt = special(<span class="number">2</span>, <span class="string">'lt'</span>, (solver, cont, x, y) -&gt;
+  ycont =  solver.cont(y, (v, solver) -&gt; cont(x&lt;=v, solver))
+  <span class="function"><span class="title">xcont</span></span> = (v, solver) -&gt;  (x = v; ycont(<span class="literal">null</span>, solver))
+  solver.cont(x, xcont))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-6">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-6">&#182;</a>
+              </div>
+              <p>x &lt;= y </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.le = special(<span class="number">2</span>, <span class="string">'le'</span>, (solver, cont, x, y) -&gt;
+  ycont =  solver.cont(y, (v, solver) -&gt; cont(x&lt;=v, solver))
+  <span class="function"><span class="title">xcont</span></span> = (v, solver) -&gt;  x = v; ycont(<span class="literal">null</span>, solver)
+  solver.cont(x, xcont))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-7">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-7">&#182;</a>
+              </div>
+              <p> x &gt; y </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.gt = special(<span class="number">2</span>, <span class="string">'gt'</span>, (solver, cont, x, y) -&gt;
+  ycont =  solver.cont(y, (v, solver) -&gt; cont(x&gt;v, solver))
+  <span class="function"><span class="title">xcont</span></span> = (v, solver) -&gt;  (x = v; ycont(<span class="literal">null</span>, solver))
+  solver.cont(x, xcont))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-8">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-8">&#182;</a>
+              </div>
+              <p>x &gt;= y </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.ge = special(<span class="number">2</span>, <span class="string">'ge'</span>, (solver, cont, x, y) -&gt;
+  ycont =  solver.cont(y, (v, solver) -&gt; cont(x&gt;=v, solver))
+  <span class="function"><span class="title">xcont</span></span> = (v, solver) -&gt;  x = v; ycont(<span class="literal">null</span>, solver)
+  solver.cont(x, xcont))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-9">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-9">&#182;</a>
+              </div>
+              <p>x + y </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.add = special(<span class="number">2</span>, <span class="string">'add'</span>, (solver, cont, x, y) -&gt;
+  ycont =  solver.cont(y, (v, solver) -&gt; cont(x+v, solver))
+  <span class="function"><span class="title">xcont</span></span> = (v, solver) -&gt;  x = v; ycont(<span class="literal">null</span>, solver)
+  solver.cont(x, xcont))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-10">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-10">&#182;</a>
+              </div>
+              <p>x - y </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.sub = special(<span class="number">2</span>, <span class="string">'sub'</span>, (solver, cont, x, y) -&gt;
+  ycont =  solver.cont(y, (v, solver) -&gt; cont(x-v, solver))
+  <span class="function"><span class="title">xcont</span></span> = (v, solver) -&gt;  (x = v; ycont(<span class="literal">null</span>, solver))
+  solver.cont(x, xcont))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-11">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-11">&#182;</a>
+              </div>
+              <p>x * y </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.mul = special(<span class="number">2</span>, <span class="string">'mul'</span>, (solver, cont, x, y) -&gt;
+  ycont =  solver.cont(y, (v, solver) -&gt; cont(x*v, solver))
+  <span class="function"><span class="title">xcont</span></span> = (v, solver) -&gt;  x = v; ycont(<span class="literal">null</span>, solver)
+  solver.cont(x, xcont))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-12">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-12">&#182;</a>
+              </div>
+              <p>x / y </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.div = special(<span class="number">2</span>, <span class="string">'div'</span>, (solver, cont, x, y) -&gt;
+  ycont =  solver.cont(y, (v, solver) -&gt; cont(x/v, solver))
+  <span class="function"><span class="title">xcont</span></span> = (v, solver) -&gt;  (x = v; ycont(<span class="literal">null</span>, solver))
+  solver.cont(x, xcont))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-13">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-13">&#182;</a>
+              </div>
+              <p>x % y </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.mod = special(<span class="number">2</span>, <span class="string">'mod'</span>, (solver, cont, x, y) -&gt;
+  ycont =  solver.cont(y, (v, solver) -&gt; cont(x%v, solver))
+  <span class="function"><span class="title">xcont</span></span> = (v, solver) -&gt;  x = v; ycont(<span class="literal">null</span>, solver)
+  solver.cont(x, xcont))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-14">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-14">&#182;</a>
+              </div>
+              <p>x &amp;&amp; y </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.and_ = special(<span class="number">2</span>, <span class="string">'and_'</span>, (solver, cont, x, y) -&gt;
+  ycont =  solver.cont(y, (v, solver) -&gt; cont(x <span class="keyword">and</span> v, solver))
+  <span class="function"><span class="title">xcont</span></span> = (v, solver) -&gt;  x = v; ycont(<span class="literal">null</span>, solver)
+  solver.cont(x, xcont))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-15">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-15">&#182;</a>
+              </div>
+              <p>x || y </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.or_ = special(<span class="number">2</span>, <span class="string">'or_'</span>, (solver, cont, x, y) -&gt;
+  ycont =  solver.cont(y, (v, solver) -&gt; cont(x <span class="keyword">and</span> v, solver))
+  <span class="function"><span class="title">xcont</span></span> = (v, solver) -&gt;  x = v; ycont(<span class="literal">null</span>, solver)
+  solver.cont(x, xcont))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-16">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-16">&#182;</a>
+              </div>
+              <p>!x </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.not_ = special(<span class="number">1</span>, <span class="string">'not_'</span>, (solver, cont, x) -&gt;
+  solver.cont(x, (v, solver) -&gt; cont(<span class="keyword">not</span> v, solver)))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-17">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-17">&#182;</a>
+              </div>
+              <p>x &lt;&lt; y </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.lshift = special(<span class="number">2</span>, <span class="string">'lshift'</span>, (solver, cont, x, y) -&gt;
+  ycont =  solver.cont(y, (v, solver) -&gt; cont(x &lt;&lt; v, solver))
+  <span class="function"><span class="title">xcont</span></span> = (v, solver) -&gt;  x = v; ycont(<span class="literal">null</span>, solver)
+  solver.cont(x, xcont))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-18">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-18">&#182;</a>
+              </div>
+              <p>x &gt;&gt; y </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.rshift = special(<span class="number">2</span>, <span class="string">'rshift'</span>, (solver, cont, x, y) -&gt;
+  ycont =  solver.cont(y, (v, solver) -&gt; cont(x &gt;&gt; v, solver))
+  <span class="function"><span class="title">xcont</span></span> = (v, solver) -&gt;  x = v; ycont(<span class="literal">null</span>, solver)
+  solver.cont(x, xcont))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-19">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-19">&#182;</a>
+              </div>
+              <p>x &amp; y </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.bitand = special(<span class="number">2</span>, <span class="string">'bitand'</span>, (solver, cont, x, y) -&gt;
+  ycont =  solver.cont(y, (v, solver) -&gt; cont(x &amp; v, solver))
+  <span class="function"><span class="title">xcont</span></span> = (v, solver) -&gt;  x = v; ycont(<span class="literal">null</span>, solver)
+  solver.cont(x, xcont))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-20">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-20">&#182;</a>
+              </div>
+              <p>x | y </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.bitor = special(<span class="number">2</span>, <span class="string">'bitor'</span>, (solver, cont, x, y) -&gt;
+  ycont =  solver.cont(y, (v, solver) -&gt; cont(x | v, solver))
+  <span class="function"><span class="title">xcont</span></span> = (v, solver) -&gt;  x = v; ycont(<span class="literal">null</span>, solver)
+  solver.cont(x, xcont))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-21">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-21">&#182;</a>
+              </div>
+              <p>~x </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.bitnot = special(<span class="number">1</span>, <span class="string">'not_'</span>, (solver, cont, x) -&gt;
+  solver.cont(x, (v, solver) -&gt; cont(~v, solver)))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-22">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-22">&#182;</a>
+              </div>
+              <p>Because not using vari.bind, these are not saved in solver.trail  <br/>
+and so it can NOT be restored in solver.failcont <br/>
+EXCEPT the vari has been in solver.trail in the logic branch before vari.binding ++</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.inc = special(<span class="number">1</span>, <span class="string">'inc'</span>, (solver, cont, vari) -&gt;
+  (v, solver) -&gt; cont(++vari.binding, solver))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-23">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-23">&#182;</a>
+              </div>
+              <p>vari.binding += 2 </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.inc2 = special(<span class="number">1</span>, <span class="string">'inc2'</span>, (solver, cont, vari) -&gt;
+  (v, solver) -&gt; (vari.binding++; cont(++vari.binding, solver)))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-24">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-24">&#182;</a>
+              </div>
+              <p>vari.binding -- </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.dec = special(<span class="number">1</span>, <span class="string">'dec'</span>, (solver, cont, vari) -&gt;
+  (v, solver) -&gt; (cont(--vari.binding, solver)))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-25">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-25">&#182;</a>
+              </div>
+              <p>vari.binding -= 2 </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.dec2 = special(<span class="number">1</span>, <span class="string">'dec2'</span>, (solver, cont, vari) -&gt;
+  (v, solver) -&gt; (vari.binding--; cont(--vari.binding, solver)))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-26">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-26">&#182;</a>
+              </div>
+              <p>x.getvalue </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.getvalue = special(<span class="number">1</span>, <span class="string">'getvalue'</span>, (solver, cont, x) -&gt;
+  solver.cont(x, (v, solver) -&gt; cont(solver.trail.getvalue(v), solver)))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-27">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-27">&#182;</a>
+              </div>
+              <p>x.length </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.length = special(<span class="number">1</span>, <span class="string">'length'</span>, (solver, cont, x) -&gt;
+  solver.cont(x, (v, solver) -&gt; cont(v.length, solver)))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-28">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-28">&#182;</a>
+              </div>
+              <p>-x </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.neg = special(<span class="number">1</span>, <span class="string">'neg'</span>, (solver, cont, x) -&gt;
+  solver.cont(x, (v, solver) -&gt; cont(-v, solver)))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-29">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-29">&#182;</a>
+              </div>
+              <p>Math.abs(x) </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.abs = special(<span class="number">1</span>, <span class="string">'abs'</span>, (solver, cont, x) -&gt;
+  solver.cont(x, (v, solver) -&gt; cont(Math.abs(v), solver)))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-30">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-30">&#182;</a>
+              </div>
+              <p>x[y] </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.index = special(<span class="number">2</span>, <span class="string">'index'</span>, (solver, cont, x, y) -&gt;
+  ycont =  solver.cont(y, (v, solver) -&gt; cont(x[y], solver))
+  <span class="function"><span class="title">xcont</span></span> = (v, solver) -&gt;  x = v; ycont(<span class="literal">null</span>, solver)
+  solver.cont(x, xcont))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-31">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-31">&#182;</a>
+              </div>
+              <p>x[0] </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.first = special(<span class="number">1</span>, <span class="string">'first'</span>, (solver, cont, x) -&gt;
+  solver.cont(x, (v, solver) -&gt; cont(v[<span class="number">0</span>], solver)))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-32">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-32">&#182;</a>
+              </div>
+              <p>x[1...] </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.left = special(<span class="number">1</span>, <span class="string">'left'</span>, (solver, cont, x) -&gt;
+  solver.cont(x, (v, solver) -&gt; cont(v[<span class="number">1.</span>..], solver)))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-33">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-33">&#182;</a>
+              </div>
+              <p>x[1] </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.second = special(<span class="number">1</span>, <span class="string">'second'</span>, (solver, cont, x) -&gt;
+  solver.cont(x, (v, solver) -&gt; cont(v[<span class="number">1</span>], solver)))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-34">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-34">&#182;</a>
+              </div>
+              <p>x[2] </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.third = special(<span class="number">1</span>, <span class="string">'third'</span>, (solver, cont, x) -&gt;
+  solver.cont(x, (v, solver) -&gt; cont(v[<span class="number">2</span>], solver)))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-35">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-35">&#182;</a>
+              </div>
+              <p>x.concat(y) </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.concat = special(<span class="number">2</span>, <span class="string">'concat'</span>, (solver, cont, x, y) -&gt;
+  ycont =  solver.cont(y, (v, solver) -&gt; cont(x.concat(y), solver))
+  <span class="function"><span class="title">xcont</span></span> = (v, solver) -&gt;  x = v; ycont(<span class="literal">null</span>, solver)
+  solver.cont(x, xcont))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-36">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-36">&#182;</a>
+              </div>
+              <p>list(args...) return an array </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.list = special([], <span class="string">'list'</span>, (solver, cont, args...) -&gt;
+  solver.argsCont(args, cont))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-37">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-37">&#182;</a>
+              </div>
+              <p>x.push(y) </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.push = special(<span class="number">2</span>, <span class="string">'push'</span>, (solver, cont, x, y) -&gt;
+  ycont =  solver.cont(y, (v, solver) -&gt; cont(x.push(v), solver))
+  <span class="function"><span class="title">xcont</span></span> = (v, solver) -&gt;  x = v; ycont(<span class="literal">null</span>, solver)
+  solver.cont(x, xcont))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-38">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-38">&#182;</a>
+              </div>
+              <p>x.push(y), when backtracking here, x.pop() </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.pushp = special(<span class="number">2</span>, <span class="string">'pushp'</span>, (solver, cont, x, y) -&gt;
+  ycont =  solver.cont(y, (v, solver) -&gt;
+    fc = solver.failcont
+    solver.<span class="function"><span class="title">failcont</span></span> = (v, solver) -&gt; x.pop(); fc(v, solver)
+    cont(x.push(v), solver))
+  <span class="function"><span class="title">xcont</span></span> = (v, solver) -&gt;  x = v; ycont(<span class="literal">null</span>, solver)
+  solver.cont(x, xcont))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-39">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-39">&#182;</a>
+              </div>
+              <p>x is a free variable? <br/>
+different from logic.freep, this never fail</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.free = special(<span class="number">1</span>, <span class="string">'freep'</span>, (solver, cont, x) -&gt;
+  (v, solver) -&gt; cont(solver.trail.deref(x) <span class="keyword">instanceof</span> Var, solver))</pre></div></div>
+            
+        </li>
+        
+    </ul>
+  </div>
+</body>
+</html>

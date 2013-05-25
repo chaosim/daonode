@@ -4,3 +4,5 @@
 *.map
 *.bak
 /*.log
+
+/.js

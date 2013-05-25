@@ -1,3 +1,13 @@
+# ### parser builtins
+
+# dao's solver have no special demand on solver'state, so we can develop any kind of parser command, to parse different kind of object, such as array, sequence, list, binary stream, tree, even any other general object, not limit to text. <br/>
+
+# parser builtins can be used by companion with any other builtins and user command.<br/>
+
+# logic var can be used in parser as parameter, parameterize grammar is the unique feature of dao.<br/>
+
+# Similar to develop parser, dao can be as the base to develop a generator. We can also generate stuff at th same time of parsing.
+
 _ = require('underscore')
 
 dao = require "../dao"
@@ -9,7 +19,14 @@ lisp = require "./lisp"
 [Trail, solve, Var,  ExpressionError, TypeError, special] = (dao[name]  for name in\
 "Trail, solve, Var,  ExpressionError, TypeError, special".split(", "))
 
-### parse @exp on @state ###
+# ####parser control/access
+
+# parse, setstate, getstate have no demand on solver.state <br/> <br/>
+# parsesequence/parsetext, setsequence/settext, getsequence/gettext, getpos, step, lefttext, next: demand that solver.state should look like [sequence, index], and sequence can be indexed by integer. index is an integer.<br/><br/>
+# lefttext, subtext, eoi, boi demand that sequence should have length property  <br/><br/>
+# eol, boil demand that sequence should be an string.
+
+# parse: parse exp on state
 exports.parse = special(2, 'parse', (solver, cont, exp, state) ->
   oldState = null
   expCont = solver.cont(exp, (v, solver) ->
@@ -20,39 +37,42 @@ exports.parse = special(2, 'parse', (solver, cont, exp, state) ->
     solver.state = state
     expCont(v, solver))
 
-### parse @exp on [@sequence, 0] ###
+# parsetext: parse exp on [sequence, 0] <br/>
+# parsesequence: parse exp on [sequence, 0]
 exports.parsetext = exports.parsesequence = (exp, sequence) -> exports.parse(exp, [sequence, 0])
 
-### solver.state = @state ###
+# setstate: solver.state = state
 exports.setstate = special(1, 'setstate', (solver, cont, state) -> (v, solver) ->
   solver.state = state
   cont(v, solver))
 
-### solver.state = [@sequence, 0] ###
+# setsequence: solver.state = [@sequence, 0]<br/>
+# settext: solver.state = [@sequence, 0]
 exports.settext = exports.setsequence = (sequence) -> exports.setstate([sequence, 0])
 
-### get solver.state ###
+# getstate: get solver.state
 exports.getstate = special(0, 'getstate', (solver, cont) -> (v, solver) ->
   cont(solver.state, solver))()
 
-### get solver.state[0] ###
+# gettext: get solver.state[0]
+# getsequence: get solver.state[0]
 exports.gettext = exports.getsequence = special(0, 'gettext', (solver, cont) -> (v, solver) ->
   cont(solver.state[0], solver))()
 
-### get solver.state[1] ###
+# getpos: solver.state[1]
 exports.getpos =special(0, 'getpos', (solver, cont) -> (v, solver) ->
   cont(solver.state[1], solver))()
 
-### end of input, means pos>=text.length ###
+# eoi: end of input, means pos>=text.length
 exports.eoi = special(0, 'eoi', (solver, cont) -> (v, solver) ->
   [data, pos] = solver.state
   if pos>=data.length then cont(true, solver) else solver.failcont(v, solver))()
 
-### begin of input, means pos==0 ###
+# boi:  begin of input, means pos==0
 exports.boi = special(0, 'boi', (solver, cont) -> (v, solver) ->
   if solver.state[1] is 0 then cont(true, solver) else solver.failcont(v, solver))()
 
-### end of line text[pos] in "\r\n" ###
+# eol: end of line text[pos] in "\r\n"
 exports.eol = special(0, 'eol', (solver, cont) -> (v, solver) ->
   [data, pos] = solver.state
   if pos>=data.length then cont(true, solver)
@@ -61,7 +81,7 @@ exports.eol = special(0, 'eol', (solver, cont) -> (v, solver) ->
     if text[pos] in "\r\n" then cont(true, solver)
     else solver.failcont(v, solver))()
 
-### begin of line text[pos-1] in "\r\n" ###
+# bol: begin of line text[pos-1] in "\r\n"
 exports.bol = special(0, 'bol', (solver, cont) -> (v, solver) ->
   if solver.state[1] is 0 then cont(true, solver)
   else
@@ -69,30 +89,32 @@ exports.bol = special(0, 'bol', (solver, cont) -> (v, solver) ->
     if text[pos-1] in "\r\n" then cont(true, solver)
     else solver.failcont(v, solver))()
 
-### step to next char in text ###
+# step: step to next char in text
 exports.step = special([0,1], 'step', (solver, cont, n=1) -> (v, solver) ->
   [text, pos] = solver.state
   solver.state = [text, pos+n]
   cont(pos+n, solver))
 
-### return left text ###
+# lefttext: return left text
 exports.lefttext =  special(0, 'lefttext', (solver, cont) -> (v, solver) ->
   [text, pos] = solver.state
   cont(text[pos...], solver))()
 
-### return text[start...start+length]  ###
+# subtext: return text[start...start+length]
 exports.subtext =  exports.subsequence =  special([0,1,2], 'subtext', (solver, cont, length, start) -> (v, solver) ->
   [text, pos] = solver.state
   start = start? or pos
   length = length? or text.length
   cont(text[start...start+length], solver))
 
-### text[pos] ###
+# nextchar: text[pos]
 exports.nextchar =  special(0, 'nextchar', (solver, cont) -> (v, solver) ->
   [text, pos] = solver.state
   cont(text[pos], solver))()
 
-### if item is followed, succeed, else fail. after eval, state is restored  ###
+# #### general predicate
+
+# follow: if item is followed, succeed, else fail. after eval, state is restored
 exports.follow = special(1, 'follow', (solver, cont, item) ->
   state = null
   itemCont =  solver.cont(item, (v, solver) ->
@@ -102,7 +124,7 @@ exports.follow = special(1, 'follow', (solver, cont, item) ->
     state = solver.state
     itemCont(v, solver))
 
-### if item is NOT followed, succeed, else fail. after eval, state is restored  ###
+# notfollow: if item is NOT followed, succeed, else fail. after eval, state is restored
 exports.notfollow = special(1, 'notfollow', (solver, cont, item) ->
   fc = state = null
   itemCont =  solver.cont(item, (v, solver) ->
@@ -124,13 +146,11 @@ parallelFun = (solver, cont, state, args) ->
       solver.state = state
       leftCont(v, solver))
 
-exports.checkParallel = checkFunction = (state, baseState) -> state[1] is baseState[1]
-
-### between current state and right, all args succeed,
-  and reach the right where checkParallel(solver.state, right) is true
-  in a simple way: in same length of piece pass all clauses. ###
-exports.parallel = special(null, 'parallel', (solver, cont, args...) ->
-  # from current position to right pass all of args
+# parallel: between current state and right, all args succeed, <br/>
+#  and reach the right where checkParallel(solver.state, right) is true <br/>
+#  in a simple case: all clauses succeed in same length piece
+exports.parallel = special(null, 'parallel', (solver, cont, args,
+      checkFunction = (state, baseState) -> state[1] is baseState[1]) ->
   length = args.length
   if length is 0 then throw new ArgumentError(args)
   else if length is 1 then return solver.cont(args[0], cont)
@@ -152,20 +172,24 @@ exports.parallel = special(null, 'parallel', (solver, cont, args...) ->
       ycont(v, solver))
     xcont)
 
-###
-normal goal try the goal at first, after succeed, if need, backtracking happens to the goal's choices.
-greedy goal goes forward at first, after succeed, no backtracking happens.
-lazy goal goes foward without trying the goal, if backtracking, try goal and go on.
-###
+# ##### normal mode, lazy mode, greedy mode
+#normal mode: try the goal at first, <br/>
+# after succeed, if need, backtracking happens to try the goal again.  <br/>
+#greedy mode: goes forward at first,<br/>
+#after succeed, no backtracking happens on the goal.<br/>
+#lazy mode: goes foward without trying the goal, <br/>
+# if failed, backtrack to goal and try again.<br/>
+#see test_parser for more informations.
 
-### aka optional ###
+# ##### may, lazymay, greedymay
+# may: aka optional
 exports.may = special(1, 'may', (solver, cont, exp) ->
   exp_cont = solver.cont(exp, cont)
   (v, solver) ->
     solver.appendFailcont(cont)
     exp_cont(v, solver))
 
-### lazy optional ###
+# lazymay: lazy optional
 exports.lazymay = special(1, 'lazymay', (solver, cont, exp) ->
   expCont = solver.cont(exp, cont)
   (v, solver) ->
@@ -175,6 +199,7 @@ exports.lazymay = special(1, 'lazymay', (solver, cont, exp) ->
       expCont(v, solver)
     cont(v, solver))
 
+# greedymay: greedy optional
 exports.greedymay = special(1, 'greedymay', (solver, cont, exp) ->
   fc = null
   expCont = solver.cont(exp, (v, solver) ->
@@ -187,6 +212,10 @@ exports.greedymay = special(1, 'greedymay', (solver, cont, exp) ->
       cont(v, solver)
     expCont(v, solver))
 
+# #### any, lazyany, greedyany
+# any: zero or more exp, normal mode <br/>
+#  result should be an dao.Var, and always be bound to the result array. <br/>
+#  template: the item in result array is getvalue(template)
 exports.any = (exp, result, template) -> if not result then any1(exp) else any2(exp, result, template)
 
 any1 = special(1, 'any', (solver, cont, exp) ->
@@ -224,6 +253,9 @@ any2 = special(3, 'any', (solver, cont, exp, result, template) ->
     anyCont(v, solver))
   (v, solver) -> result1 = [];  result.bind(result1, solver.trail); anyCont(v, solver))
 
+# lazyany: zero or more exp, lazy mode <br/>
+#  result should be an dao.Var, and always be bound to the result array. <br/>
+#  template: the item in reuslt array is getvalue(template)
 exports.lazyany = (exp, result, template) ->
   if not result then lazyany1(exp) else lazyany2(exp, result, template)
 
@@ -252,6 +284,9 @@ lazyany2 = special(3, 'lazyany', (solver, cont, exp, result, template) ->
     [expcont, v, solver]
   (v, solver) -> result1 = []; fc = solver.failcont; anyCont(v, solver))
 
+# greedyany: zero or more exp, greedy mode
+#  result should be an dao.Var, and always be bound to the result array.
+#  template: the item in reuslt array is getvalue(template)
 exports.greedyany = (exp, result, template) -> if not result then greedyany1(exp) else greedyany2(exp, result, template)
 
 greedyany1 = special(1, 'greedyany', (solver, cont, exp) ->
@@ -272,6 +307,10 @@ greedyany2 = special(3, 'greedyany', (solver, cont, exp, result, template) ->
     solver.failcont = (v, solver) -> (solver.failcont = fc; result.bind(result1, solver.trail); cont(v, solver))
     anyCont(v, solver))
 
+# ##### some, lazysome, greedysome
+# some: one or more exp, normal mode <br/>
+#  result should be an dao.Var, and always be bound to the result array. <br/>
+#  template: the item in reuslt array is getvalue(template)
 exports.some = (exp, result, template) -> if not result then some1(exp) else some2(exp, result, template)
 
 some1 = special(1, 'some', (solver, cont, exp) ->
@@ -309,6 +348,9 @@ some2 = special(3, 'some', (solver, cont, exp, result, template) ->
     someCont(v, solver))
   (v, solver) -> result1 = []; result.bind(result1, solver.trail); expCont(v, solver))
 
+# lazysome: one or more exp, lazy mode <br/>
+#  result should be an dao.Var, and always be bound to the result array. <br/>
+#  template: the item in reuslt array is getvalue(template)
 exports.lazysome = (exp, result, template) -> if not result then lazysome1(exp) else lazysome2(exp, result, template)
 
 lazysome1 = special(1, 'lazysome', (solver, cont, exp) ->
@@ -338,6 +380,9 @@ lazysome2 = special(3, 'lazysome', (solver, cont, exp, result, template) ->
     fc = solver.failcont;
     expcont(v, solver))
 
+# greedysome: one or more exp, greedy mode<br/>
+#  result should be an dao.Var, and always be bound to the result array. <br/>
+#  template: the item in reuslt array is getvalue(template)
 exports.greedysome = (exp, result, template) -> if not result then greedysome1(exp) else greedysome2(exp, result, template)
 
 greedysome1 = special(1, 'greedysome', (solver, cont, exp) ->
@@ -360,12 +405,16 @@ greedysome2 = special(3, 'greedysome', (solver, cont, exp, result, template) ->
     solver.failcont = (v, solver) -> (solver.failcont = fc; result.bind(result1, solver.trail); cont(v, solver))
     expCont(v, solver))
 
+# times: given times of exp, expectTimes should be integer or dao.Var <br/>
+#  if @expectTimes is free dao.Var, then times behaviour like any(normal node).<br/>
+#  result should be an dao.Var, and always be bound to the result array.<br/>
+#  template: the item in reuslt array is getvalue(template)
 exports.times = (exp, expectTimes, result, template) ->
   if not result then times1(exp, expectTimes)
   else times2(exp, expectTimes, result, template)
 
 numberTimes1Fun = (solver, cont, exp, expectTimes) ->
-  expectTimes = Math.ceil(expectTimes)
+  expectTimes = Math.floor(expectTimes)
   if expectTimes<0 then throw new ValueError(expectTimes)
   else if expectTimes is 0 then cont
   else if expectTimes is 1 then solver.cont(exp, cont)
@@ -408,7 +457,7 @@ times1Fun = (solver, cont, exp, expectTimes) ->
 times1 = special(2, 'times', times1Fun)
 
 numberTimes2Fun = (solver, cont, exp, expectTimes, result, template) ->
-  expectTimes = Math.ceil(expectTimes)
+  expectTimes = Math.floor(expectTimes)
   if expectTimes<0 then throw new ValueError(expectTimes)
   else if expectTimes is 0 then (v, solver) -> result.bind([], solver.trail); cont(v, solver)
   else if expectTimes is 1 then solver.cont(exp, (v, solver) ->
@@ -457,8 +506,13 @@ times2Fun = (solver, cont, exp, expectTimes, result, template) ->
 
 times2 = special(4, 'times', times2Fun)
 
+# seplist: sep separated exp, expectTimes should be integer or dao.Var <br/>
+#  at least one exp is matched.<br/>
+#  if expectTimes is free dao.Var, then seplist behaviour like some(normal node).<br/>
+#  result should be an dao.Var, and always be bound to the result array.<br/>
+#  template: the item in reuslt array is getvalue(template)
 exports.seplist = (exp, options={}) ->
-  # 1 or more exp separated by sep
+  # one or more exp separated by sep
   sep = options.sep or char(' ');
   expectTimes = options.times or null
   result = options.result or null;
@@ -477,7 +531,7 @@ exports.seplist = (exp, options={}) ->
        andp(bind(result, []), exp, pushp(result, getvalue(template)),
                   any(andp(sep, exp, pushp(result, getvalue(template)))))
   else if _.isNumber(expectTimes)
-    expectTimes = Math.ceil Math.max 0, expectTimes
+    expectTimes = Math.floor Math.max 0, expectTimes
     if result is null
       switch expectTimes
         when 0 then succeed
@@ -507,6 +561,9 @@ exports.seplist = (exp, options={}) ->
                     is_(n, sub(expectTimes, 1)),
                     times(andp(sep, exp, pushp(result,getvalue(template))),n))))
 
+# char: match one char  <br/>
+#  if x is char or bound to char, then match that given char with next<br/>
+#  else match with next char, and bound x to it.
 exports.char = special(1, 'char', (solver, cont, x) ->  (v, solver) ->
   [data, pos] = solver.state
   if pos>=data.length then return solver.failcont(v, solver)
@@ -523,7 +580,10 @@ exports.char = special(1, 'char', (solver, cont, x) ->  (v, solver) ->
     else throw new ExpressionError(x)
   else throw new TypeError(x))
 
-exports.followChar = special(1, 'followChar', (solver, cont, arg) -> (v, solver) ->
+# followChar: follow given char? <br/>
+#  x should be char or be bound to char, then match that given char
+  
+exports.followChar = special(1, 'followChar', (solver, cont, x) -> (v, solver) ->
   [data, pos] = solver.state
   if pos>=data.length then return solver.failcont(v, solver)
   trail = solver.trail
@@ -536,6 +596,9 @@ exports.followChar = special(1, 'followChar', (solver, cont, arg) -> (v, solver)
     else throw new ValueError(x)
   else throw new TypeError(x))
 
+# notFollowChar: not follow given char? <br/>
+#  x should be char or be bound to char, then match that given char
+  
 exports.notFollowChar = special(1, 'notfollowChar', (solver, cont, x) -> (v, solver) ->
   [data, pos] = solver.state
   if pos>=data.length then return solver.failcont(v, solver)
@@ -549,6 +612,9 @@ exports.notFollowChar = special(1, 'notfollowChar', (solver, cont, x) -> (v, sol
     else throw new ValueError(x)
   else throw new TypeError(x))
 
+# followChars: follow one of given chars?  <br/>
+#  chars should be string or be bound to char, then match that given char
+  
 exports.followChars = special(1, 'followChars', (solver, cont, chars) -> (v, solver) ->
   # follow one of char in chars
   chars = trail.deref(chars)
@@ -562,6 +628,9 @@ exports.followChars = special(1, 'followChars', (solver, cont, chars) -> (v, sol
     throw new TypeError(chars)
   else solver.failcont(pos, solver))
 
+# notFollowChars: not follow one of given chars? <br/>
+#  chars should be string or be bound to char, then match that given char
+  
 exports.notFollowChars = special(1, 'notFollowChars', (solver, cont, chars) -> (v, solver) ->
   # not follow one of char in chars
   chars = trail.deref(chars)
@@ -575,6 +644,9 @@ exports.notFollowChars = special(1, 'notFollowChars', (solver, cont, chars) -> (
     throw new TypeError(chars)
   else cont(pos, solver))
 
+# charWhen: next char pass @test? <br/>
+#  @test should be an function with single argument
+  
 exports.charWhen = special(1, 'charWhen', (solver, cont, test) -> (v, solver) ->
   [data, pos] = solver.state
   if pos>=data.length then return solver.failcont(false, solver)
@@ -584,6 +656,7 @@ exports.charWhen = special(1, 'charWhen', (solver, cont, test) -> (v, solver) ->
 
 exports.charBetween = (x, start, end) -> exports.charWhen(x, (c) -> start<c<end)
 exports.charIn = (x, set) -> exports.charWhen((c) ->  c in x)
+# theses terminal should be used directly, NO suffix with ()
 exports.digit = exports.charWhen((c)->'0'<=c<='9')
 exports.digit1_9 = exports.charWhen((c)->'1'<=c<='9')
 exports.lower = exports.charWhen((c)->'a'<=c<='z')
@@ -595,26 +668,31 @@ exports.tabspace = exports.charIn(' \t')
 exports.whitespace = exports.charIn(' \t\r\n')
 exports.newline = exports.charIn('\r\n')
 
+# spaces: one or more spaces(' ') <br/>
+#usage: spaces # !!! NOT spaces()
 exports.spaces = special(0, 'spaces', (solver, cont) -> (v, solver) ->
-  # 1 or more spaces
   [data, pos] = solver.state
   if pos>=data.length then return solver.failcont(false, solver)
   c = data[pos]
   if c isnt ' ' then return solver.failcont(c, solver)
   p = pos+1
   while p< length and data[p] is ' ' then p++
-  cont(p-pos, solver))
+  cont(p-pos, solver))()
 
+# spaces0: zero or more spaces(' ') <br/>
+#usage: spaces0 # !!! NOT spaces0()
 exports.spaces0 = special(0, 'spaces', (solver, cont) -> (v, solver) ->
-  # 0 or more spaces
   [data, pos] = solver.state
   if pos>=data.length then return cont(0, solver)
   c = data[pos]
   if c isnt ' ' then return cont(c, solver)
   p = pos+1
   while p< length and data[p] is ' ' then p++
-  cont(p-pos, solver))
+  cont(p-pos, solver))()
 
+# stringWhile: match a string, every char in the string should pass test <br/>
+# test: a function with single argument <br/>
+#  the string should contain on char at least.
 exports.stringWhile = special(1, 'stringWhile', (solver, cont, test) -> (v, solver) ->
   [data, pos] = solver.state
   length = data.length
@@ -627,6 +705,7 @@ exports.stringWhile = special(1, 'stringWhile', (solver, cont, test) -> (v, solv
 
 exports.stringBetween = (start, end) -> exports.stringWhile((c) -> start<c<end)
 exports.stringIn = (set) -> exports.stringWhile((c) ->  c in set)
+# theses terminal should be used directly, NO suffix with ()
 exports.digits = exports.stringWhile((c)->'0'<=c<='9')
 exports.digits1_9 = exports.stringWhile((c)->'1'<=c<='9')
 exports.lowers = exports.stringWhile((c)->'a'<=c<='z')
@@ -638,6 +717,9 @@ exports.tabspaces = exports.stringIn(' \t')
 exports.whitespaces = exports.stringIn(' \t\r\n')
 exports.newlinespaces = exports.stringIn('\r\n')
 
+#stringWhile0: match a string, every char in it passes test <br/>
+# test: a function with single argument <br/>
+#  the string can be empty string.
 exports.stringWhile0 = special(1, 'stringWhile0', (solver, cont, test) -> (v, solver) ->
   [data, pos] = solver.state
   length = data.length
@@ -650,6 +732,7 @@ exports.stringWhile0 = special(1, 'stringWhile0', (solver, cont, test) -> (v, so
 
 exports.stringBetween0 = (start, end) -> exports.stringWhile0((c) -> start<c<end)
 exports.stringIn0 = (set) -> exports.stringWhile0((c) ->  c in set)
+# theses terminal should be used directly, NO suffix with ()
 exports.digits0 = exports.stringWhile0((c)->'0'<=c<='9')
 exports.digits1_90 = exports.stringWhile0((c)->'1'<=c<='9')
 exports.lowers0 = exports.stringWhile0((c)->'a'<=c<='z')
@@ -661,6 +744,9 @@ exports.tabspaces0 = exports.stringIn0(' \t')
 exports.whitespaces0 = exports.stringIn0(' \t\r\n')
 exports.newlines0 = exports.stringIn0('\r\n')
 
+# float: match a number, which can be float format..<br/>
+#  if arg is free dao.Var, arg would be bound to the number <br/>
+#  else arg should equal to the number.
 exports.float = special(1, 'float', (solver, cont, arg) -> (v, solver) ->
   [text, pos] = solver.parse_state
   length = text.length
@@ -674,7 +760,6 @@ exports.float = special(1, 'float', (solver, cont, arg) -> (v, solver) ->
   if p<length-1 and text[p] in 'eE' then (p++; p++)
   while p<length and '0'<=text[p]<='9' then p++
   if text[pos:p]=='.' then return solver.failcont(v, solver)
-  val = eval(text[pos...p])
   arg = solver.trail.deref(arg)
   value =  eval(text[pos:p])
   if (arg instanceof Var)
@@ -686,6 +771,8 @@ exports.float = special(1, 'float', (solver, cont, arg) -> (v, solver) ->
       else solver.failcont(v, solver)          s
     else throw new exports.TypeError(arg))
 
+#literal: match given literal arg,  <br/>
+# arg is a string or a var bound to a string.
 exports.literal = special(1, 'literal', (solver, cont, arg) -> (v, solver) ->
   arg = solver.trail.deref(arg)
   if (arg instanceof Var) then throw new exports.TypeError(arg)
@@ -701,6 +788,9 @@ exports.literal = special(1, 'literal', (solver, cont, arg) -> (v, solver) ->
     cont(p, solver)
   else solver.failcont(p, solver))
 
+#followLiteral: follow  given literal arg<br/>
+# arg is a string or a var bound to a string. <br/>
+#solver.state is restored after match.
 exports.followLiteral = special(1, 'followLiteral', (solver, cont, arg) -> (v, solver) ->
   arg = solver.trail.deref(arg)
   if (arg instanceof Var) then throw new exports.TypeError(arg)
@@ -714,6 +804,9 @@ exports.followLiteral = special(1, 'followLiteral', (solver, cont, arg) -> (v, s
   if i is length2 then cont(p, solver)
   else solver.failcont(p, solver))
 
+#notFollowLiteral: not follow  given literal arg,  <br/>
+# arg is a string or a var bound to a string. <br/>
+#solver.state is restored after match.
 exports.notFollowLiteral = special(1, 'followLiteral', (solver, cont, arg) -> (v, solver) ->
   arg = solver.trail.deref(arg)
   if (arg instanceof Var) then throw new exports.TypeError(arg)
@@ -727,6 +820,7 @@ exports.notFollowLiteral = special(1, 'followLiteral', (solver, cont, arg) -> (v
   if i is length2 then solver.failcont(p, solver)
   else cont(p, solver))
 
+#quoteString: match a quote string quoted by quote, quote can be escapedby \
 exports.quoteString = special(1, 'quoteString', (solver, cont, quote) -> (v, solver) ->
   string = ''
   [text, pos] = solver.parse_state
@@ -746,5 +840,12 @@ exports.quoteString = special(1, 'quoteString', (solver, cont, quote) -> (v, sol
   if p is length then return solver.failcont(v, solver)
   cont(string, solver))
 
+#dqstring： double quoted string "..." <br/>
+#usage: dqstring  #!!! not dqstring()
 dqstring = exports.quoteString('"')
+#sqstring： single quoted string '...' <br/>
+#usage: sqstring  #!!! not sqstring()
 sqstring = exports.quoteString("'")
+
+# todo: memo parse result <br/>
+# todo: left recursive nonterminal(memo could be useful to implement this)

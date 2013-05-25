@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+
+<html>
+<head>
+  <title>logic.coffee</title>
+  <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+  <meta name="viewport" content="width=device-width, target-densitydpi=160dpi, initial-scale=1.0; maximum-scale=1.0; user-scalable=0;">
+  <link rel="stylesheet" media="all" href="docco.css" />
+</head>
+<body>
+  <div id="container">
+    <div id="background"></div>
+    
+    <ul class="sections">
+        
+          <li id="title">
+              <div class="annotation">
+                  <h1>logic.coffee</h1>
+              </div>
+          </li>
+        
+        
+        
+        <li id="section-1">
+            <div class="annotation">
+              
+              <div class="pilwrap for-h4">
+                <a class="pilcrow" href="#section-1">&#182;</a>
+              </div>
+              <h4>logic builtins</h4>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>solve = require <span class="string">"../dao"</span>
+
+special = solve.special
+macro = solve.macro
+Trail = solve.Trail
+Var = solve.Var
+
+exports.succeed = special(<span class="number">0</span>, <span class="string">'succeed'</span>, (solver, cont) -&gt; cont)()
+
+exports.fail = special(<span class="number">0</span>, <span class="string">'fail'</span>, (solver, cont) -&gt; (v, solver) -&gt; solver.failcont(v, solver))()</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-2">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-2">&#182;</a>
+              </div>
+              <p>prepend fun() before solver.failcont </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.prependFailcont = special(<span class="number">1</span>, <span class="string">'setFailcont'</span>, (solver, cont, fun) -&gt; (v, solver) -&gt;
+  fc = solver.failcont
+  solver.<span class="function"><span class="title">failcont</span></span> = (v, solver) -&gt;
+    fun();
+    fc(v, solver)
+  cont(v, solver))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-3">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-3">&#182;</a>
+              </div>
+              <p>same as lisp.begin, aka &quot;,&quot; in prolog </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.andp = special(<span class="literal">null</span>, <span class="string">'andp'</span>, (solver, cont, args...) -&gt; solver.expsCont(args, cont))
+
+<span class="function"><span class="title">orpFun</span></span> = (solver, cont, args...) -&gt;
+  length = args.length
+  <span class="keyword">if</span> length <span class="keyword">is</span> <span class="number">0</span> <span class="keyword">then</span> <span class="keyword">throw</span> <span class="keyword">new</span> ArgumentError(args)
+  <span class="keyword">else</span> <span class="keyword">if</span> length <span class="keyword">is</span> <span class="number">1</span> <span class="keyword">then</span> <span class="keyword">return</span> solver.cont(args[<span class="number">0</span>], cont)
+  <span class="keyword">else</span> <span class="keyword">if</span> length <span class="keyword">is</span> <span class="number">2</span>
+    x = args[<span class="number">0</span>]
+    y = args[<span class="number">1</span>]
+    xcont = solver.cont(x, cont)
+    ycont = solver.cont(y, cont)
+  <span class="keyword">else</span>
+    x = args[<span class="number">0</span>]
+    y = args[<span class="number">1.</span>..]
+    xcont = solver.cont(x, cont)
+    ycont = orpFun(solver, cont, y...)
+  trail = state = fc = <span class="literal">null</span>
+  <span class="function"><span class="title">orcont</span></span> = (v, solver) -&gt;
+    trail.undo()
+    solver.state = state
+    solver.failcont = fc
+    [ycont, v, solver]
+  (v, solver) -&gt;
+    trail = <span class="keyword">new</span> Trail
+    state = solver.state
+    fc = solver.failcont
+    solver.trail = trail
+    solver.failcont = orcont
+    [xcont, <span class="literal">null</span>, solver]</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-4">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-4">&#182;</a>
+              </div>
+              <p>logic choices, aka &quot;;&quot; in prolog </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.orp = special(<span class="literal">null</span>, <span class="string">'orp'</span>, orpFun)</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-5">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-5">&#182;</a>
+              </div>
+              <p> make the goal x cutable </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.cutable = special(<span class="number">1</span>, <span class="string">'cutable'</span>, (solver, cont, x) -&gt;
+  cc = <span class="literal">null</span>
+  xcont = solver.cont(x, (v, solver) -&gt; solver.cutCont = cc; [cont, v, solver])
+  (v, solver) -&gt; cc = solver.cutCont;  xcont <span class="literal">null</span>, solver)</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-6">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-6">&#182;</a>
+              </div>
+              <p>prolog&#39;s cut, aka &quot;!&quot;</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.cut = special(<span class="number">0</span>, <span class="string">'cut'</span>, (solver, cont) -&gt; (v, solver) -&gt;
+  solver.failcont = solver.cutCont
+  cont(v, solver))()</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-7">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-7">&#182;</a>
+              </div>
+              <p>prolog&#39;s if, aka -&gt;
+ different from lisp.if_</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.ifp = special([<span class="number">2</span>,<span class="number">3</span>], <span class="string">'ifp'</span>, (solver, cont, test, action, else_) -&gt;</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-8">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-8">&#182;</a>
+              </div>
+              <p>if -&gt; Then; _Else :- If, !, Then.<br/>
+If -&gt; _Then; Else :- !, Else.<br/>
+If -&gt; Then :- If, !, Then</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>  cc = <span class="literal">null</span>
+  <span class="function"><span class="title">ccCont</span></span> = (v, solver) -&gt; solver.cutCont = cc; cont(v, solver)
+  actionCont = solver.cont(action, ccCont)
+  resultCont = solver.cont(test, (v, solver) -&gt;</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-9">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-9">&#182;</a>
+              </div>
+              <p>add cut after test, try test only once</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>    solver.failcont = solver.cutCont
+    actionCont(v, solver))
+  <span class="keyword">if</span> else_?
+    elseCont =  solver.cont(else_, ccCont)
+    (v, solver) -&gt;</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-10">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-10">&#182;</a>
+              </div>
+              <p>at first: make ifp cutable</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>      cc = solver.cutCont
+      trail = <span class="keyword">new</span> Trail
+      state = solver.state
+      fc = solver.failcont
+      solver.<span class="function"><span class="title">failcont</span></span> = (v, solver) -&gt;
+        trail.undo()
+        solver.state = state
+        solver.<span class="function"><span class="title">failcont</span></span> = (v, solver) -&gt; solver.failcont = fc; fc(v, solver)
+        elseCont(v, solver)
+      resultCont(v, solver)
+  <span class="keyword">else</span>
+    (v, solver) -&gt;
+      cc = solver.cutCont
+      resultCont(v, solver))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-11">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-11">&#182;</a>
+              </div>
+              <p>like in prolog, failure as negation. </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.notp = special(<span class="number">1</span>, <span class="string">'notp'</span>, (solver, cont, x) -&gt;
+  fc = <span class="literal">null</span>
+  mycont = solver.cont(x, (v, solver) -&gt;
+    solver.failcont = fc
+    [fc, v, solver])
+  (v, solver) -&gt;
+    trail = solver.trail
+    solver.trail = <span class="keyword">new</span> Trail
+    fc = solver.failcont
+    state = solver.state
+    solver.<span class="function"><span class="title">failcont</span></span> = (v, solver) -&gt;
+      solver.trail.undo()
+      solver.trail = trail
+      solver.state = state
+      solver.failcont = fc
+      [cont, v, solver]
+    mycont(v, solver))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-12">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-12">&#182;</a>
+              </div>
+              <p>aka repeat in prolog </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.repeat = special(<span class="number">0</span>, <span class="string">'repeat'</span>, (solver, cont) -&gt;
+  (v, solver) -&gt; solver.failcont = cont; [cont, <span class="literal">null</span>, solver])()</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-13">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-13">&#182;</a>
+              </div>
+              <p>find all solution to the goal @exp in prolog  </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.findall = special(<span class="number">1</span>, <span class="string">'findall'</span>, (solver, cont, exp) -&gt;
+  fc = <span class="literal">null</span>
+  findnext = solver.cont(exp, (v, solver) -&gt; solver.failcont(v, solver))
+  <span class="function"><span class="title">findallDone</span></span> = (v, solver) -&gt; ( solver.failcont = fc; [cont, v, solver])
+  (v, solver) -&gt; (fc = solver.failcont; solver.failcont = findallDone; [findnext, v, solver]))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-14">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-14">&#182;</a>
+              </div>
+              <p>find only one solution to the goal @x  </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.once = special(<span class="number">1</span>, <span class="string">'once'</span>, (solver, cont, x) -&gt;
+  fc = <span class="literal">null</span>
+  cont1 = solver.cont(x, (v, solver) -&gt; (solver.failcont = fc; cont(v, solver)))
+  (v, solver) -&gt; fc = solver.failcont; [cont1, <span class="literal">null</span>, solver])</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-15">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-15">&#182;</a>
+              </div>
+              <p>evaluate @exp and bind it to vari </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.is_ = special(<span class="number">2</span>, <span class="string">'is_'</span>, (solver, cont, vari, exp) -&gt;</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-16">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-16">&#182;</a>
+              </div>
+              <p>different from assign in lisp.coffee:  <br/>
+by using vari.bind, this is saved in solver.trail<br/>
+and can be restored in solver.failcont</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>  solver.cont(exp, (v, solver) -&gt;  vari.bind(v, solver.trail); [cont, <span class="literal">true</span>, solver]))
+
+exports.bind = special(<span class="number">2</span>, <span class="string">'bind'</span>, (solver, cont, vari, term) -&gt;</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-17">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-17">&#182;</a>
+              </div>
+              <p>different from is_, do not evaluate the exp instead. <br/>
+by using vari.bind, this is saved in solver.trail <br/>
+and can be restored in solver.failcont</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>  (v, solver) -&gt;  vari.bind(term, solver.trail); [cont, <span class="literal">true</span>, solver])</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-18">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-18">&#182;</a>
+              </div>
+              <p>todo: provide unify function as the third argument</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.unifyFun = <span class="function"><span class="title">unifyFun</span></span> = (solver, cont, x, y) -&gt; (v, solver) -&gt;
+  <span class="keyword">if</span> solver.trail.unify(x, y) <span class="keyword">then</span> cont(<span class="literal">true</span>, solver)
+  <span class="keyword">else</span> solver.failcont(<span class="literal">false</span>, solver)</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-19">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-19">&#182;</a>
+              </div>
+              <p>unify two items. </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.unify = special(<span class="number">2</span>, <span class="string">'unify'</span>, unifyFun)
+
+exports.notunifyFun = <span class="function"><span class="title">notunifyFun</span></span> = (solver, cont, x, y) -&gt; (v, solver) -&gt;
+  <span class="keyword">if</span> <span class="keyword">not</span> solver.trail.unify(x, y) <span class="keyword">then</span> cont(<span class="literal">true</span>, solver)
+  <span class="keyword">else</span> solver.failcont(<span class="literal">false</span>, solver)</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-20">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-20">&#182;</a>
+              </div>
+              <p>to prove two items can NOT be unified </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.notunify = special(<span class="number">2</span>, <span class="string">'notunify'</span>, notunifyFun)
+
+exports.unifyListFun = <span class="function"><span class="title">unifyListFun</span></span> = (solver, cont, xs, ys) -&gt;  (v, solver) -&gt;
+  xlen = xs.length
+  <span class="keyword">if</span> ys.length <span class="keyword">isnt</span> xlen <span class="keyword">then</span> solver.failcont(<span class="literal">false</span>, solver)
+  <span class="keyword">else</span> <span class="keyword">for</span> i <span class="keyword">in</span> [<span class="number">0.</span>..xlen]
+    <span class="keyword">if</span> <span class="keyword">not</span> solver.trail.unify(xs[i], ys[i]) <span class="keyword">then</span> <span class="keyword">return</span> solver.failcont(<span class="literal">false</span>, solver)
+  cont(<span class="literal">true</span>, solver)</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-21">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-21">&#182;</a>
+              </div>
+              <p>unify two lists </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.unifyList = unifyList = special(<span class="number">2</span>, <span class="string">'unifyList'</span>, unifyListFun)
+
+exports.notunifyListFun = <span class="function"><span class="title">notunifyListFun</span></span> = (solver, cont, xs, ys) -&gt;  (v, solver) -&gt;
+  xlen = xs.length
+  <span class="keyword">if</span> ys.length <span class="keyword">isnt</span> xlen <span class="keyword">then</span> solver.failcont(<span class="literal">false</span>, solver)
+  <span class="keyword">else</span> <span class="keyword">for</span> i <span class="keyword">in</span> [<span class="number">0.</span>..xlen]
+    <span class="keyword">if</span> solver.trail.unify(xs[i], ys[i]) <span class="keyword">then</span> <span class="keyword">return</span> solver.failcont(<span class="literal">false</span>, solver)
+  cont(<span class="literal">true</span>, solver)
+
+exports.notunifyList = notunifyList = special(<span class="number">2</span>, <span class="string">'notunifyList'</span>, notunifyListFun)</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-22">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-22">&#182;</a>
+              </div>
+              <p>todo: optimize by using arity and the signature for rules which has many clauses <br/>
+todo: database rules manipulation: abolish, assert, retract</p>
+
+            </div>
+            
+        </li>
+        
+        
+        <li id="section-23">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-23">&#182;</a>
+              </div>
+              <p>  rule((arguments) -&gt;   <br/>
+ [head1, body1, <br/>
+  head2, body2, <br/>
+  ...         <br/>
+ else<em>]) <br/>
+the rule&#39;s argument should be a function, <br/>
+which return a array, which conains the rule&#39;s clauses <br/>
+rule&#39;s clause is composed of head and body. <br/>
+rule head will be unified with the arguments.<br/>
+ if the length of args is odd number, then the last clause is the else</em> clause, <br/>
+which has not rule head, has only rule body that will always be run. <br/>
+ !!! empty clauses means succeed. <br/>
+if fails is need, rule((args..)-&gt;[fail]) should be ok.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>
+exports.<span class="function"><span class="title">rule</span></span> = (arity, name, fun) -&gt;
+  <span class="keyword">unless</span> fun? <span class="keyword">then</span> (fun = name; name = <span class="string">'noname_rule'</span>)
+  macro(arity, name, (args...) -&gt;
+    clauses = fun(args...)
+    length = clauses.length
+    <span class="keyword">if</span> length==<span class="number">0</span> <span class="keyword">then</span> <span class="keyword">return</span> succeed
+    result = <span class="keyword">for</span> i <span class="keyword">in</span> [<span class="number">0.</span>..length-<span class="number">1</span>]  <span class="keyword">by</span> <span class="number">2</span>
+      head = clauses[i]
+      body = clauses[i+<span class="number">1</span>]
+      andp(unifyList(head, args), body)
+    <span class="keyword">if</span> length-Math.floor(length/<span class="number">2</span>)*<span class="number">2</span>==<span class="number">1</span> <span class="keyword">then</span> result.push(clauses[length-<span class="number">1</span>])
+    orp(result...))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-24">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-24">&#182;</a>
+              </div>
+              <p>borrowed from lisp, same as in lisp.coffee  <br/>
+todo: need a trampoline for running the current continuation until done or faildone</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.callfc = special(<span class="number">1</span>, <span class="string">'callfc'</span>, (solver, cont, fun) -&gt; (v, solver) -&gt;
+                         result = fun(solver.failcont)[<span class="number">1</span>]
+                         solver.done = <span class="literal">false</span>
+                         cont(result, solver))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-25">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-25">&#182;</a>
+              </div>
+              <p>if x is true then succeed, else fail </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.truep = special(<span class="number">1</span>, <span class="string">'truep'</span>, (solver, cont, fun, x) -&gt;
+  solver.cont(x, (x1, solver) -&gt;
+    <span class="keyword">if</span> x1 <span class="keyword">then</span> cont(x1, solver)
+    <span class="keyword">else</span> solver.failcont(x1, solver)))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-26">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-26">&#182;</a>
+              </div>
+              <p>if x is false then succeed, else fail </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.falsep = special(<span class="number">1</span>, <span class="string">'falsep'</span>, (solver, cont, fun, x) -&gt;
+  solver.cont(x, (x1, solver) -&gt;
+    <span class="keyword">if</span> <span class="keyword">not</span> x1 <span class="keyword">then</span> cont(x1, solver)
+    <span class="keyword">else</span> solver.failcont(x1, solver)))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-27">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-27">&#182;</a>
+              </div>
+              <p>if fun(x) is true then succeed, else fail </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.unaryPredicate = <span class="function"><span class="title">unaryPredicate</span></span> = (name, fun) -&gt;
+  <span class="keyword">unless</span> fun? <span class="keyword">then</span> (fun = name; name = <span class="string">'noname'</span>)
+  special(<span class="number">1</span>, name, (solver, cont, x) -&gt;
+    solver.cont(x, (x1, solver) -&gt;
+      result = fun(x1)
+      <span class="keyword">if</span> result <span class="keyword">then</span> cont(result, solver)
+      <span class="keyword">else</span> solver.failcont(result, solver)))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-28">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-28">&#182;</a>
+              </div>
+              <p>if fun(x, y) is true then succeed, else fail  </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.binaryPredicate = <span class="function"><span class="title">binaryPredicate</span></span> = (name, fun) -&gt;
+  <span class="keyword">unless</span> fun? <span class="keyword">then</span> (fun = name; name = <span class="string">'noname'</span>)
+  special(<span class="number">2</span>, name, (solver, cont, x, y) -&gt;
+    x1 = <span class="literal">null</span>
+    ycont =  solver.cont(y,  (y1, solver) -&gt;
+      result = fun(x1, y1)
+      <span class="keyword">if</span> result <span class="keyword">then</span> cont(result, solver)
+      <span class="keyword">else</span> solver.failcont(result, solver)
+    solver.cont(x, (v, solver) -&gt; x1 = v; ycont(<span class="literal">null</span>, solver))))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-29">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-29">&#182;</a>
+              </div>
+              <p>== != &lt; &lt;= &gt; &gt;=: if false then fail.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.eqp = binaryPredicate((x, y) -&gt; x <span class="keyword">is</span> y)
+exports.nep = binaryPredicate((x, y) -&gt; x <span class="keyword">isnt</span> y)
+exports.ltp = binaryPredicate((x, y) -&gt; x &lt; y)
+exports.lep = binaryPredicate((x, y) -&gt; x &lt;= y)
+exports.gtp = binaryPredicate((x, y) -&gt; x &gt; y)
+exports.gep = binaryPredicate((x, y) -&gt; x &gt;= y)</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-30">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-30">&#182;</a>
+              </div>
+              <p>if fun(x, y, z) is true then succeed, else fail  </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.<span class="function"><span class="title">ternaryPredicate</span></span> = (name, fun) -&gt;
+  <span class="keyword">unless</span> fun? <span class="keyword">then</span> (fun = name; name = <span class="string">'noname'</span>)
+  special(<span class="number">3</span>, name, (solver, cont, x, y, z) -&gt;
+    zcont = solver.cont(z,  (z, solver) -&gt;
+      result = fun(x, y, z)
+      <span class="keyword">if</span> result <span class="keyword">then</span> cont(result, solver)
+      <span class="keyword">else</span> solver.failcont(result, solver))
+    ycont = solver.cont(y,  (v, solver) -&gt; y = v; zcont(<span class="literal">null</span>, solver)
+    solver.cont(x, (v, solver) -&gt; x = v; ycont(<span class="literal">null</span>, solver))))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-31">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-31">&#182;</a>
+              </div>
+              <p>if fun(args...) is true then succeed, else fail </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.<span class="function"><span class="title">functionPredicate</span></span> = (arity, name, fun) -&gt;
+  <span class="keyword">unless</span> fun? <span class="keyword">then</span> (fun = name; name = <span class="string">'noname'</span>)
+  special(arity, name, (solver, cont, args...) -&gt;
+    solver.argsCont(args, (params, solver) -&gt;
+      result = fun(params...)
+      <span class="keyword">if</span> result <span class="keyword">then</span> cont(result, solver)
+      <span class="keyword">else</span> solver.failcont(result, solver)))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-32">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-32">&#182;</a>
+              </div>
+              <p>like &quot;between&quot; in prolog <br/>
+if y is number and x&lt;=y&lt;=z then succeed, else fail <br/>
+if y is Var, then try all branch by binding y with integer between x and y</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.between = special(<span class="number">3</span>, <span class="string">'between'</span>, (solver, cont, fun, x, y, z) -&gt;
+  y1 = z1 = <span class="literal">null</span>
+  zcont = solver.cont(z,  (zz, solver) -&gt;
+    <span class="keyword">if</span> x1 <span class="keyword">instanceof</span> dao.Var <span class="keyword">then</span> <span class="keyword">throw</span> dao.TypeError(x)
+    <span class="keyword">else</span> <span class="keyword">if</span> y1 <span class="keyword">instanceof</span> dao.Var <span class="keyword">then</span> <span class="keyword">throw</span> <span class="keyword">new</span> dao.TypeError(y)
+    <span class="keyword">if</span> y1 <span class="keyword">instanceof</span> dao.Var
+      y11 = y1
+      fc = solver.failcont
+      solver.<span class="function"><span class="title">failcont</span></span> = (v, solver) -&gt;
+        y11++
+        <span class="keyword">if</span> y11&gt;z1 <span class="keyword">then</span> fc(v, solver)
+        <span class="keyword">else</span> y1.bind(y11, solver.trail); cont(y11, solver)
+      y1.bind(y11, solver.trail); cont(y11, solver)
+    <span class="keyword">else</span>
+      <span class="keyword">if</span> (x1&lt;=y1&lt;=z1) <span class="keyword">then</span> cont(<span class="literal">true</span>, solver)
+      <span class="keyword">else</span> solver.failcont(<span class="literal">false</span>, solver))
+  ycont = solver.cont(y,  (v, solver) -&gt; y1 = v; zcont(<span class="literal">null</span>, solver))
+  solver.cont(x, (v, solver) -&gt; x1 = v; ycont(<span class="literal">null</span>, solver)))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-33">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-33">&#182;</a>
+              </div>
+              <p>try all branch by returning integer between x and y </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.rangep = special(<span class="number">2</span>, <span class="string">'rangep'</span>, (solver, cont, x, y) -&gt;</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-34">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-34">&#182;</a>
+              </div>
+              <p>select all of values between x and y as choices</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>  x1 = <span class="literal">null</span>
+  ycont = solver.cont(y,  (y, solver) -&gt;
+    <span class="keyword">if</span> x1 <span class="keyword">instanceof</span> dao.Var <span class="keyword">then</span> <span class="keyword">throw</span> dao.TypeError(x)
+    <span class="keyword">else</span> <span class="keyword">if</span> y1 <span class="keyword">instanceof</span> dao.Var <span class="keyword">then</span> <span class="keyword">throw</span> <span class="keyword">new</span> dao.TypeError(y)
+    <span class="keyword">else</span> <span class="keyword">if</span> x1&gt;y1 <span class="keyword">then</span> <span class="keyword">return</span> solver.failcont(<span class="literal">false</span>, solver)
+    result = x1
+    fc = solver.failcont
+    solver.<span class="function"><span class="title">failcont</span></span> = (v, solver) -&gt;
+      result++
+      <span class="keyword">if</span> result&gt;y1 <span class="keyword">then</span> fc(v, solver)
+      <span class="keyword">else</span> cont(result, solver)
+    cont(result, solver))
+  solver.cont(x, (v, solver) -&gt; x1 = v; ycont(<span class="literal">null</span>, solver)))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-35">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-35">&#182;</a>
+              </div>
+              <p>if x is Var then succeed else fail </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.varp = special(<span class="number">1</span>, <span class="string">'varp'</span>, (solver, cont, x) -&gt;
+   solver.cont(x, (x1, solver) -&gt;
+     <span class="keyword">if</span> (x1 <span class="keyword">instanceof</span> dao.Var) <span class="keyword">then</span> cont(<span class="literal">true</span>, solver)
+     <span class="keyword">else</span> solver.failcont(<span class="literal">false</span>, solver)))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-36">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-36">&#182;</a>
+              </div>
+              <p>if x is NOT Var then succeed else fail </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.nonvarp = special(<span class="number">1</span>, <span class="string">'notvarp'</span>, (solver, cont, x) -&gt;
+  solver.cont(x, (x1, solver) -&gt;
+    <span class="keyword">if</span> (x1 <span class="keyword">not</span> <span class="keyword">instanceof</span> dao.Var) <span class="keyword">then</span> cont(<span class="literal">true</span>, solver)
+    <span class="keyword">else</span> solver.failcont(<span class="literal">false</span>, solver)))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-37">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-37">&#182;</a>
+              </div>
+              <p> if x is Var and is bound to itself then succeed else fail </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.freep = special(<span class="number">1</span>, <span class="string">'freep'</span>, (solver, cont, x) -&gt;</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-38">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-38">&#182;</a>
+              </div>
+              <p>x is a free variable?</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre> (v, solver) -&gt;
+   <span class="keyword">if</span> solver.trail.deref(x) <span class="keyword">instanceof</span> Var <span class="keyword">then</span> cont(<span class="literal">true</span>, solver)
+   <span class="keyword">else</span> solver.failcont(<span class="literal">false</span>, solver))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-39">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-39">&#182;</a>
+              </div>
+              <p> if x is number then succeed else fail </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.numberp = special(<span class="number">1</span>, <span class="string">'numberp'</span>, (solver, cont, x) -&gt;
+  solver.cont(x, (x1, solver) -&gt;
+  <span class="keyword">if</span> _.isNumber(x1) <span class="keyword">then</span> cont(<span class="literal">true</span>, solver)
+  <span class="keyword">else</span> solver.failcont(<span class="literal">false</span>, solver)))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-40">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-40">&#182;</a>
+              </div>
+              <p> if x is String then succeed else fail </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.stringp = special(<span class="number">1</span>, <span class="string">'stringp'</span>, (solver, cont, x) -&gt;
+  solver.cont(x, (x1, solver) -&gt;
+  <span class="keyword">if</span> _.isString(x1) <span class="keyword">then</span> cont(<span class="literal">true</span>, solver)
+  <span class="keyword">else</span> solver.failcont(<span class="literal">false</span>, solver)))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-41">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-41">&#182;</a>
+              </div>
+              <p> if x is String or Number then succeed else fail </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.atomp = special(<span class="number">1</span>, <span class="string">'atomp'</span>, (solver, cont, x) -&gt;
+  solver.cont(x, (x1, solver) -&gt;
+  <span class="keyword">if</span> _.isNumber(x1) <span class="keyword">or</span> _.isString(x1) <span class="keyword">then</span> cont(<span class="literal">true</span>, solver)
+  <span class="keyword">else</span> solver.failcont(<span class="literal">false</span>, solver)))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-42">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-42">&#182;</a>
+              </div>
+              <p> if x is Array then succeed else fail </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.listp = special(<span class="number">1</span>, <span class="string">'listp'</span>, (solver, cont, x) -&gt;
+  solver.cont(x, (x1, solver) -&gt;
+  <span class="keyword">if</span> _.isArray(x1) <span class="keyword">then</span> cont(<span class="literal">true</span>, solver)
+  <span class="keyword">else</span> solver.failcont(<span class="literal">false</span>, solver)))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-43">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-43">&#182;</a>
+              </div>
+              <p> if x is callable then succeed else fail </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.callablep = special(<span class="number">1</span>, <span class="string">'callablep'</span>, (solver, cont, x) -&gt;
+  solver.cont(x, (x1, solver) -&gt;
+  <span class="keyword">if</span> x1 <span class="keyword">instanceof</span> dao.Apply <span class="keyword">then</span> cont(<span class="literal">true</span>, solver)
+  <span class="keyword">else</span> solver.failcont(<span class="literal">false</span>, solver)))</pre></div></div>
+            
+        </li>
+        
+    </ul>
+  </div>
+</body>
+</html>

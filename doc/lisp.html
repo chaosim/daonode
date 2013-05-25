@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+
+<html>
+<head>
+  <title>lisp.coffee</title>
+  <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+  <meta name="viewport" content="width=device-width, target-densitydpi=160dpi, initial-scale=1.0; maximum-scale=1.0; user-scalable=0;">
+  <link rel="stylesheet" media="all" href="docco.css" />
+</head>
+<body>
+  <div id="container">
+    <div id="background"></div>
+    
+    <ul class="sections">
+        
+          <li id="title">
+              <div class="annotation">
+                  <h1>lisp.coffee</h1>
+              </div>
+          </li>
+        
+        
+        
+        <li id="section-1">
+            <div class="annotation">
+              
+              <div class="pilwrap for-h4">
+                <a class="pilcrow" href="#section-1">&#182;</a>
+              </div>
+              <h4>lisp builtins</h4>
+<p>lispt.coffee doesn&#39;t know trail, failcont, state and the like.
+lisp knows cont only.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>
+_ = require(<span class="string">'underscore'</span>)
+solve = require <span class="string">"../dao"</span>
+general = require <span class="string">"./general"</span>
+
+special = solve.special
+macro = solve.macro
+
+debug = solve.debug</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-2">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-2">&#182;</a>
+              </div>
+              <p>aka lisp&#39;s quote, like in lisp, &#39;x==x, quote(x) === x </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.quote = special(<span class="number">1</span>, <span class="string">'quote'</span>, (solver, cont, exp) -&gt;
+    (v, solver) -&gt; cont(exp, solver))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-3">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-3">&#182;</a>
+              </div>
+              <p>aka lisp&#39;s eval, solve(eval_(quote(x))) means solve(x),  </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.eval_ = special(<span class="number">1</span>, <span class="string">'eval'</span>, (solver, cont, exp) -&gt;
+  solver.cont(exp, (v, solver) -&gt; [solver.cont(v, cont), <span class="literal">null</span>, solver]))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-4">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-4">&#182;</a>
+              </div>
+              <p>vari.binding = exp </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.assign = special(<span class="number">2</span>, <span class="string">'assign'</span>, (solver, cont, vari, exp) -&gt;</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-5">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-5">&#182;</a>
+              </div>
+              <p>different from is_ in logic.coffee: <br/>
+Because not using vari.bind, this is not saved in solver.trail  <br/>
+and so it can NOT be restored in solver.failcont <br/>
+EXCEPT the vari has been in solver.trail in the logic branch before.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>  solver.cont(exp, (v, solver) -&gt; (vari.binding = v; cont(v, solver))))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-6">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-6">&#182;</a>
+              </div>
+              <p>vari.binding = 0 <br/>
+ provide this for reducing continuation, and make code running faster.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.zero = special(<span class="number">1</span>, <span class="string">'zero'</span>, (solver, cont, vari, exp) -&gt;
+  (v, solver) -&gt; (vari.binding = <span class="number">0</span>; cont(v, solver)))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-7">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-7">&#182;</a>
+              </div>
+              <p>vari.binding = 1 <br/>
+ provide this for reducing continuation, and make code running faster.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.one = special(<span class="number">1</span>, <span class="string">'one'</span>, (solver, cont, vari, exp) -&gt;
+ (v, solver) -&gt; (vari.binding = <span class="number">1</span>; cont(v, solver)))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-8">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-8">&#182;</a>
+              </div>
+              <p>aka lisp&#39;s begin, same as logic.andp </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.begin = special(<span class="literal">null</span>, <span class="string">'begin'</span>, (solver, cont, exps...) -&gt; solver.expsCont(exps, cont))
+
+<span class="function"><span class="title">if_fun</span></span> = (solver, cont, test, then_, else_) -&gt;
+  then_cont = solver.cont(then_, cont)
+  <span class="keyword">if</span> else_?
+    else_cont = solver.cont(else_, cont)
+    <span class="function"><span class="title">action</span></span> = (v, solver) -&gt;
+      <span class="keyword">if</span> (v) <span class="keyword">then</span> then_cont(v, solver)
+      <span class="keyword">else</span> else_cont(v, solver)
+    solver.cont(test, action)
+  <span class="keyword">else</span>
+    <span class="function"><span class="title">action</span></span> =  (v, solver) -&gt;
+      <span class="keyword">if</span> (v) <span class="keyword">then</span> then_cont(<span class="literal">null</span>, solver)
+      <span class="keyword">else</span> cont(<span class="literal">null</span>, solver)
+    solver.cont(test, action)</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-9">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-9">&#182;</a>
+              </div>
+              <p>lisp style if. <br/>
+ different from logic.ifp, when test fail, it do not run else_ clause.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.if_ = special([<span class="number">2</span>,<span class="number">3</span>], <span class="string">'if_'</span>, if_fun)
+
+<span class="function"><span class="title">iff_fun</span></span> = (solver, cont, clauses, else_) -&gt;
+  length = clauses.length
+  <span class="keyword">if</span> length <span class="keyword">is</span> <span class="number">0</span> <span class="keyword">then</span> <span class="keyword">throw</span> <span class="keyword">new</span> exports.TypeError(clauses)
+  <span class="keyword">else</span> <span class="keyword">if</span> length <span class="keyword">is</span> <span class="number">1</span>
+    [test, then_] = clauses[<span class="number">0</span>]
+    if_fun(solver, cont, test, then_, else_)
+  <span class="keyword">else</span>
+    [test, then_] = clauses[<span class="number">0</span>]
+    then_cont = solver.cont(then_, cont)
+    iff_else_cont = iff_fun(solver, cont, clauses[<span class="number">1.</span>..], else_)
+    <span class="function"><span class="title">action</span></span> = (v, solver) -&gt;
+      <span class="keyword">if</span> (v) <span class="keyword">then</span> [then_cont, v, solver]
+      <span class="keyword">else</span> [iff_else_cont, v, solver]
+    solver.cont(test, action)</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-10">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-10">&#182;</a>
+              </div>
+              <p>iff [ [test1, body1], <br/>
+     [test2, body2]  <br/>
+   ] <br/>
+   else_</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>
+exports.iff = special(-<span class="number">2</span>, <span class="string">'iff'</span>, iff_fun)</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-11">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-11">&#182;</a>
+              </div>
+              <p>lisp style block </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.block = block = special(<span class="literal">null</span>, <span class="string">'block'</span>, (solver, cont, label, body...) -&gt;
+  <span class="keyword">if</span> <span class="keyword">not</span> _.isString(label) <span class="keyword">then</span> (label = <span class="string">''</span>; body = [label].concat(body))
+
+  exits = solver.exits[label] ?= []
+  exits.push(cont)
+  defaultExits = solver.exits[<span class="string">''</span>] ?= []  <span class="comment"># if no label, go here</span>
+  defaultExits.push(cont)
+  holder = [<span class="literal">null</span>]
+  continues = solver.continues[label] ?= []
+  continues.push(holder)
+  defaultContinues = solver.continues[<span class="string">''</span>] ?= []   <span class="comment"># if no label, go here</span>
+  defaultContinues.push(holder)
+  holder[<span class="number">0</span>] = fun = solver.expsCont(body, cont)
+  exits.pop()
+  <span class="keyword">if</span> exits.length <span class="keyword">is</span> <span class="number">0</span> <span class="keyword">then</span> <span class="keyword">delete</span> solver.exits[label]
+  continues.pop()
+  <span class="keyword">if</span> continues.length <span class="keyword">is</span> <span class="number">0</span> <span class="keyword">then</span> <span class="keyword">delete</span> solver.continues[label]
+  defaultExits.pop()
+  defaultContinues.pop()
+  fun)</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-12">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-12">&#182;</a>
+              </div>
+              <p>break a block </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.break_ = break_ = special([<span class="number">0</span>, <span class="number">1</span>,<span class="number">2</span>], <span class="string">'break_'</span>, (solver, cont, label=<span class="string">''</span>, value=<span class="literal">null</span>) -&gt;
+  <span class="keyword">if</span> value != <span class="literal">null</span> <span class="keyword">and</span> <span class="keyword">not</span> _.isString label <span class="keyword">then</span> <span class="keyword">throw</span> <span class="keyword">new</span> TypeError([label, value])
+  <span class="keyword">if</span> value <span class="keyword">is</span> <span class="literal">null</span> <span class="keyword">and</span> <span class="keyword">not</span> _.isString label <span class="keyword">then</span> (value = label; label = <span class="string">''</span>)
+  exits = solver.exits[label]
+  <span class="keyword">if</span> <span class="keyword">not</span> exits <span class="keyword">or</span> exits==[] <span class="keyword">then</span> <span class="keyword">throw</span> Error(label)
+  exitCont = exits[exits.length-<span class="number">1</span>]
+  <span class="function"><span class="title">valCont</span></span> = (v, solver) -&gt; solver.protect(exitCont)(v, solver)
+  solver.cont(value, valCont))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-13">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-13">&#182;</a>
+              </div>
+              <p>continue a block </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.continue_ = continue_ = special([<span class="number">0</span>,<span class="number">1</span>], <span class="string">'continue_'</span>, (solver, cont, label=<span class="string">''</span>) -&gt;
+  continues = solver.continues[label]
+  <span class="keyword">if</span> <span class="keyword">not</span> continues <span class="keyword">or</span> continues==[] <span class="keyword">then</span> <span class="keyword">throw</span> Error(label)
+  continueCont = continues[continues.length-<span class="number">1</span>]
+  (v, solver) -&gt; [solver.protect(continueCont[<span class="number">0</span>]), v, solver])
+
+not_ = general.not_</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-14">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-14">&#182;</a>
+              </div>
+              <p>loop </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.loop_ = macro(<span class="literal">null</span>, <span class="string">'loop'</span>, (label, body...) -&gt;
+  <span class="keyword">if</span> <span class="keyword">not</span> _.isString(label) <span class="keyword">then</span> (label = <span class="string">''</span>; body = [label].concat body)
+  block(label, body.concat([continue_(label)])...))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-15">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-15">&#182;</a>
+              </div>
+              <p>while </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.while_ = macro(<span class="literal">null</span>, <span class="string">'while_'</span>, (label, test, body...) -&gt;
+  <span class="keyword">if</span> <span class="keyword">not</span> _.isString(label) <span class="keyword">then</span> (label = <span class="string">''</span>; test = label; body = [test].concat body)
+  block(label, [if_(not_(test), break_(label))].concat(body).concat([continue_(label)])...))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-16">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-16">&#182;</a>
+              </div>
+              <p>until </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.until_ = macro(<span class="literal">null</span>, <span class="string">'until_'</span>, (label,body..., test) -&gt;
+   <span class="keyword">if</span> <span class="keyword">not</span> _.isString(label) <span class="keyword">then</span> (label = <span class="string">''</span>; test = label; body = [test].concat body)
+   body = body.concat([if_(not_(test), continue_(label))])
+   block(label, body...))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-17">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-17">&#182;</a>
+              </div>
+              <p>aka. lisp style catch/throw  </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.catch_ = special(-<span class="number">1</span>, <span class="string">'catch_'</span>, (solver, cont, tag, forms...) -&gt;
+  <span class="function"><span class="title">tagCont</span></span> = (v, solver) -&gt;
+    solver.pushCatch(v, cont)
+    formsCont = solver.expsCont(forms, (v2, solver) -&gt; solver.popCatch(v); [cont, v2, solver])
+    [formsCont, v, solver]
+  solver.cont(tag, tagCont))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-18">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-18">&#182;</a>
+              </div>
+              <p>aka lisp style throw </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.throw_ = special(<span class="number">2</span>, <span class="string">'throw_'</span>, (solver, cont, tag, form) -&gt;
+  <span class="function"><span class="title">formCont</span></span> =  (v, solver) -&gt;
+    solver.cont(form, (v2, solver) -&gt;
+      solver.protect(solver.findCatch(v))(v2, solver))(v, solver)
+  solver.cont(tag, formCont))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-19">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-19">&#182;</a>
+              </div>
+              <p>aka. lisp&#39;s unwind-protect </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.protect = special(-<span class="number">1</span>, <span class="string">'protect'</span>, (solver, cont, form, cleanup...) -&gt;
+  oldprotect = solver.protect
+  solver.<span class="function"><span class="title">protect</span></span> = (fun) -&gt; (v1, solver) -&gt;
+                               solver.expsCont(cleanup, (v2, solver) -&gt;
+                                 solver.protect = oldprotect;
+                                 oldprotect(fun)(v1, solver))(v1, solver)
+  <span class="function"><span class="title">cleanupCont</span></span> = (v1, solver) -&gt;
+    solver.expsCont(cleanup, (v2, solver) -&gt;
+                    solver.protect = oldprotect
+                    cont(v1, solver))(v1, solver)
+  result = solver.cont(form, cleanupCont)
+  result)</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-20">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-20">&#182;</a>
+              </div>
+              <p>used by callcc and callfc </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="function"><span class="title">runner</span></span> = (solver, cont) -&gt; (v) -&gt;
+  <span class="keyword">while</span> <span class="keyword">not</span> solver.done <span class="keyword">then</span> [cont, v, solver] = cont(v, solver)
+  solver.done = <span class="literal">false</span>
+  <span class="keyword">return</span> v</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-21">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-21">&#182;</a>
+              </div>
+              <p>callfc(someFunction(kont) -&gt; body) <br/>
+current continuation @cont can be captured in someFunction</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>
+exports.callcc = special(<span class="number">1</span>, <span class="string">'callcc'</span>, (solver, cont, fun) -&gt; (v, solver) -&gt;
+  cont(fun(runner(solver.clone(), cont)), solver))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-22">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-22">&#182;</a>
+              </div>
+              <p>callfc(someFunction(fc) -&gt; body) <br/>
+current solver.failcont can be captured in someFunction</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>
+exports.callfc = special(<span class="number">1</span>, <span class="string">'callfc'</span>, (solver, cont, fun) -&gt; (v, solver) -&gt;
+  cont(fun(runner(solver.clone(), solver.failcont)), solver))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-23">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-23">&#182;</a>
+              </div>
+              <p>callcs(someFunction(solver, kont) -&gt; body) <br/>
+ the solver and current cont can be captured in someFunction</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>  
+exports.callcs = special(<span class="number">1</span>, <span class="string">'callcs'</span>, (solver, cont, fun) -&gt; (v, solver) -&gt;
+  cont(fun(solver.clone(), cont), solver))</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-24">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-24">&#182;</a>
+              </div>
+              <p>lisp style quasiquote/unquote/unquote-slice &quot;`&quot;, &quot;,&quot; and &quot;,@&quot; </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>exports.quasiquote = exports.qq = special(<span class="number">1</span>, <span class="string">'quasiquote'</span>, (solver, cont, item) -&gt;
+  solver.quasiquote?(item, cont))
+
+exports.unquote = exports.uq = special(<span class="number">1</span>, <span class="string">'unquote'</span>, (solver, cont, item) -&gt;
+  <span class="keyword">throw</span> <span class="string">"unquote: too many unquote and unquoteSlice"</span> )
+
+exports.unquoteSlice = exports.uqs = special(<span class="number">1</span>, <span class="string">'unquoteSlice'</span>, (solver, cont, item) -&gt;
+  <span class="keyword">throw</span> <span class="string">"unquoteSlice: too many unquote and unquoteSlice"</span>)</pre></div></div>
+            
+        </li>
+        
+    </ul>
+  </div>
+</body>
+</html>
