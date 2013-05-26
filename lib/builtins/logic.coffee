@@ -19,7 +19,7 @@ exports.prependFailcont = special(1, 'setFailcont', (solver, cont, fun) -> (v, s
   cont(v, solver))
 
 # same as lisp.begin, aka "," in prolog 
-exports.andp = special(null, 'andp', (solver, cont, args...) -> solver.expsCont(args, cont))
+exports.andp = andp = special(null, 'andp', (solver, cont, args...) -> solver.expsCont(args, cont))
 
 orpFun = (solver, cont, args...) ->
   length = args.length
@@ -50,7 +50,7 @@ orpFun = (solver, cont, args...) ->
     [xcont, null, solver]
 
 # logic choices, aka ";" in prolog 
-exports.orp = special(null, 'orp', orpFun)
+exports.orp = orp = special(null, 'orp', orpFun)
 
 #  make the goal x cutable 
 exports.cutable = special(1, 'cutable', (solver, cont, x) ->

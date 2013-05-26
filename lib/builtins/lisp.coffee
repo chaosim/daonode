@@ -3,13 +3,13 @@
 # lisp knows cont only.
 
 _ = require('underscore')
-solve = require "../dao"
+dao = require "../dao"
 general = require "./general"
 
-special = solve.special
-macro = solve.macro
+special = dao.special
+macro = dao.macro
 
-debug = solve.debug
+debug = dao.debug
 
 # aka lisp's quote, like in lisp, 'x==x, quote(x) === x 
 exports.quote = special(1, 'quote', (solver, cont, exp) ->
@@ -25,7 +25,12 @@ exports.assign = special(2, 'assign', (solver, cont, vari, exp) ->
   # Because not using vari.bind, this is not saved in solver.trail  <br/>
   # and so it can NOT be restored in solver.failcont <br/>
   # EXCEPT the vari has been in solver.trail in the logic branch before.
-  solver.cont(exp, (v, solver) -> (vari.binding = v; cont(v, solver))))
+
+  solver.cont(exp, (v, solver) ->
+    if v instanceof dao.Var
+      new dao.TypeError(v, "do NOT assign free logic var to var")
+    vari.binding = v;
+    cont(v, solver)))
 
 # vari.binding = 0 <br/>
 #  provide this for reducing continuation, and make code running faster.

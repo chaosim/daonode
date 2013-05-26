@@ -2,11 +2,12 @@ I = require "./importer"
 
 base  =  "../lib/"
 
-I.use base+"dao: solve vari Trail fun, macro proc rule, tofun"
-I.use base+"builtins/general: add print_"
-I.use base+"builtins/lisp: quote eval_"
+dao = require('../lib/dao')
+I.use base+"dao: solve vari Trail fun, macro proc rule, tofun, dummy"
+I.use base+"builtins/general: add print_, sub, eq, inc"
+I.use base+"builtins/lisp: quote eval_, if_, begin"
 I.use base+"builtins/logic: andp orp notp succeed fail unify findall once"
-I.use base+"builtins/parser: char parsetext may any"
+I.use base+"builtins/parser: char parsetext settext, may any"
 
 xexports = {}
 
@@ -70,3 +71,27 @@ exports.Test =
     test.equal  solve(tofun(orpm)(quote(print_(1)), quote(print_(2)))), null
     test.done()
 
+  "test 1": (test) ->
+    _ = dummy('_')
+    i = vari('i')
+    i.binding = 0
+    m = macro(0, () ->   begin(print_(i), inc(i), m()))
+    test.equal  solve(m()), null
+    test.equal(dao.status, dao.FAIL);
+    test.done()
+
+
+  "test recursive macro": (test) ->
+    _ = dummy('_')
+    m = macro(0, () ->  orp(andp(char(_), print_(_), m()), succeed))
+    test.equal  solve(andp(settext('abc'), m())), null
+    test.equal(dao.status, dao.SUCCESS);
+    test.done()
+
+xexports.Test =
+  "test 1": (test) ->
+    _ = dummy('_')
+    m = macro(0, () ->  print_(1))
+    x = m()
+    test.equal  solve(andp(x, x)), null
+    test.done()

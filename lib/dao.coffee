@@ -1,13 +1,18 @@
 # ##dao
 # ###a functional logic sover, with builtin parser.
-# continuation pass style, two continuations, one for succeed, one for fail and backtracking.
+# continuation pass style, two continuations, one for succeed, one for fail and backtracking. <br/>
+
+# #### what's new in 0.1.10
+# uobject <br/>
+# uarray <br/>
+
 _ = require('underscore')
 
 # * **todo**: compile
 # * \#an idea: direct compile by function and compile to function?
 # * **todo**: optimazation: partial evaluation?
-# * **nottodo**: variable's apply_cont:: canceled. lisp1 should be good.
-# * **nottodo**: Apply's apply_cont:: lisp1 should be good.
+# * **nottodo**: variable's applyCont:: canceled. lisp1 should be good.
+# * **nottodo**: Apply's applyCont:: lisp1 should be good.
 
 
 # ####solve
@@ -212,9 +217,6 @@ exports.faildone = faildone = (v, solver) ->
   exports.status = exports.FAIL
   [null, solver.trail.getvalue(v), solver]
 
-# to break cylylic binding of logic variables
-MAXBINDINGCHAINLENGTH = 200
-
 # record the trail for variable binding <br/>
 #  when multiple choices exist, a new Trail for current branch is constructored, <br/>
 #  when backtracking, undo the trail to restore the previous variable binding
@@ -231,8 +233,12 @@ Trail = class exports.Trail
       vari.binding = value
 
   deref: (x) -> x?.deref?(@) or x
-  getvalue: (x, chainslength=0) -> x?.getvalue?(@, chainslength) or x
-  unify: (x, y) -> x?.unify?(y, @) or y?.unify?(x, @) or (x is y)
+  getvalue: (x, memo={}) -> x?.getvalue?(@, memo) or x
+  unify: (x, y) ->
+    x = @deref(x); y = @deref(y)
+    if x instanceof Var then @set(x, x.binding); x.binding = y; true;
+    else if y instanceof Var then @set(y, y.binding); y.binding = x; true;
+    else x?.unify?(y, @) or y?.unify?(x, @) or (x is y)
 
 # ####class Var
 # Var for logic bindings, used in unify, lisp.assign, inc/dec, parser operation, etc.
@@ -261,30 +267,26 @@ Var = class exports.Var
             x.binding = next
             trail.set(x, chains[i+1])
           return next
-        else if length > MAXBINDINGCHAINLENGTH
-          throw BindingError(v, "Binding chains is too long!")
 
   bind: (value, trail) ->
     trail.set(@, @binding)
-    @binding = value
+    @binding = trail.deref(value)
 
-  unify: (y, trail) ->
-    x = @deref(trail)
-    y = trail.deref(y)
-    if x instanceof exports.Var then (x.bind(y, trail); true)
-    else if y instanceof exports.Var then (y.bind(x,  trail); true)
-    else x._unify?(y, trail) or y._unify?(x, trail) or x is y
-
-  _unify: (y, trail) -> @bind(y, trail); true
-
-  getvalue: (trail, chainslength=0) ->
+  getvalue: (trail, memo={}) ->
+    name = @name
+    if memo.hasOwnProperty(name) then return memo[name]
     result = @deref(trail)
-    if result instanceof exports.Var then result
-    else trail.getvalue(result, chainslength+1)
+    if result instanceof Var
+      memo[name] = result
+      result
+    else
+      result = trail.getvalue(result, memo)
+      memo[name] = result
+      result
 
   cont: (solver, cont) -> (v, solver) => cont(@deref(solver.trail), solver)
 
-  # nottodo: variable's apply_cont:: canceled. lisp1 should be good.
+  # nottodo: variable's applyCont:: canceled. lisp1 should be good.
 
   toString:() -> "vari(#{@name})"
 
@@ -297,24 +299,28 @@ exports.vars = (names) -> new Var(name) for name in split names,  reElements
 # sometiems, say in macro, we need unique var to avoid name conflict
 nameToIndexMap = {}
 exports.newVar = (name='v') ->
-  index = nameToIndexMap[name]? or 1
+  index = nameToIndexMap[name] or 1
   nameToIndexMap[name] = index+1
   return new Var(name+index)
 
 # DummyVar never fail when it unify. see tests on any/some/times in test_parser for examples
 exports.DummyVar = class DummyVar extends Var
   constructor: (name) -> @name = '_$'+name
+  cont:(solver, cont) -> (v, solver) => cont(@binding, solver)
   deref: (trail) -> @
-  bind: (value, trail) -> @binding = value
-  _unify: (y, trail) -> @binding = y; true
-  getvalue: (trail, chainslength=1) ->
+  getvalue: (trail, memo={}) ->
+    name = @name
+    if memo.hasOwnProperty(name) then return memo[name]
     result = @binding
     if result is @
-    else if chainslength>MAXBINDINGCHAINLENGTH
-      throw new BindingError(result, "Binding chains is too long!")
-    else trail.getvalue(result, chainslength+1)
+      memo[name] = result
+      result
+    else
+      result = trail.getvalue(result, memo)
+      memo[name] = result
+      result
 
-  # nottodo: variable's apply_cont:: canceled. lisp1 should be good.
+  # nottodo: variable's applyCont:: canceled. lisp1 should be good.
 
 exports.dummy = (name) -> new exports.DummyVar(name)
 exports.dummies = (names) -> new DummyVar(name) for name in split names,  reElements
@@ -340,11 +346,13 @@ class exports.Apply
       for x in @args
         if x?.caller?.name is "unquoteSlice" then return
       throw new ArityError(@)
-
+    # used in macro.applyCont, to prevent maximum recursive depth error
+    if @caller instanceof Macro then @id = (Apply.id++).toString()
+  @id: 0
   toString: -> "#{@caller}(#{@args.join(', ')})"
 
   # get the continuation of an instance of Apply based on cont
-  cont: (solver, cont) -> @caller.apply_cont(solver, cont, @args)
+  cont: (solver, cont) -> @caller.applyCont(solver, cont, @)
 
   # play with lisp style quasiquote/unquote/unquoteSlice
   quasiquote:  (solver, cont) ->
@@ -395,7 +403,7 @@ commandMaker = (klass) -> (arity, name_or_fun, fun) ->
 
 # Speical knows solver and cont, with them the special function has full control of things.
 class exports.Special extends exports.Command
-  apply_cont: (solver, cont, args) -> @fun(solver, cont, args...)
+  applyCont: (solver, cont, apply) -> @fun(solver, cont, apply.args...)
 
 # generate an instance of Special from a function <br/>
 #  example:<br/>
@@ -415,7 +423,7 @@ class exports.Special extends exports.Command
 #
 exports.special = special = commandMaker(exports.Special)
 
-# KISS: to keep it simple, not to implmenting the apply_cont in Var and Apply<br/>
+# KISS: to keep it simple, not to implmenting the applyCont in Var and Apply<br/>
 # call goal with args...
 exports.call = special(-1, 'call', (solver, cont, goal, args...) ->
   goal1 = null
@@ -432,7 +440,7 @@ exports.apply  = special(2, 'apply', (solver, cont, goal, args) ->
 
 # Fun evaluate its arguments, and return the result to fun(params...) to cont directly.
 class exports.Fun extends exports.Command
-  apply_cont: (solver, cont, args) ->  solver.argsCont(args, (params, solver) => [cont, @fun(params...), solver])
+  applyCont: (solver, cont, apply) ->  solver.argsCont(apply.args, (params, solver) => [cont, @fun(params...), solver])
 
 # generate an instance of Fun from a function <br/>
 #  example:  <br/>
@@ -441,8 +449,15 @@ class exports.Fun extends exports.Command
 exports.fun = commandMaker(exports.Fun)
 
 # similar to lisp'macro, Macro does NOT evaluate its arguments, but evaluate the result to fun(args).
-class exports.Macro extends exports.Command
-  apply_cont: (solver, cont, args) -> solver.cont(@fun(args...), cont)
+exports.Macro = class Macro extends exports.Command
+  @idMap: {}
+
+  applyCont: (solver, cont, apply) ->
+    exp = @fun(apply.args...)
+    idMap =  Macro.idMap
+    id = apply.id
+    if not idMap[id] then idMap[id] = true; result = solver.cont(exp, cont); delete idMap[id]; result
+    else (v, solver) ->  delete idMap[id]; solver.cont(exp, cont)(v, solver)
 
 # generate a instance of Macro from a function <br/>
 #  example:   <br/>
@@ -452,18 +467,17 @@ exports.macro = commandMaker(exports.Macro)
 
 # In Proc's function, the dao's expressions can be directly evaluated
 class exports.Proc extends exports.Command
-  apply_cont:  (solver, cont, args) ->
+  applyCont:  (solver, cont, apply) ->
     (v, solver) =>
       Command.directRun = true
       savedSolver = Command.globalSolver
       Command.globalSolver = solver
-      result = @fun(args...)
+      result = @fun(apply.args...)
       Command.globalSolver = savedSolver
       Command.directRun = false
       [cont, result,  solver]
 
 exports.proc = commandMaker(exports.Proc)
-
 
 exports.tofun = (name, cmd) ->
   # evaluate the arguments of a command before execute it<br/>.
@@ -474,6 +488,72 @@ exports.tofun = (name, cmd) ->
   unless cmd? then (cmd = name; name = 'noname')
   special(cmd.arity, name, (solver, cont, args...) ->
           solver.argsCont(args, (params, solver) -> [solver.cont(cmd(params...), cont), params, solver]))
+
+exports.UObject = class UObject
+  constructor: (@data) ->
+
+  getvalue: (trail, memo) ->
+    result = {}
+    changed = false
+    for key, value of @data
+      v = trail.getvalue(value, memo)
+      if v isnt value then changed = true
+      result[key] = v
+    if changed then new UObject(result)
+    else @
+
+  unify: (y, trail) ->
+    xdata = @data; ydata = y.data
+    ykeys = Object.keys(y)
+    for key of xdata
+      index = ykeys.indexOf(key)
+      if index==-1 then return false
+      if not trail.unify(xdata[key], ydata[key]) then return false
+      ykeys.splice(index, 1);
+    if ykeys.length isnt 0 then return false
+    true
+
+# make unifable object
+exports.uobject = (x) -> new UObject(x)
+
+exports.UArray = class UArray
+  constructor: (@data) ->
+
+  getvalue: (trail, memo={}) ->
+    result = []
+    changed = false
+    for x in @data
+      v = trail.getvalue(x, memo)
+      if v isnt x then changed = true
+      result[key] = v
+    if changed then new UArray(result)
+    else @
+
+  unify: (y, trail) ->
+    xdata = @data; ydata = y.data
+    length = @length
+    if length!=y.length then return false
+    for i in [0...length]
+      if not trail.unify(xdata[i], ydata[i]) then return false
+    true
+
+# make unifable array
+exports.uarray = uarray = (x) -> new UArray(x)
+
+# cons, like pair in lisp
+exports.cons = (x, y) -> uarray([x, y])
+# conslist, like list in lisp
+exports.conslist = (args...) ->
+  result = null
+  for i in [args.length-1..0] by -1
+    result = uarray([args[i], result])
+  result
+
+# make unifiable array or unifiable object
+exports.unifiable = (x) ->
+  if _.isArray(x) then new UArray(x)
+  else if _.isObject(x) then new UObject(x)
+  else x
 
 class Error
   constructor: (@exp, @message='', @stack = @) ->  # @stack: to make webstorm nodeunit happy.

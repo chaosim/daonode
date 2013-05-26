@@ -23,5 +23,7 @@
     "url": "https://www.github.com/chaosim/daonode.git"
   },
     "dependencies": {
-        "underscore": "*"}
+        "underscore": "*"},
+    "readme":"readme.md"
+
 }
