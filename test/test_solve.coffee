@@ -3,7 +3,7 @@ I = require "./importer"
 base  =  "../lib/"
 
 dao = require('../lib/dao')
-I.use base+"dao: solve vari Trail fun, macro proc rule, tofun, dummy"
+I.use base+"dao: solve vari Trail fun, fun2, macro proc rule, tofun, dummy"
 I.use base+"builtins/general: add print_, sub, eq, inc"
 I.use base+"builtins/lisp: quote eval_, if_, begin"
 I.use base+"builtins/logic: andp orp notp succeed fail unify findall once"
@@ -38,10 +38,10 @@ exports.Test =
     x = vari('x')
     test.equal x.binding, x
     x.bind(1, trail)
-    test.ok x.unify(1, trail)
-    test.ok not x.unify(2, trail)
+    test.ok trail.unify(1, x)
+    test.ok not trail.unify(2, x)
     trail.undo()
-    test.ok x.unify(2, trail)
+    test.ok trail.unify(x, 2)
     test.done()
 
   "test macro": (test) ->
@@ -71,27 +71,40 @@ exports.Test =
     test.equal  solve(tofun(orpm)(quote(print_(1)), quote(print_(2)))), null
     test.done()
 
-  "test 1": (test) ->
-    _ = dummy('_')
-    i = vari('i')
-    i.binding = 0
-    m = macro(0, () ->   begin(print_(i), inc(i), m()))
-    test.equal  solve(m()), null
-    test.equal(dao.status, dao.FAIL);
+  "test macro 1": (test) ->
+    m = macro(1, (x) -> if x is 0 then print_(x) else m(x-1))
+    test.equal  solve(m(5)), null
     test.done()
 
-
-  "test recursive macro": (test) ->
-    _ = dummy('_')
-    m = macro(0, () ->  orp(andp(char(_), print_(_), m()), succeed))
-    test.equal  solve(andp(settext('abc'), m())), null
-    test.equal(dao.status, dao.SUCCESS);
+  "test fun2": (test) ->
+    m = fun2(1, (x) -> if_(eq(x,0),print_(x), m(sub(x,1))))
+    test.equal  solve(m(5)), null
     test.done()
 
-xexports.Test =
-  "test 1": (test) ->
+  "test macro 2": (test) ->
     _ = dummy('_')
     m = macro(0, () ->  print_(1))
     x = m()
     test.equal  solve(andp(x, x)), null
+    test.equal(dao.status, dao.SUCCESS);
+    test.done()
+
+  "test recursive macro2": (test) ->
+    _ = dummy('_')
+    m = macro(0, () ->  orp(andp(char(_), print_(_), m()),
+                            succeed))
+    test.equal  solve(andp(settext('abc'), m())), null
+    test.equal(dao.status, dao.SUCCESS);
+    test.done()
+
+  "test recursive macro1": (test) ->
+    m = macro(1, (x) -> if x is 0 then print_(x) else begin(print_(x), m(x-1)))
+    test.equal  solve(m(5)), null
+    test.equal(dao.status, dao.SUCCESS);
+    test.done()
+
+exports.Test =
+  "test fun2": (test) ->
+    m = fun2(1, (x) -> if_(eq(x,0),print_(x), m(sub(x,1))))
+    test.equal  solve(m(5)), null
     test.done()

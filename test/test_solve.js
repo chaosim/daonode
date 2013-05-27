@@ -8,7 +8,7 @@
 
   dao = require('../lib/dao');
 
-  I.use(base + "dao: solve vari Trail fun, macro proc rule, tofun, dummy");
+  I.use(base + "dao: solve vari Trail fun, fun2, macro proc rule, tofun, dummy");
 
   I.use(base + "builtins/general: add print_, sub, eq, inc");
 
@@ -56,10 +56,10 @@
       x = vari('x');
       test.equal(x.binding, x);
       x.bind(1, trail);
-      test.ok(x.unify(1, trail));
-      test.ok(!x.unify(2, trail));
+      test.ok(trail.unify(1, x));
+      test.ok(!trail.unify(2, x));
       trail.undo();
-      test.ok(x.unify(2, trail));
+      test.ok(trail.unify(x, 2));
       return test.done();
     },
     "test macro": function(test) {
@@ -106,20 +106,41 @@
       test.equal(solve(tofun(orpm)(quote(print_(1)), quote(print_(2)))), null);
       return test.done();
     },
-    "test 1": function(test) {
-      var i, m, _;
+    "test macro 1": function(test) {
+      var m;
 
-      _ = dummy('_');
-      i = vari('i');
-      i.binding = 0;
-      m = macro(0, function() {
-        return begin(print_(i), inc(i), m());
+      m = macro(1, function(x) {
+        if (x === 0) {
+          return print_(x);
+        } else {
+          return m(x - 1);
+        }
       });
-      test.equal(solve(m()), null);
-      test.equal(dao.status, dao.FAIL);
+      test.equal(solve(m(5)), null);
       return test.done();
     },
-    "test recursive macro": function(test) {
+    "test fun2": function(test) {
+      var m;
+
+      m = fun2(1, function(x) {
+        return if_(eq(x, 0), print_(x), m(sub(x, 1)));
+      });
+      test.equal(solve(m(5)), null);
+      return test.done();
+    },
+    "test macro 2": function(test) {
+      var m, x, _;
+
+      _ = dummy('_');
+      m = macro(0, function() {
+        return print_(1);
+      });
+      x = m();
+      test.equal(solve(andp(x, x)), null);
+      test.equal(dao.status, dao.SUCCESS);
+      return test.done();
+    },
+    "test recursive macro2": function(test) {
       var m, _;
 
       _ = dummy('_');
@@ -129,19 +150,31 @@
       test.equal(solve(andp(settext('abc'), m())), null);
       test.equal(dao.status, dao.SUCCESS);
       return test.done();
+    },
+    "test recursive macro1": function(test) {
+      var m;
+
+      m = macro(1, function(x) {
+        if (x === 0) {
+          return print_(x);
+        } else {
+          return begin(print_(x), m(x - 1));
+        }
+      });
+      test.equal(solve(m(5)), null);
+      test.equal(dao.status, dao.SUCCESS);
+      return test.done();
     }
   };
 
-  xexports.Test = {
-    "test 1": function(test) {
-      var m, x, _;
+  exports.Test = {
+    "test fun2": function(test) {
+      var m;
 
-      _ = dummy('_');
-      m = macro(0, function() {
-        return print_(1);
+      m = fun2(1, function(x) {
+        return if_(eq(x, 0), print_(x), m(sub(x, 1)));
       });
-      x = m();
-      test.equal(solve(andp(x, x)), null);
+      test.equal(solve(m(5)), null);
       return test.done();
     }
   };

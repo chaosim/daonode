@@ -142,7 +142,7 @@ exports.bind = special(2, 'bind', (solver, cont, vari, term) ->
   # different from is_, do not evaluate the exp instead. <br/>
   # by using vari.bind, this is saved in solver.trail <br/>
   # and can be restored in solver.failcont
-  (v, solver) ->  vari.bind(term, solver.trail); [cont, true, solver])
+  (v, solver) ->  vari.bind(solver.trail.deref(term), solver.trail); [cont, true, solver])
 
 #todo: provide unify function as the third argument
 exports.unifyFun = unifyFun = (solver, cont, x, y) -> (v, solver) ->

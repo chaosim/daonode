@@ -518,7 +518,7 @@ exports.seplist = (exp, options={}) ->
   result = options.result or null;
   template = options.template or null
 
-  newVar = dao.newVar
+  vari = dao.vari
   succeed = logic.succeed; andp = logic.andp; bind = logic.bind; is_ = logic.is_
   freep = logic.freep; ifp = logic.ifp; prependFailcont = logic.prependFailcont
   list = general.list; push = general.push; pushp = general.pushp
@@ -544,8 +544,8 @@ exports.seplist = (exp, options={}) ->
         else andp(bind(result, []), exp, pushp(result,getvalue(template)),
                   times(andp(sep, exp, pushp(result, getvalue(template))), expectTimes-1))
   else
-    n = newVar('n')
-    i = newVar('i')
+    n = vari('n')
+    i = vari('i')
     if result is null
        ifp(freep(expectTimes), andp(exp, one(i); any(andp(sep, exp,inc(i))), bind(expectTimes, i))
            andp(exp, is_(n, sub(expectTimes, 1)), times(andp(sep, exp), n)))
@@ -651,7 +651,7 @@ exports.charWhen = special(1, 'charWhen', (solver, cont, test) -> (v, solver) ->
   [data, pos] = solver.state
   if pos>=data.length then return solver.failcont(false, solver)
   c = data[pos]
-  if test(c) then cont(c, solver)
+  if test(c) then solver.state = [data, pos+1]; cont(c, solver)
   else solver.failcont(c, solver))
 
 exports.charBetween = (x, start, end) -> exports.charWhen(x, (c) -> start<c<end)
@@ -672,22 +672,26 @@ exports.newline = exports.charIn('\r\n')
 #usage: spaces # !!! NOT spaces()
 exports.spaces = special(0, 'spaces', (solver, cont) -> (v, solver) ->
   [data, pos] = solver.state
-  if pos>=data.length then return solver.failcont(false, solver)
+  length = data.length
+  if pos>=length then return solver.failcont(false, solver)
   c = data[pos]
   if c isnt ' ' then return solver.failcont(c, solver)
   p = pos+1
   while p< length and data[p] is ' ' then p++
+  solver.state = [data, p]
   cont(p-pos, solver))()
 
 # spaces0: zero or more spaces(' ') <br/>
 #usage: spaces0 # !!! NOT spaces0()
 exports.spaces0 = special(0, 'spaces', (solver, cont) -> (v, solver) ->
   [data, pos] = solver.state
-  if pos>=data.length then return cont(0, solver)
+  length = data.length
+  if pos>=length then return cont(0, solver)
   c = data[pos]
   if c isnt ' ' then return cont(c, solver)
   p = pos+1
   while p< length and data[p] is ' ' then p++
+  solver.state = [data, p]
   cont(p-pos, solver))()
 
 # stringWhile: match a string, every char in the string should pass test <br/>
@@ -700,8 +704,9 @@ exports.stringWhile = special(1, 'stringWhile', (solver, cont, test) -> (v, solv
   c = data[pos]
   unless test(c) then return solver.failcont(c, solver)
   p = pos+1
-  while p<length and test(data[p]) then p
-  cont(text[pos...p], solver))
+  while p<length and test(data[p]) then p++
+  solver.state = [data, p]
+  cont(data[pos...p], solver))
 
 exports.stringBetween = (start, end) -> exports.stringWhile((c) -> start<c<end)
 exports.stringIn = (set) -> exports.stringWhile((c) ->  c in set)
@@ -727,8 +732,9 @@ exports.stringWhile0 = special(1, 'stringWhile0', (solver, cont, test) -> (v, so
   c = data[pos]
   unless test(c) then return cont('', solver)
   p = pos+1
-  while p<length and test(data[p]) then p
-  cont(text[pos...p], solver))
+  while p<length and test(data[p]) then p++
+  solver.state = [data, p]
+  cont(data[pos...p], solver))
 
 exports.stringBetween0 = (start, end) -> exports.stringWhile0((c) -> start<c<end)
 exports.stringIn0 = (set) -> exports.stringWhile0((c) ->  c in set)
@@ -764,10 +770,11 @@ exports.float = special(1, 'float', (solver, cont, arg) -> (v, solver) ->
   value =  eval(text[pos:p])
   if (arg instanceof Var)
     arg.bind(value, solver.trail)
+    solver.state = [data, p]
     cont(value, solver)
   else
     if _.isNumber(arg)
-      if arg is value then cont(arg, solver)
+      if arg is value then solver.state = [data, p]; cont(arg, solver)
       else solver.failcont(v, solver)          s
     else throw new exports.TypeError(arg))
 
@@ -838,6 +845,7 @@ exports.quoteString = special(1, 'quoteString', (solver, cont, quote) -> (v, sol
       string = text[pos+ 1...p]
       break
   if p is length then return solver.failcont(v, solver)
+  solver.state = [data, p]
   cont(string, solver))
 
 #dqstring： double quoted string "..." <br/>

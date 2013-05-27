@@ -203,3 +203,7 @@ exports.pushp = special(2, 'pushp', (solver, cont, x, y) ->
 # different from logic.freep, this never fail
 exports.free = special(1, 'freep', (solver, cont, x) ->
   (v, solver) -> cont(solver.trail.deref(x) instanceof Var, solver))
+
+# toString: x.toString
+exports.toString = special(1, 'toString', (solver, cont, x) ->
+  solver.cont(x, (v, solver) -> cont(v?.toString?() or JSON.stringify(v), solver)))

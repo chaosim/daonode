@@ -233,7 +233,10 @@ Trail = class exports.Trail
       vari.binding = value
 
   deref: (x) -> x?.deref?(@) or x
-  getvalue: (x, memo={}) -> x?.getvalue?(@, memo) or x
+  getvalue: (x, memo={}) ->
+    getvalue =  x?.getvalue
+    if getvalue then getvalue.call(x, @, memo)
+    else x
   unify: (x, y) ->
     x = @deref(x); y = @deref(y)
     if x instanceof Var then @set(x, x.binding); x.binding = y; true;
@@ -293,15 +296,14 @@ Var = class exports.Var
 reElements = /\s*,\s*|\s+/
 
 # utilities for new variables
-exports.vari = (name) -> new exports.Var(name)
-exports.vars = (names) -> new Var(name) for name in split names,  reElements
-
 # sometiems, say in macro, we need unique var to avoid name conflict
 nameToIndexMap = {}
-exports.newVar = (name='v') ->
+exports.vari = (name) ->
   index = nameToIndexMap[name] or 1
   nameToIndexMap[name] = index+1
-  return new Var(name+index)
+  new Var(name+index)
+
+exports.vars = (names) -> vari(name) for name in split names,  reElements
 
 # DummyVar never fail when it unify. see tests on any/some/times in test_parser for examples
 exports.DummyVar = class DummyVar extends Var
@@ -320,10 +322,12 @@ exports.DummyVar = class DummyVar extends Var
       memo[name] = result
       result
 
-  # nottodo: variable's applyCont:: canceled. lisp1 should be good.
-
-exports.dummy = (name) -> new exports.DummyVar(name)
-exports.dummies = (names) -> new DummyVar(name) for name in split names,  reElements
+# nottodo: variable's applyCont:: canceled. lisp1 should be good.
+exports.dummy = dummy = (name) ->
+  index = nameToIndexMap[name] or 1
+  nameToIndexMap[name] = index+1
+  new exports.DummyVar(name+index)
+exports.dummies = (names) -> new dummy(name) for name in split names,  reElements
 
 # ####class Apply
 # Apply to some Command(special, fun, macro, proc, etc)
@@ -347,12 +351,11 @@ class exports.Apply
         if x?.caller?.name is "unquoteSlice" then return
       throw new ArityError(@)
     # used in macro.applyCont, to prevent maximum recursive depth error
-    if @caller instanceof Macro then @id = (Apply.id++).toString()
-  @id: 0
+
   toString: -> "#{@caller}(#{@args.join(', ')})"
 
   # get the continuation of an instance of Apply based on cont
-  cont: (solver, cont) -> @caller.applyCont(solver, cont, @)
+  cont: (solver, cont) -> @caller.applyCont(solver, cont, @args)
 
   # play with lisp style quasiquote/unquote/unquoteSlice
   quasiquote:  (solver, cont) ->
@@ -403,7 +406,7 @@ commandMaker = (klass) -> (arity, name_or_fun, fun) ->
 
 # Speical knows solver and cont, with them the special function has full control of things.
 class exports.Special extends exports.Command
-  applyCont: (solver, cont, apply) -> @fun(solver, cont, apply.args...)
+  applyCont: (solver, cont, args) -> @fun(solver, cont, args...)
 
 # generate an instance of Special from a function <br/>
 #  example:<br/>
@@ -440,7 +443,7 @@ exports.apply  = special(2, 'apply', (solver, cont, goal, args) ->
 
 # Fun evaluate its arguments, and return the result to fun(params...) to cont directly.
 class exports.Fun extends exports.Command
-  applyCont: (solver, cont, apply) ->  solver.argsCont(apply.args, (params, solver) => [cont, @fun(params...), solver])
+  applyCont: (solver, cont, args) ->  solver.argsCont(args, (params, solver) => [cont, @fun(params...), solver])
 
 # generate an instance of Fun from a function <br/>
 #  example:  <br/>
@@ -448,14 +451,30 @@ class exports.Fun extends exports.Command
 #  add = fun(function(x,y){ return x+y; } # javascript <br/>
 exports.fun = commandMaker(exports.Fun)
 
+# Fun2 evaluate its arguments, and evaluate the result of fun(params...) again
+class exports.Fun2 extends exports.Command
+  applyCont: (solver, cont, args) ->
+    solver.argsCont(args, (params, solver) => solver.cont(@fun(params...), cont)(params, solver))
+
+# generate an instance of Fun from a function <br/>
+#  example:  <br/>
+#  add = fun((x, y) -> x+y ) # coffeescript <br/>
+#  add = fun(function(x,y){ return x+y; } # javascript <br/>
+exports.fun2 = commandMaker(exports.Fun2)
+
 # similar to lisp'macro, Macro does NOT evaluate its arguments, but evaluate the result to fun(args).
 exports.Macro = class Macro extends exports.Command
   @idMap: {}
+  @id: 0
+  constructor: (@fun, @name, @arity) ->
+    super
+    @id = (Macro.id++).toString()
 
-  applyCont: (solver, cont, apply) ->
-    exp = @fun(apply.args...)
+  applyCont: (solver, cont, args) ->
+    exp = @fun(args...)
+#    solver.cont(exp, cont)
     idMap =  Macro.idMap
-    id = apply.id
+    id = @id
     if not idMap[id] then idMap[id] = true; result = solver.cont(exp, cont); delete idMap[id]; result
     else (v, solver) ->  delete idMap[id]; solver.cont(exp, cont)(v, solver)
 
@@ -467,12 +486,12 @@ exports.macro = commandMaker(exports.Macro)
 
 # In Proc's function, the dao's expressions can be directly evaluated
 class exports.Proc extends exports.Command
-  applyCont:  (solver, cont, apply) ->
+  applyCont:  (solver, cont, args) ->
     (v, solver) =>
       Command.directRun = true
       savedSolver = Command.globalSolver
       Command.globalSolver = solver
-      result = @fun(apply.args...)
+      result = @fun(args...)
       Command.globalSolver = savedSolver
       Command.directRun = false
       [cont, result,  solver]
@@ -525,7 +544,7 @@ exports.UArray = class UArray
     for x in @data
       v = trail.getvalue(x, memo)
       if v isnt x then changed = true
-      result[key] = v
+      result.push(v)
     if changed then new UArray(result)
     else @
 
@@ -537,16 +556,46 @@ exports.UArray = class UArray
       if not trail.unify(xdata[i], ydata[i]) then return false
     true
 
+  toString: () -> @data.toString()
+
 # make unifable array
 exports.uarray = uarray = (x) -> new UArray(x)
 
+exports.Cons = class Cons
+  constructor: (@head, @tail) ->
+
+  getvalue: (trail, memo={}) ->
+    head = @head; tail = @tail
+    head1  = trail.getvalue(head, memo)
+    tail1  = trail.getvalue(tail, memo)
+    if head1 is head and tail1 is tail then @
+    else new Cons(head1, tail1)
+
+  unify: (y, trail) ->
+   if y not instanceof Cons then false
+   else if not trail.unify(@head, y.head) then false
+   else trail.unify(@tail, y.tail)
+
+  flatString: () ->
+    result = "#{@head}"
+    tail = @tail
+    if tail is null then null
+    else if tail instanceof Cons
+      result += ','
+      result += tail.flatString()
+    else result += tail.toString()
+    result
+
+  toString: () -> "cons(#{@head}, #{@tail})"
+
 # cons, like pair in lisp
-exports.cons = (x, y) -> uarray([x, y])
+exports.cons = (x, y) -> new Cons(x, y)
+
 # conslist, like list in lisp
 exports.conslist = (args...) ->
   result = null
   for i in [args.length-1..0] by -1
-    result = uarray([args[i], result])
+    result = new Cons([args[i], result])
   result
 
 # make unifiable array or unifiable object
