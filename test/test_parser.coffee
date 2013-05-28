@@ -1,12 +1,13 @@
 I = require "./importer"
 
 base = "../lib/"
-I.use base+"dao: Trail, solve, fun, macro vari debug dummy"
+I.use base+"dao: Trail, solve, fun, macro vari debug dummy, fun2"
 I.use base+"builtins/lisp: begin"
 I.use base+"builtins/logic: andp orp notp succeed fail unify findall once "
 I.use base+"""builtins/parser: char parsetext settext may greedymay
-           any greedyany lazyany some greedysome lazysome eoi nextchar, times seplist"""
-I.use base+"builtins/general: getvalue print_"
+           any greedyany lazyany some greedysome lazysome eoi nextchar, times seplist
+           purememo"""
+I.use base+"builtins/general: getvalue print_, sub, mul"
 
 dao = require base+"dao"
 
@@ -242,13 +243,23 @@ exports.Test =
     test.equal(dao.status, dao.SUCCESS);
     test.done()
 
-xexports.Test =
-  "test": (test) ->
+  "test purememo": (test) ->
     _ = dummy('_')
     result = vari('result')
     n = vari('n');
-    test.deepEqual  solve(begin(parsetext(seplist(char(_), {sep:char(','), times:n, result:result, template:_}), 'a,b,c'), result)), ['a', 'b','c']
-    test.equal(dao.status, dao.SUCCESS);
-    test.deepEqual  solve(begin(parsetext(andp(seplist(char(_), {sep:char(','), times:n, result:result, template:_}), char(','), char('c')), 'a,b,c'), result)), ['a', 'b']
-    test.equal(dao.status, dao.SUCCESS);
+    f = (x) -> if x is 1 then console.log(1); 1 else x *f(x-1)
+    factorial = fun(f)
+    fac = purememo(factorial)
+    test.equal solve(begin(fac(5), fac(5))), 120
     test.done()
+
+exports.Test =
+  "test fun2 purememo": (test) ->
+    _ = dummy('_')
+    result = vari('result')
+    n = vari('n');
+    factorial = fun2((x) -> if x is 1 then begin(print_(1), 1) else mul(x, factorial(sub(x, 1))))
+    fac = purememo(factorial)
+    test.equal solve(begin(fac(5), fac(5))), 120
+    test.done()
+

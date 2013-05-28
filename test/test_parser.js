@@ -6,15 +6,15 @@
 
   base = "../lib/";
 
-  I.use(base + "dao: Trail, solve, fun, macro vari debug dummy");
+  I.use(base + "dao: Trail, solve, fun, macro vari debug dummy, fun2");
 
   I.use(base + "builtins/lisp: begin");
 
   I.use(base + "builtins/logic: andp orp notp succeed fail unify findall once ");
 
-  I.use(base + "builtins/parser: char parsetext settext may greedymay\nany greedyany lazyany some greedysome lazysome eoi nextchar, times seplist");
+  I.use(base + "builtins/parser: char parsetext settext may greedymay\nany greedyany lazyany some greedysome lazysome eoi nextchar, times seplist\npurememo");
 
-  I.use(base + "builtins/general: getvalue print_");
+  I.use(base + "builtins/general: getvalue print_, sub, mul");
 
   dao = require(base + "dao");
 
@@ -295,30 +295,44 @@
       }), char(','), char('b'), char(','), char('c')), 'a,b,c'), result)), ['a']);
       test.equal(dao.status, dao.SUCCESS);
       return test.done();
-    }
-  };
-
-  xexports.Test = {
-    "test": function(test) {
-      var n, result, _;
+    },
+    "test purememo": function(test) {
+      var f, fac, factorial, n, result, _;
 
       _ = dummy('_');
       result = vari('result');
       n = vari('n');
-      test.deepEqual(solve(begin(parsetext(seplist(char(_), {
-        sep: char(','),
-        times: n,
-        result: result,
-        template: _
-      }), 'a,b,c'), result)), ['a', 'b', 'c']);
-      test.equal(dao.status, dao.SUCCESS);
-      test.deepEqual(solve(begin(parsetext(andp(seplist(char(_), {
-        sep: char(','),
-        times: n,
-        result: result,
-        template: _
-      }), char(','), char('c')), 'a,b,c'), result)), ['a', 'b']);
-      test.equal(dao.status, dao.SUCCESS);
+      f = function(x) {
+        if (x === 1) {
+          console.log(1);
+          return 1;
+        } else {
+          return x * f(x - 1);
+        }
+      };
+      factorial = fun(f);
+      fac = purememo(factorial);
+      test.equal(solve(begin(fac(5), fac(5))), 120);
+      return test.done();
+    }
+  };
+
+  exports.Test = {
+    "test fun2 purememo": function(test) {
+      var fac, factorial, n, result, _;
+
+      _ = dummy('_');
+      result = vari('result');
+      n = vari('n');
+      factorial = fun2(function(x) {
+        if (x === 1) {
+          return begin(print_(1), 1);
+        } else {
+          return mul(x, factorial(sub(x, 1)));
+        }
+      });
+      fac = purememo(factorial);
+      test.equal(solve(begin(fac(5), fac(5))), 120);
       return test.done();
     }
   };

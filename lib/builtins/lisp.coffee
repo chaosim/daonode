@@ -178,7 +178,7 @@ runner = (solver, cont) -> (v) ->
   solver.done = false
   return v
 
-# callfc(someFunction(kont) -> body) <br/>
+# callcc(someFunction(kont) -> body) <br/>
 #current continuation @cont can be captured in someFunction
 
 exports.callcc = special(1, 'callcc', (solver, cont, fun) -> (v, solver) ->

@@ -1,5 +1,5 @@
 # #### logic builtins
-solve = require "../dao"
+{ArgumentError} = solve = require "../dao"
 
 special = solve.special
 macro = solve.macro
@@ -118,14 +118,33 @@ exports.notp = special(1, 'notp', (solver, cont, x) ->
 exports.repeat = special(0, 'repeat', (solver, cont) ->
   (v, solver) -> solver.failcont = cont; [cont, null, solver])()
 
+# update(0.1.11) findall get result by template
+exports.findall = (exp, result, template) ->
+  if result is undefined then findall1(exp)
+  else findall2(exp, result, template)
+
 # find all solution to the goal @exp in prolog  
-exports.findall = special(1, 'findall', (solver, cont, exp) ->
+findall1 = special(1, 'findall', (solver, cont, exp) ->
   fc = null
   findnext = solver.cont(exp, (v, solver) -> solver.failcont(v, solver))
   findallDone = (v, solver) -> ( solver.failcont = fc; [cont, v, solver])
   (v, solver) -> (fc = solver.failcont; solver.failcont = findallDone; [findnext, v, solver]))
 
-# find only one solution to the goal @x  
+# update(0.1.11) findall get result by template
+findall2 = special(3, 'findall', (solver, cont, exp, result, template) ->
+  result1 = null; fc = null
+  findnext = solver.cont(exp, (v, solver) ->
+    result1.push(solver.trail.getvalue(template));
+    solver.failcont(v, solver))
+  findallDone = (v, solver) -> ( solver.failcont = fc; [cont, v, solver])
+  (v, solver) ->
+    result1 = []
+    result.bind(result1, solver.trail)
+    fc = solver.failcont
+    solver.failcont = findallDone
+    [findnext, v, solver])
+
+# find only one solution to the goal @x
 exports.once = special(1, 'once', (solver, cont, x) ->
   fc = null
   cont1 = solver.cont(x, (v, solver) -> (solver.failcont = fc; cont(v, solver)))
@@ -208,12 +227,17 @@ exports.rule = (arity, name, fun) ->
     if length-Math.floor(length/2)*2==1 then result.push(clauses[length-1])
     orp(result...))
 
+# used by callcc and callfc
+runner = (solver, cont) -> (v) ->
+  while not solver.done then [cont, v, solver] = cont(v, solver)
+  solver.done = false
+  return v
+
 # borrowed from lisp, same as in lisp.coffee  <br/>
-# todo: need a trampoline for running the current continuation until done or faildone
+# callfc(someFunction(fc) -> body) <br/>
+#current solver.failcont can be captured in someFunction
 exports.callfc = special(1, 'callfc', (solver, cont, fun) -> (v, solver) ->
-                         result = fun(solver.failcont)[1]
-                         solver.done = false
-                         cont(result, solver))
+  cont(fun(runner(solver.clone(), solver.failcont)), solver))
 
 # if x is true then succeed, else fail 
 exports.truep = special(1, 'truep', (solver, cont, fun, x) ->

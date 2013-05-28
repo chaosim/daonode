@@ -114,6 +114,54 @@ exports.nextchar =  special(0, 'nextchar', (solver, cont) -> (v, solver) ->
 
 # #### general predicate
 
+defaultPureHash = (name, caller, args...) -> (name or caller.name) + args.join(',')
+
+exports._memoPureResult = _memoPureResult = {}
+
+exports.purememo = (caller, name='', hash=defaultPureHash) ->
+  if not _.isString(name) then hash  = name; name = '';
+  special(1, 'memo', (solver, cont, args...) ->
+    realCont = solver.cont(caller(args...), cont)
+    (v, solver) ->
+      hashValue = hash(name, caller, args...)
+      # todo: take the tramploine into account.
+      if hashValue is undefined then realCont(v, solver)
+      else
+        if _memoPureResult.hasOwnProperty(hashValue) then cont(_memoPureResult[hashValue], solver)
+        else
+          result = [newCont, v, solver] = realCont(v, solver);
+          _memoPureResult[hashValue] =  v
+          result
+         )
+
+exports.clearPureMemo = special(1, 'clearPureMemo', (solver, cont) ->
+  (v, solver) -> exports._memoPureResult = {}; cont(v, solver))
+
+defaultHash = (name, solver, caller, args...) -> (name or caller.name)+solver.state[1]
+
+exports._memoResult = {}
+
+exports.memo = (caller, name='', hash=defaultHash) ->
+  if not _.isString(name) then hash  = name; name = '';
+  special(1, 'memo', (solver, cont, args...) ->
+    realCont = solver.cont(caller(args...), cont)
+    (v, solver) ->
+      hash = hash(name, solver, caller, args...)
+      # todo: take the tramploine into account.
+      if hash is undefined then realCont(v, solver)
+      else
+        if exports._memoResult.hasOwnProperty(hash)
+          [result, solver.state] = memoResult[hash]
+          cont(result, solver)
+        else
+          result = [v, solver]  = realCont(v, solver);
+          exports._memoResult[hash] =  [v, solver.state]
+          result
+    )
+
+exports.todoclearmemo = special(1, 'clearmemo', (solver, cont) ->
+  (v, solver) -> exports._memoResult = {}; cont(v, solver))
+
 # follow: if item is followed, succeed, else fail. after eval, state is restored
 exports.follow = special(1, 'follow', (solver, cont, item) ->
   state = null

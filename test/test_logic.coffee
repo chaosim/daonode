@@ -82,12 +82,6 @@ exports.Test =
     test.equal  solve(orp(andp(unify(a, 1), unify(a, 2)))), false
     test.done()
 
-  "test findall once": (test) ->
-    test.equal  solve(findall(orp(print_(1), print_(2)))), null
-    test.equal  solve(findall(orp(print_(1), print_(2), print_(3)))), null
-    test.equal  solve(findall(once(orp(print_(1), print_(2))))), null
-    test.done()
-
   "test rule": (test) ->
     r = rule(2, (x, y)->
       [[x,y], 1, null])
@@ -103,8 +97,15 @@ exports.Test =
     test.equal  solve(r(1,1)), null
     test.done()
 
-  "test findall": (test) ->
-    test.equal  solve(orp(findall(orp(print_(1), print_(2))),
-                         print_(3))), null
-    test.equal  solve(findall(once(orp(print_(1), (print_(2)))))), null
+  "test findall once": (test) ->
+    x = vari('x')
+    result = vari('result')
+    test.equal  solve(findall(orp(print_(1), print_(2)))), null
+    test.equal  solve(findall(orp(print_(1), print_(2), print_(3)))), null
+    test.deepEqual  solve(andp(findall(orp(unify(x, 1), unify(x, 2)), result, x), result)), [1,2]
+    test.deepEqual  solve(andp(findall(fail, result, x), result)), []
+    test.deepEqual  solve(andp(findall(succeed, result, 1), result)), [1]
+    test.deepEqual  solve(andp(findall(once(orp(print_(1), print_(2))), result, 1), result)), [1]
+    test.equal(dao.status, dao.SUCCESS);
     test.done()
+

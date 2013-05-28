@@ -2,6 +2,10 @@
 # ###a functional logic solver, with builtin parser.
 # continuation pass style, two continuations, one for succeed, one for fail and backtracking. <br/>
 
+# #### what's new 0.1.11
+# findall: get result by template
+# bug fix: special arity checking take account of (solver, cont, args...)
+
 # #### what's new in 0.1.10
 # uobject <br/>
 # uarray <br/>
@@ -214,12 +218,14 @@ exports.faildone = faildone = (v, solver) ->
 # record the trail for variable binding <br/>
 #  when multiple choices exist, a new Trail for current branch is constructored, <br/>
 #  when backtracking, undo the trail to restore the previous variable binding
+# todo: when variable is new constrctored in current branch, it could not be recorded.
 Trail = class exports.Trail
   constructor: (@data={}) ->
   copy: () -> new Trail(_.extend({},@data))
   set: (vari, value) ->
-    if not @data.hasOwnProperty(vari.name)
-      @data[vari.name] = [vari, value]
+    data = @data
+    if not data.hasOwnProperty(vari.name)
+      data[vari.name] = [vari, value]
 
   undo: () -> for nam, pair of  @data
       vari = pair[0]
@@ -399,10 +405,15 @@ commandMaker = (klass) -> (arity, name, fun) ->
   if not name? and not fun?
     fun = arity
     name = "noname"
-    arity = fun.length
+    # bugfix(0.1.11): Special has special fun's signature (solver, cont, args...)
+    if klass is exports.Special then arity = fun.length - 2
+    else arity = fun.length
   else if not fun?
     fun = name
-    if _.isString(arity) then name = arity; arity = fun.length
+    if _.isString(arity)
+      name = arity;
+      if klass is exports.Special then arity = fun.length - 2
+      else arity = fun.length
     else
       if not _.isNumber(arity) and arity isnt null and not _.isArray(arity) then throw new ArgumentError(arity)
       name = "noname"
@@ -461,7 +472,7 @@ exports.fun = commandMaker(exports.Fun)
 # Fun2 evaluate its arguments, and evaluate the result of fun(params...) again
 class exports.Fun2 extends exports.Command
   applyCont: (solver, cont, args) ->
-    solver.argsCont(args, (params, solver) => solver.cont(@fun(params...), cont)(params, solver))
+    solver.argsCont(args, (params, solver) => [solver.cont(@fun(params...), cont), params, solver])
 
 # generate an instance of Fun from a function <br/>
 #  example:  <br/>
@@ -611,15 +622,15 @@ exports.unifiable = (x) ->
   else if _.isObject(x) then new UObject(x)
   else x
 
-class Error
+exports.BindingError = class Error
   constructor: (@exp, @message='', @stack = @) ->  # @stack: to make webstorm nodeunit happy.
   toString: () -> "#{@constructor.name}: #{@exp} >>> #{@message}"
 
-class BindingError extends Error
-class TypeError extends Error
-class ExpressionError extends Error
-class ArgumentError extends Error
-class ArityError extends Error
+exports.BindingError = class BindingError extends Error
+exports.TypeError = class TypeError extends Error
+exports.ExpressionError = class ExpressionError extends Error
+exports.ArgumentError = class ArgumentError extends Error
+exports.ArityError = class ArityError extends Error
 
 # solver's status is set to UNKNOWN when start to solve, <br/>
 #  if solver successfully run to solver'last continuation, status is set SUCCESS,<br/>

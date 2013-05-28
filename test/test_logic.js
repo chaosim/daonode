@@ -103,12 +103,6 @@
       test.equal(solve(orp(andp(unify(a, 1), unify(a, 2)))), false);
       return test.done();
     },
-    "test findall once": function(test) {
-      test.equal(solve(findall(orp(print_(1), print_(2)))), null);
-      test.equal(solve(findall(orp(print_(1), print_(2), print_(3)))), null);
-      test.equal(solve(findall(once(orp(print_(1), print_(2))))), null);
-      return test.done();
-    },
     "test rule": function(test) {
       var r;
 
@@ -128,9 +122,18 @@
       test.equal(solve(r(1, 1)), null);
       return test.done();
     },
-    "test findall": function(test) {
-      test.equal(solve(orp(findall(orp(print_(1), print_(2))), print_(3))), null);
-      test.equal(solve(findall(once(orp(print_(1), print_(2))))), null);
+    "test findall once": function(test) {
+      var result, x;
+
+      x = vari('x');
+      result = vari('result');
+      test.equal(solve(findall(orp(print_(1), print_(2)))), null);
+      test.equal(solve(findall(orp(print_(1), print_(2), print_(3)))), null);
+      test.deepEqual(solve(andp(findall(orp(unify(x, 1), unify(x, 2)), result, x), result)), [1, 2]);
+      test.deepEqual(solve(andp(findall(fail, result, x), result)), []);
+      test.deepEqual(solve(andp(findall(succeed, result, 1), result)), [1]);
+      test.deepEqual(solve(andp(findall(once(orp(print_(1), print_(2))), result, 1), result)), [1]);
+      test.equal(dao.status, dao.SUCCESS);
       return test.done();
     }
   };
