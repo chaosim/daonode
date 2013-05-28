@@ -167,18 +167,6 @@
     }
   };
 
-  xexports.Test = {
-    "test fun2": function(test) {
-      var m;
-
-      m = fun2(function(x) {
-        return if_(eq(x, 0), print_(x), m(sub(x, 1)));
-      });
-      test.equal(solve(m(5)), null);
-      return test.done();
-    }
-  };
-
 }).call(this);
 
 /*

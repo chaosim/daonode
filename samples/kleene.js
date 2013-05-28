@@ -13,8 +13,8 @@
   _ref3 = require("../lib/builtins/parser"), settext = _ref3.settext, char = _ref3.char, digits = _ref3.digits, spaces = _ref3.spaces, eoi = _ref3.eoi;
 
   exports.flatString = flatString = special(1, 'flatString', function(solver, cont, x) {
-    return solver.cont(x, function(v, solver) {
-      return cont((typeof v.flatString === "function" ? v.flatString() : void 0) || 'null', solver);
+    return solver.cont(x, function(v) {
+      return cont((typeof v.flatString === "function" ? v.flatString() : void 0) || 'null');
     });
   });
 

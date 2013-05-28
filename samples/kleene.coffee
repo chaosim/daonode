@@ -5,7 +5,7 @@
 {settext, char, digits, spaces, eoi} = require("../lib/builtins/parser")
 
 exports.flatString = flatString = special(1, 'flatString', (solver, cont, x) ->
-  solver.cont(x, (v, solver) -> cont(v.flatString?() or 'null', solver)))
+  solver.cont(x, (v) -> cont(v.flatString?() or 'null')))
 
 exports.kleene = kleene = rule(1, (x) ->
   x = vari('x');  y = vari('y')

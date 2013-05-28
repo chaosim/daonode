@@ -253,7 +253,7 @@ exports.Test =
     test.equal solve(begin(fac(5), fac(5))), 120
     test.done()
 
-exports.Test =
+xexports.Test =
   "test fun2 purememo": (test) ->
     _ = dummy('_')
     result = vari('result')

@@ -31,29 +31,29 @@
   });
 
   exports.operator = special('operator', function(solver, cont, x) {
-    return function(v, solver) {
+    return function(v) {
       var c, data, pos, _ref4;
 
       _ref4 = solver.state, data = _ref4[0], pos = _ref4[1];
       if (pos >= data.length) {
-        return solver.failcont(false, solver);
+        return solver.failcont(false);
       }
       c = data[pos];
       x = solver.trail.deref(x);
       if (_.isString(x)) {
         if (x === c) {
           solver.state = [data, pos + 1];
-          return cont(c, solver);
+          return cont(c);
         } else {
-          return solver.failcont(c, solver);
+          return solver.failcont(c);
         }
       } else {
         if (__indexOf.call("+-*/", c) >= 0) {
           x.bind(c, solver.trail);
           solver.state = [data, pos + 1];
-          return cont(c, solver);
+          return cont(c);
         } else {
-          return solver.failcont(c, solver);
+          return solver.failcont(c);
         }
       }
     };

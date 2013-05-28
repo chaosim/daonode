@@ -3,7 +3,7 @@ _ = require "underscore"
 I = require("./importer")
 
 base = "../lib/"
-I.use base+"solve: Trail, solve, solver, fun, macro proc vari debug done faildone UnquoteSliceValue"
+I.use base+"dao: Trail, solve, solver, fun, macro proc vari debug done faildone UnquoteSliceValue"
 I.use base+"builtins/general: add print_ inc dec eq le"
 I.use base+"builtins/logic: orp"
 I.use base+"""builtins/lisp: quote begin if_ iff eval_ block break_ continue_ assign loop_ while_ until_
@@ -28,6 +28,7 @@ exports.Test =
     test.equal  solve(iff([[1, 2]], 3)), 2
     test.equal  solve(iff([[0, 2], [1, 3]], 5)), 3
     test.done()
+
 
   "test eval_ quote": (test) ->
     exp = if_(1, 2, 3)
@@ -69,15 +70,6 @@ exports.Test =
     test.equal  solve(begin(assign(a, 1),  block('a', if_(eq(a, 5), break_('a', a)), inc(a), continue_('a')))), 5
     test.done()
 
-  "test assign inc dec": (test) ->
-    a = vari('a')
-    test.equal  solve(begin(assign(a, 1),  block('a', if_(eq(a, 5), break_('a', a)), print_(a), inc(a), continue_('a')))), 5
-    test.equal  solve(begin(assign(a, 1),  loop_('a', if_(eq(a, 5), break_('a', a)), print_(a), inc(a)))), 5
-    test.equal  solve(begin(assign(a, 1),  block('a', if_(eq(a, 5), break_(a)), print_(a), inc(a), continue_()))), 5
-    test.equal  solve(begin(assign(a, 1),  loop_('a', print_(a), if_(eq(a, 5), break_(a)), inc(a)))), 5
-    test.equal  solve(begin(assign(a, 1),  while_('a', le(a, 5), print_(a), inc(a)))), null
-    test.equal  solve(begin(assign(a, 1),  until_('a', print_(a), inc(a), eq(a, 5)))), null
-    test.done()
 
   "test assign inc dec": (test) ->
     a = vari('a')
@@ -89,7 +81,7 @@ exports.Test =
     test.equal  solve(begin(assign(a, 1),  until_('a', print_(a), inc(a), eq(a, 5)))), null
     test.done()
 
-  "test callcc2": (test) ->
+  "test callcc": (test) ->
     a = null
     solve(begin(callcc((k) -> a = k), add(1, 2)))
     test.equal a(null), 3
@@ -125,11 +117,4 @@ exports.Test =
     test.deepEqual  solve(incall(1, 2, 3, 4, 5, 6, 7)), [2, 3, 4, 5, 6, 7, 8]
     test.deepEqual  solve(incall(1, 2, 3, 4, 5, 6, 7, 8)), [2, 3, 4, 5, 6, 7, 8, 9]
     test.deepEqual  solve(incall(1, 2, 3, 4, 5, 6, 7, 8, 9)), [2, 3, 4, 5, 6, 7, 8, 9, 10]
-    test.done()
-
-xexports.Test =
-  "test callcc": (test) ->
-    a = null
-    solve(begin(callcc((k) -> a = k), add(1, 2)))
-    test.equal a(null), 3
     test.done()

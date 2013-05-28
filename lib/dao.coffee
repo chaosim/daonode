@@ -15,11 +15,11 @@ _ = require('underscore')
 
 # ####solve
 # use this utlity to solve a dao expression exp<br/>
-#cont: (v, solver) -> body # in coffeescript <br/>
-#function(v, solver){ body } # in javascript<br/>
+#cont: (v) -> body # in coffeescript <br/>
+#function(v){ body } # in javascript<br/>
 #when solver succeed at last, @cont is executed.<br/>
-#failcont: (v, solver) -> body  # in coffeescript<br/>
-#function(v, solver){ body } # in javascript<br/>
+#failcont: (v) -> body  # in coffeescript<br/>
+#function(v){ body } # in javascript<br/>
 #when solver fails at last, @failcont is executed.<br/>
 #state: the state of solver, mainly used for parsing <br/>
 
@@ -36,8 +36,9 @@ exports.solver = (failcont = faildone, state) -> new exports.Solver(failcont, st
 class exports.Solver
   # failcont is for backtracking in logic operation
   # state is mainly used in parsing.
-  constructor: (@failcont=faildone, @state) ->
+  constructor: (@faildone=faildone, @state) ->
     # @trail is used to restore varibale's binding for backtracking multiple logic choices
+    @failcont = @faildone
     @trail=new Trail
     #@cutCont is used for cut like in prolog.
     @cutCont = @failcont
@@ -47,37 +48,43 @@ class exports.Solver
     @exits = {}
     # like above, @continues play with block/continue
     @continues = {}
-    # when @done is true, stop the the trampoline loop on continuation.
-    @done = false
 
   # in callcc, callfc, callcs, the solver is needed to be cloned.
   clone: () ->
+    result = {}
+    result.constructor = @constructor
+    result:: = @::
+    result.faildone = @faildone
+    result.failcont = @failcont
+    result.trail = @trail.copy()
     state = @state
     if state? then state = state.slice?(0) or state.copy?() or state.clone?() or state
-    result = new @constructor(@failcont, @trail.copy(), state)
     result.cutCont = @cutCont
     result.catches = _.extend({}, @catches)
     result.exits = _.extend({}, @exits)
     result.continues = _.extend({}, @continues)
+    result.done = @done
+    result.faildone = @faildone
     result
 
   # use this solver to solve exp, cont=done is the succeed continuation.
-  solve: (exp, cont = done) ->
+  solve: (exp, toCont = done) ->
+    @done = toCont
     # first generate the continuation to get start.
-    cont = @cont(exp, cont or done)
+    fromCont = @cont(exp, toCont)
     # and then run the trampoline loop on continuation.
-    @run(cont)
+    @trail.getvalue(@run(null, fromCont, toCont))
 
   # run the trampoline from cont until @done is true.
-  run: (cont) ->
-    value = null
-    solver = @
-    while not solver.done
-      [cont, value, solver] = cont(value, solver)
-    value
+  run: (value, cont, toCont) ->
+    if not toCont then toCont = @done
+    while 1
+      [cont, value] = cont(value)
+      if cont is toCont then exports.status = exports.SUCCESS; return value
+      if cont is @faildone then  exports.status = exports.FAIL; return value
 
   # generate the continuation to get start with.
-  cont: (exp, cont) -> exp?.cont?(@, cont) or ((v, solver) -> cont(exp, solver))
+  cont: (exp, cont) -> exp?.cont?(@, cont) or ((v) -> cont(exp))
 
   # used for lisp.begin, logic.andp, etc., to generate the continuation for an expression array
   expsCont: (exps, cont) ->
@@ -89,90 +96,90 @@ class exports.Solver
   # evaluate an array of expression to a array.
   argsCont: (args, cont) ->
     length = args.length
-    solver = @
     # switch is an optimization for speed on frequent cases.
     switch length
       when 0
-        (v, solver) -> cont([], solver)
+        (v) -> cont([])
       when 1
-        cont0 = (v, solver) -> cont([v], solver)
-        solver.cont(args[0],cont0)
+        cont0 = (v) -> cont([v])
+        @cont(args[0],cont0)
       when 2
         arg0 = null
-        _cont1 = (arg1, solver) -> cont([arg0, arg1], solver)
-        cont1 = solver.cont(args[1], _cont1)
-        cont0 = (v, solver) -> arg0 = v; cont1(null, solver)
-        solver.cont(args[0], cont0)
+        _cont1 = (arg1) -> cont([arg0, arg1])
+        cont1 = @cont(args[1], _cont1)
+        cont0 = (v) -> arg0 = v; cont1(null)
+        @cont(args[0], cont0)
       when 3
         arg0 = null; arg1 = null
-        _cont2 = (arg2, solver) -> cont([arg0, arg1, arg2], solver)
-        cont2 = solver.cont(args[2], _cont2)
-        _cont1 = (v, solver) -> arg1 = v; cont2(null, solver)
-        cont1 = solver.cont(args[1], _cont1)
-        cont0 = (v, solver) -> arg0 = v; cont1(null, solver)
-        solver.cont(args[0], cont0)
+        _cont2 = (arg2) -> cont([arg0, arg1, arg2])
+        cont2 = @cont(args[2], _cont2)
+        _cont1 = (v) -> arg1 = v; cont2(null)
+        cont1 = @cont(args[1], _cont1)
+        cont0 = (v) -> arg0 = v; cont1(null)
+        @cont(args[0], cont0)
       when 4
         arg0 = null; arg1 = null; arg2 = null
-        _cont3 = (arg3, solver) -> cont([arg0, arg1, arg2, arg3], solver)
-        cont3 = solver.cont(args[3], _cont3)
-        _cont2 = (v, solver) -> arg2 = v; cont3(null, solver)
-        cont2 = solver.cont(args[2], _cont2)
-        _cont1 = (v, solver) -> arg1 = v; cont2(null, solver)
-        cont1 = solver.cont(args[1], _cont1)
-        cont0 = (v, solver) -> arg0 = v; cont1(null, solver)
-        solver.cont(args[0], cont0)
+        _cont3 = (arg3) -> cont([arg0, arg1, arg2, arg3])
+        cont3 = @cont(args[3], _cont3)
+        _cont2 = (v) -> arg2 = v; cont3(null)
+        cont2 = @cont(args[2], _cont2)
+        _cont1 = (v) -> arg1 = v; cont2(null)
+        cont1 = @cont(args[1], _cont1)
+        cont0 = (v) -> arg0 = v; cont1(null)
+        @cont(args[0], cont0)
       when 5
         arg0 = null; arg1 = null; arg2 = null; arg3 = null
-        _cont4 = (arg4, solver) -> cont([arg0, arg1, arg2, arg3, arg4], solver)
-        cont4 = solver.cont(args[4], _cont4)
-        _cont3 = (v, solver) -> arg3 = v; cont4(null, solver)
-        cont3 = solver.cont(args[3], _cont3)
-        _cont2 = (v, solver) -> arg2 = v; cont3(null, solver)
-        cont2 = solver.cont(args[2], _cont2)
-        _cont1 = (v, solver) -> arg1 = v; cont2(null, solver)
-        cont1 = solver.cont(args[1], _cont1)
-        cont0 = (v, solver) -> arg0 = v; cont1(null, solver)
-        solver.cont(args[0], cont0)
+        _cont4 = (arg4) -> cont([arg0, arg1, arg2, arg3, arg4])
+        cont4 = @cont(args[4], _cont4)
+        _cont3 = (v) -> arg3 = v; cont4(null)
+        cont3 = @cont(args[3], _cont3)
+        _cont2 = (v) -> arg2 = v; cont3(null)
+        cont2 = @cont(args[2], _cont2)
+        _cont1 = (v) -> arg1 = v; cont2(null)
+        cont1 = @cont(args[1], _cont1)
+        cont0 = (v) -> arg0 = v; cont1(null)
+        @cont(args[0], cont0)
       when 6
         arg0 = null; arg1 = null; arg2 = null; arg3 = null; arg4 = null
-        _cont5 = (arg5, solver) -> cont([arg0, arg1, arg2, arg3, arg4, arg5], solver)
-        cont5 = solver.cont(args[5], _cont5)
-        _cont4 = (v, solver) -> arg4 = v; cont5(null, solver)
-        cont4 = solver.cont(args[4], _cont4)
-        _cont3 = (v, solver) -> arg3 = v; cont4(null, solver)
-        cont3 = solver.cont(args[3], _cont3)
-        _cont2 = (v, solver) -> arg2 = v; cont3(null, solver)
-        cont2 = solver.cont(args[2], _cont2)
-        _cont1 = (v, solver) -> arg1 = v; cont2(null, solver)
-        cont1 = solver.cont(args[1], _cont1)
-        cont0 = (v, solver) -> arg0 = v; cont1(null, solver)
-        solver.cont(args[0], cont0)
+        _cont5 = (arg5) -> cont([arg0, arg1, arg2, arg3, arg4, arg5])
+        cont5 = @cont(args[5], _cont5)
+        _cont4 = (v) -> arg4 = v; cont5(null)
+        cont4 = @cont(args[4], _cont4)
+        _cont3 = (v) -> arg3 = v; cont4(null)
+        cont3 = @cont(args[3], _cont3)
+        _cont2 = (v) -> arg2 = v; cont3(null)
+        cont2 = @cont(args[2], _cont2)
+        _cont1 = (v) -> arg1 = v; cont2(null)
+        cont1 = @cont(args[1], _cont1)
+        cont0 = (v) -> arg0 = v; cont1(null)
+        @cont(args[0], cont0)
       when 7
         arg0 = null; arg1 = null; arg2 = null; arg3 = null; arg4 = null; arg5 = null
-        _cont6 = (arg6, solver) -> cont([arg0, arg1, arg2, arg3, arg4, arg5, arg6], solver)
-        cont6 = solver.cont(args[6], _cont6)
-        _cont5 = (v, solver) -> arg5 = v; cont6(null, solver)
-        cont5 = solver.cont(args[5], _cont5)
-        _cont4 = (v, solver) -> arg4 = v; cont5(null, solver)
-        cont4 = solver.cont(args[4], _cont4)
-        _cont3 = (v, solver) -> arg3 = v; cont4(null, solver)
-        cont3 = solver.cont(args[3], _cont3)
-        _cont2 = (v, solver) -> arg2 = v; cont3(null, solver)
-        cont2 = solver.cont(args[2], _cont2)
-        _cont1 = (v, solver) -> arg1 = v; cont2(null, solver)
-        cont1 = solver.cont(args[1], _cont1)
-        cont0 = (v, solver) -> arg0 = v; cont1(null, solver)
-        solver.cont(args[0], cont0)
+        _cont6 = (arg6) -> cont([arg0, arg1, arg2, arg3, arg4, arg5, arg6])
+        cont6 = @cont(args[6], _cont6)
+        _cont5 = (v) -> arg5 = v; cont6(null)
+        cont5 = @cont(args[5], _cont5)
+        _cont4 = (v) -> arg4 = v; cont5(null)
+        cont4 = @cont(args[4], _cont4)
+        _cont3 = (v) -> arg3 = v; cont4(null)
+        cont3 = @cont(args[3], _cont3)
+        _cont2 = (v) -> arg2 = v; cont3(null)
+        cont2 = @cont(args[2], _cont2)
+        _cont1 = (v) -> arg1 = v; cont2(null)
+        cont1 = @cont(args[1], _cont1)
+        cont0 = (v) -> arg0 = v; cont1(null)
+        @cont(args[0], cont0)
       else
         params = []
+        solver = @
         for i in [args.length-1..0] by -1
           cont = do (i=i, cont=cont) ->
-            _cont = (argi, solver) ->  (params.push(argi); cont(params, solver))
+            _cont = (argi) ->  (params.push(argi); cont(params))
             solver.cont(args[i], _cont)
         cont
 
   # used by lisp style quasiquote, unquote, unquoteSlice
-  quasiquote: (exp, cont) -> exp?.quasiquote?(@, cont) or ((v, solver) -> cont(exp, solver))
+  quasiquote: (exp, cont) -> exp?.quasiquote?(@, cont) or ((v) -> cont(exp))
 
   # an utility that is useful for some logic builtins<br/>
   # when backtracking, execute fun at first, and then go to original failcont
@@ -181,12 +188,12 @@ class exports.Solver
     @trail = new Trail
     state = @state
     fc = @failcont
-    @failcont = (v, solver) ->
-      solver.trail.undo()
-      solver.trail = trail
-      solver.state = state
-      solver.failcont = fc;
-      fun(v, solver)
+    @failcont = (v) ->
+      @trail.undo()
+      @trail = trail
+      @state = state
+      @failcont = fc;
+      fun(v)
 
   # pushCatch/popCatch/findCatch: utlities for lisp style catch/throw
   pushCatch: (value, cont) ->
@@ -204,16 +211,10 @@ class exports.Solver
   protect: (fun) -> fun
 
 # default stop continuation when succeed
-exports.done = done =(v, solver) ->
-  solver.done = true
-  exports.status = exports.SUCCESS
-  [null, solver.trail.getvalue(v), solver]
+exports.done = done =(v) -> [done, v]
 
 # default stop continuation when fail
-exports.faildone = faildone = (v, solver) ->
-  solver.done = true
-  exports.status = exports.FAIL
-  [null, solver.trail.getvalue(v), solver]
+exports.faildone = faildone = (v) -> [faildone, v]
 
 # record the trail for variable binding <br/>
 #  when multiple choices exist, a new Trail for current branch is constructored, <br/>
@@ -287,7 +288,7 @@ Var = class exports.Var
       memo[name] = result
       result
 
-  cont: (solver, cont) -> (v, solver) => cont(@deref(solver.trail), solver)
+  cont: (solver, cont) -> (v) => cont(@deref(solver.trail))
 
   # nottodo: variable's applyCont:: canceled. lisp1 should be good.
 
@@ -308,7 +309,7 @@ exports.vars = (names) -> vari(name) for name in split names,  reElements
 # DummyVar never fail when it unify. see tests on any/some/times in test_parser for examples
 exports.DummyVar = class DummyVar extends Var
   constructor: (name) -> @name = '_$'+name
-  cont:(solver, cont) -> (v, solver) => cont(@binding, solver)
+  cont:(solver, cont) -> (v) => cont(@binding)
   deref: (trail) -> @
   getvalue: (trail, memo={}) ->
     name = @name
@@ -360,20 +361,20 @@ class exports.Apply
   # play with lisp style quasiquote/unquote/unquoteSlice
   quasiquote:  (solver, cont) ->
     if @caller.name is "unquote"
-      return  solver.cont(@args[0], (v, solver) -> cont(v, solver))
+      return  solver.cont(@args[0], (v) -> cont(v))
     else if @caller.name is "unquoteSlice"
       # use the flag class UnquoteSliceValue to find unquoteSlice expression
-      return solver.cont(@args[0], (v, solver) -> cont(new UnquoteSliceValue(v), solver))
+      return solver.cont(@args[0], (v) -> cont(new UnquoteSliceValue(v)))
     params = []
-    cont = do (cont=cont) => ((v, solver) => [cont, new @constructor(@caller, params), solver])
+    cont = do (cont=cont) => ((v) => [cont, new @constructor(@caller, params)])
     args = @args
     for i in [args.length-1..0] by -1
       cont = do (i=i, cont=cont) ->
-        solver.quasiquote(args[i], (v, solver) ->
+        solver.quasiquote(args[i], (v) ->
           if v instanceof UnquoteSliceValue
             for x in v.value then params.push x
           else params.push(v);
-          cont(null, solver))
+          cont(null))
     cont
 
 # A flag class is used to process unquoteSlice
@@ -385,14 +386,11 @@ UnquoteSliceValue = class exports.UnquoteSliceValue
 #  Special, Fun, Macro, Proc is subclass of Command.
 Command = class exports.Command
   @directRun = false
-  @done = (v, solver) -> (solver.done = true; [null, solver.trail.getvalue(v), solver])
-  @faildone = (v, solver) -> (solver.done = true; [null, solver.trail.getvalue(v), solver])
   constructor: (@fun, @name, @arity) ->
     @callable = (args...) =>
       applied = new exports.Apply(@, args)
       if Command.directRun
-        result = Command.globalSolver.solve(applied, Command.done)
-        Command.globalSolver.done = false
+        result = Command.globalSolver.solve(applied, done)
         result
       else applied
     @callable.arity = @arity
@@ -435,10 +433,10 @@ class exports.Special extends exports.Command
 #    solver = arguments[0], cont = arguments[1], exps = 3 <= arguments.length ? __slice.call(arguments, 2) : [];<br/>
 #    return solver.expsCont(exps, cont);<br/>
 #  });<br/>
-#  exports.fail = special(0, 'fail', (solver, cont) -> (v, solver) -> solver.failcont(v, solver))() #coffescript <br/>
+#  exports.fail = special(0, 'fail', (solver, cont) -> (v) -> solver.failcont(v))() #coffescript <br/>
 #  exports.fail = special(0, 'fail', function(solver, cont) { # javascript <br/>
-#    return function(v, solver) { <br/>
-#      return solver.failcont(v, solver);<br/>
+#    return function(v) { <br/>
+#      return solver.failcont(v);<br/>
 #    }; <br/>
 #  })();<br/>
 #
@@ -449,19 +447,19 @@ exports.special = special = commandMaker(exports.Special)
 exports.call = special(-1, 'call', (solver, cont, goal, args...) ->
   goal1 = null
   argsCont =  solver.argsCont(args, (params,  solver) ->
-    solver.cont(goal1(params...), cont)(null, solver))
-  solver.cont(goal, (v, solver) -> goal1 = goal; argsCont(null, solver)))
+    solver.cont(goal1(params...), cont)(null))
+  solver.cont(goal, (v) -> goal1 = goal; argsCont(null)))
 
 # apply goal with args
 exports.apply  = special(2, 'apply', (solver, cont, goal, args) ->
   goal1 = null
   argsCont =  solver.argsCont(args, (params,  solver) ->
-    solver.cont(goal1(params...), cont)(null, solver))
-  solver.cont(goal, (v, solver) -> goal1 = goal; argsCont(null, solver)))
+    solver.cont(goal1(params...), cont)(null))
+  solver.cont(goal, (v) -> goal1 = goal; argsCont(null)))
 
 # Fun evaluate its arguments, and return the result to fun(params...) to cont directly.
 class exports.Fun extends exports.Command
-  applyCont: (solver, cont, args) ->  solver.argsCont(args, (params, solver) => [cont, @fun(params...), solver])
+  applyCont: (solver, cont, args) ->  solver.argsCont(args, (params) => [cont, @fun(params...)])
 
 # generate an instance of Fun from a function <br/>
 #  example:  <br/>
@@ -472,7 +470,7 @@ exports.fun = commandMaker(exports.Fun)
 # Fun2 evaluate its arguments, and evaluate the result of fun(params...) again
 class exports.Fun2 extends exports.Command
   applyCont: (solver, cont, args) ->
-    solver.argsCont(args, (params, solver) => [solver.cont(@fun(params...), cont), params, solver])
+    solver.argsCont(args, (params) => [solver.cont(@fun(params...), cont), params])
 
 # generate an instance of Fun from a function <br/>
 #  example:  <br/>
@@ -491,10 +489,11 @@ exports.Macro = class Macro extends exports.Command
   applyCont: (solver, cont, args) ->
     exp = @fun(args...)
 #    solver.cont(exp, cont)
+    # prevent max recursive macro extend
     idMap =  Macro.idMap
     id = @id
     if not idMap[id] then idMap[id] = true; result = solver.cont(exp, cont); delete idMap[id]; result
-    else (v, solver) ->  delete idMap[id]; solver.cont(exp, cont)(v, solver)
+    else (v) ->  delete idMap[id]; solver.cont(exp, cont)(v)
 
 # generate a instance of Macro from a function <br/>
 #  example:   <br/>
@@ -505,7 +504,7 @@ exports.macro = commandMaker(exports.Macro)
 # In Proc's function, the dao's expressions can be directly evaluated
 class exports.Proc extends exports.Command
   applyCont:  (solver, cont, args) ->
-    (v, solver) =>
+    (v) =>
       Command.directRun = true
       savedSolver = Command.globalSolver
       Command.globalSolver = solver
@@ -524,7 +523,7 @@ exports.tofun = (name, cmd) ->
 #     and specials that don't eval their arguments.
   unless cmd? then (cmd = name; name = 'noname')
   special(cmd.arity, name, (solver, cont, args...) ->
-          solver.argsCont(args, (params, solver) -> [solver.cont(cmd(params...), cont), params, solver]))
+          solver.argsCont(args, (params) -> [solver.cont(cmd(params...), cont), params]))
 
 exports.UObject = class UObject
   constructor: (@data) ->

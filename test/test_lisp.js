@@ -106,19 +106,7 @@
       test.equal(solve(begin(assign(a, 1), until_('a', print_(a), inc(a), eq(a, 5)))), null);
       return test.done();
     },
-    "test assign inc dec": function(test) {
-      var a;
-
-      a = vari('a');
-      test.equal(solve(begin(assign(a, 1), block('a', if_(eq(a, 5), break_('a', a)), print_(a), inc(a), continue_('a')))), 5);
-      test.equal(solve(begin(assign(a, 1), loop_('a', if_(eq(a, 5), break_('a', a)), print_(a), inc(a)))), 5);
-      test.equal(solve(begin(assign(a, 1), block('a', if_(eq(a, 5), break_(a)), print_(a), inc(a), continue_()))), 5);
-      test.equal(solve(begin(assign(a, 1), loop_('a', print_(a), if_(eq(a, 5), break_(a)), inc(a)))), 5);
-      test.equal(solve(begin(assign(a, 1), while_('a', le(a, 5), print_(a), inc(a)))), null);
-      test.equal(solve(begin(assign(a, 1), until_('a', print_(a), inc(a), eq(a, 5)))), null);
-      return test.done();
-    },
-    "test callcc2": function(test) {
+    "test callcc": function(test) {
       var a;
 
       a = null;
@@ -175,19 +163,6 @@
       test.deepEqual(solve(incall(1, 2, 3, 4, 5, 6, 7)), [2, 3, 4, 5, 6, 7, 8]);
       test.deepEqual(solve(incall(1, 2, 3, 4, 5, 6, 7, 8)), [2, 3, 4, 5, 6, 7, 8, 9]);
       test.deepEqual(solve(incall(1, 2, 3, 4, 5, 6, 7, 8, 9)), [2, 3, 4, 5, 6, 7, 8, 9, 10]);
-      return test.done();
-    }
-  };
-
-  xexports.Test = {
-    "test callcc": function(test) {
-      var a;
-
-      a = null;
-      solve(begin(callcc(function(k) {
-        return a = k;
-      }), add(1, 2)));
-      test.equal(a(null), 3);
       return test.done();
     }
   };

@@ -108,4 +108,3 @@ exports.Test =
     test.deepEqual  solve(andp(findall(once(orp(print_(1), print_(2))), result, 1), result)), [1]
     test.equal(dao.status, dao.SUCCESS);
     test.done()
-

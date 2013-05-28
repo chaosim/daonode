@@ -20,18 +20,18 @@ exports.operator = rule(1, 'operator', (x) ->
   ])
 
 # use special, speed optimization
-exports.operator = special('operator', (solver, cont, x) -> (v, solver) ->
+exports.operator = special('operator', (solver, cont, x) -> (v) ->
   [data, pos] = solver.state
-  if pos>=data.length then return solver.failcont(false, solver)
+  if pos>=data.length then return solver.failcont(false)
   c = data[pos]
   x = solver.trail.deref(x)
   if _.isString(x)
     if x is c
-      solver.state = [data, pos+1]; cont(c, solver)
-    else solver.failcont(c, solver)
+      solver.state = [data, pos+1]; cont(c)
+    else solver.failcont(c)
   else
-    if c in "+-*/" then x.bind(c, solver.trail); solver.state = [data, pos+1]; cont(c, solver)
-    else solver.failcont(c, solver))
+    if c in "+-*/" then x.bind(c, solver.trail); solver.state = [data, pos+1]; cont(c)
+    else solver.failcont(c))
 
 # use terminal in parser.coffee
 operator = (x) -> is_(charIn("+-*/"))

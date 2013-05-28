@@ -13,11 +13,11 @@ debug = dao.debug
 
 # aka lisp's quote, like in lisp, 'x==x, quote(x) === x 
 exports.quote = special(1, 'quote', (solver, cont, exp) ->
-    (v, solver) -> cont(exp, solver))
+    (v) -> cont(exp))
 
 # aka lisp's eval, solve(eval_(quote(x))) means solve(x),  
 exports.eval_ = special(1, 'eval', (solver, cont, exp) ->
-  solver.cont(exp, (v, solver) -> [solver.cont(v, cont), null, solver]))
+  solver.cont(exp, (v) -> [solver.cont(v, cont), null]))
 
 # vari.binding = exp 
 exports.assign = special(2, 'assign', (solver, cont, vari, exp) ->
@@ -26,21 +26,21 @@ exports.assign = special(2, 'assign', (solver, cont, vari, exp) ->
   # and so it can NOT be restored in solver.failcont <br/>
   # EXCEPT the vari has been in solver.trail in the logic branch before.
 
-  solver.cont(exp, (v, solver) ->
+  solver.cont(exp, (v) ->
     if v instanceof dao.Var
       new dao.TypeError(v, "do NOT assign free logic var to var")
     vari.binding = v;
-    cont(v, solver)))
+    cont(v)))
 
 # vari.binding = 0 <br/>
 #  provide this for reducing continuation, and make code running faster.
 exports.zero = special(1, 'zero', (solver, cont, vari, exp) ->
-  (v, solver) -> (vari.binding = 0; cont(v, solver)))
+  (v) -> (vari.binding = 0; cont(v)))
 
 # vari.binding = 1 <br/>
 #  provide this for reducing continuation, and make code running faster.
 exports.one = special(1, 'one', (solver, cont, vari, exp) ->
- (v, solver) -> (vari.binding = 1; cont(v, solver)))
+ (v) -> (vari.binding = 1; cont(v)))
 
 # aka lisp's begin, same as logic.andp 
 exports.begin = special(null, 'begin', (solver, cont, exps...) -> solver.expsCont(exps, cont))
@@ -49,14 +49,14 @@ if_fun = (solver, cont, test, then_, else_) ->
   then_cont = solver.cont(then_, cont)
   if else_?
     else_cont = solver.cont(else_, cont)
-    action = (v, solver) ->
-      if (v) then then_cont(v, solver)
-      else else_cont(v, solver)
+    action = (v) ->
+      if (v) then then_cont(v)
+      else else_cont(v)
     solver.cont(test, action)
   else
-    action =  (v, solver) ->
-      if (v) then then_cont(null, solver)
-      else cont(null, solver)
+    action =  (v) ->
+      if (v) then then_cont(null)
+      else cont(null)
     solver.cont(test, action)
 
 # lisp style if. <br/>
@@ -73,9 +73,9 @@ iff_fun = (solver, cont, clauses, else_) ->
     [test, then_] = clauses[0]
     then_cont = solver.cont(then_, cont)
     iff_else_cont = iff_fun(solver, cont, clauses[1...], else_)
-    action = (v, solver) ->
-      if (v) then [then_cont, v, solver]
-      else [iff_else_cont, v, solver]
+    action = (v) ->
+      if (v) then [then_cont, v]
+      else [iff_else_cont, v]
     solver.cont(test, action)
 
 
@@ -115,7 +115,7 @@ exports.break_ = break_ = special([0, 1,2], 'break_', (solver, cont, label='', v
   exits = solver.exits[label]
   if not exits or exits==[] then throw Error(label)
   exitCont = exits[exits.length-1]
-  valCont = (v, solver) -> solver.protect(exitCont)(v, solver)
+  valCont = (v) -> solver.protect(exitCont)(v)
   solver.cont(value, valCont))
 
 # continue a block 
@@ -123,7 +123,7 @@ exports.continue_ = continue_ = special([0,1], 'continue_', (solver, cont, label
   continues = solver.continues[label]
   if not continues or continues==[] then throw Error(label)
   continueCont = continues[continues.length-1]
-  (v, solver) -> [solver.protect(continueCont[0]), v, solver])
+  (v) -> [solver.protect(continueCont[0]), v])
 
 not_ = general.not_
 
@@ -145,56 +145,54 @@ exports.until_ = macro(null, 'until_', (label,body..., test) ->
 
 # aka. lisp style catch/throw  
 exports.catch_ = special(-1, 'catch_', (solver, cont, tag, forms...) ->
-  tagCont = (v, solver) ->
+  tagCont = (v) ->
     solver.pushCatch(v, cont)
-    formsCont = solver.expsCont(forms, (v2, solver) -> solver.popCatch(v); [cont, v2, solver])
-    [formsCont, v, solver]
+    formsCont = solver.expsCont(forms, (v2) -> solver.popCatch(v); [cont, v2])
+    [formsCont, v]
   solver.cont(tag, tagCont))
 
 # aka lisp style throw 
 exports.throw_ = special(2, 'throw_', (solver, cont, tag, form) ->
-  formCont =  (v, solver) ->
-    solver.cont(form, (v2, solver) ->
-      solver.protect(solver.findCatch(v))(v2, solver))(v, solver)
+  formCont =  (v) ->
+    solver.cont(form, (v2) ->
+      solver.protect(solver.findCatch(v))(v2))(v)
   solver.cont(tag, formCont))
 
 # aka. lisp's unwind-protect 
 exports.protect = special(-1, 'protect', (solver, cont, form, cleanup...) ->
   oldprotect = solver.protect
-  solver.protect = (fun) -> (v1, solver) ->
-                               solver.expsCont(cleanup, (v2, solver) ->
+  solver.protect = (fun) -> (v1) ->
+                               solver.expsCont(cleanup, (v2) ->
                                  solver.protect = oldprotect;
-                                 oldprotect(fun)(v1, solver))(v1, solver)
-  cleanupCont = (v1, solver) ->
-    solver.expsCont(cleanup, (v2, solver) ->
+                                 oldprotect(fun)(v1))(v1)
+  cleanupCont = (v1) ->
+    solver.expsCont(cleanup, (v2) ->
                     solver.protect = oldprotect
-                    cont(v1, solver))(v1, solver)
+                    cont(v1))(v1)
   result = solver.cont(form, cleanupCont)
   result)
 
 # used by callcc and callfc 
 runner = (solver, cont) -> (v) ->
-  while not solver.done then [cont, v, solver] = cont(v, solver)
-  solver.done = false
-  return v
+  solver.trail.getvalue(solver.run(v, cont))
 
 # callcc(someFunction(kont) -> body) <br/>
 #current continuation @cont can be captured in someFunction
 
-exports.callcc = special(1, 'callcc', (solver, cont, fun) -> (v, solver) ->
-  cont(fun(runner(solver.clone(), cont)), solver))
+exports.callcc = special(1, 'callcc', (solver, cont, fun) -> (v) ->
+  cont(fun(runner(solver.clone(), cont))))
 
 # callfc(someFunction(fc) -> body) <br/>
 #current solver.failcont can be captured in someFunction
 
-exports.callfc = special(1, 'callfc', (solver, cont, fun) -> (v, solver) ->
-  cont(fun(runner(solver.clone(), solver.failcont)), solver))
+exports.callfc = special(1, 'callfc', (solver, cont, fun) -> (v) ->
+  cont(fun(runner(solver.clone(), solver.failcont))))
 
 # callcs(someFunction(solver, kont) -> body) <br/>
 #  the solver and current cont can be captured in someFunction
   
-exports.callcs = special(1, 'callcs', (solver, cont, fun) -> (v, solver) ->
-  cont(fun(solver.clone(), cont), solver))
+exports.callcs = special(1, 'callcs', (solver, cont, fun) -> (v) ->
+  cont(fun(solver.clone(), cont)))
 
 # lisp style quasiquote/unquote/unquote-slice "`", "," and ",@" 
 exports.quasiquote = exports.qq = special(1, 'quasiquote', (solver, cont, item) ->

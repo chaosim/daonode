@@ -317,7 +317,7 @@
     }
   };
 
-  exports.Test = {
+  xexports.Test = {
     "test fun2 purememo": function(test) {
       var fac, factorial, n, result, _;
 

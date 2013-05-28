@@ -81,6 +81,7 @@ exports.Test =
     test.equal  solve(m(5)), null
     test.done()
 
+
   "test macro 2": (test) ->
     _ = dummy('_')
     m = macro(0, () ->  print_(1))
@@ -101,10 +102,4 @@ exports.Test =
     m = macro(1, (x) -> if x is 0 then print_(x) else begin(print_(x), m(x-1)))
     test.equal  solve(m(5)), null
     test.equal(dao.status, dao.SUCCESS);
-    test.done()
-
-xexports.Test =
-  "test fun2": (test) ->
-    m = fun2((x) -> if_(eq(x,0),print_(x), m(sub(x,1))))
-    test.equal  solve(m(5)), null
     test.done()
