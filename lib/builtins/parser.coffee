@@ -654,8 +654,8 @@ exports.charWhen = special(1, 'charWhen', (solver, cont, test) -> (v, solver) ->
   if test(c) then solver.state = [data, pos+1]; cont(c, solver)
   else solver.failcont(c, solver))
 
-exports.charBetween = (x, start, end) -> exports.charWhen(x, (c) -> start<c<end)
-exports.charIn = (x, set) -> exports.charWhen((c) ->  c in x)
+exports.charBetween = (start, end) -> exports.charWhen((c) -> start<c<end)
+exports.charIn = (set) -> exports.charWhen((c) ->  c in set)
 # theses terminal should be used directly, NO suffix with ()
 exports.digit = exports.charWhen((c)->'0'<=c<='9')
 exports.digit1_9 = exports.charWhen((c)->'1'<=c<='9')
@@ -753,8 +753,8 @@ exports.newlines0 = exports.stringIn0('\r\n')
 # float: match a number, which can be float format..<br/>
 #  if arg is free dao.Var, arg would be bound to the number <br/>
 #  else arg should equal to the number.
-exports.float = special(1, 'float', (solver, cont, arg) -> (v, solver) ->
-  [text, pos] = solver.parse_state
+exports.number = exports.float = special(1, 'float', (solver, cont, arg) -> (v, solver) ->
+  [text, pos] = solver.state
   length = text.length
   if pos>=length then return solver.failcont(v, solver)
   if not '0'<=text[pos]<='9' and text[pos]!='.'
@@ -783,7 +783,7 @@ exports.float = special(1, 'float', (solver, cont, arg) -> (v, solver) ->
 exports.literal = special(1, 'literal', (solver, cont, arg) -> (v, solver) ->
   arg = solver.trail.deref(arg)
   if (arg instanceof Var) then throw new exports.TypeError(arg)
-  [text, pos] = solver.parse_state
+  [text, pos] = solver.state
   length = text.length
   if pos>=length then return solver.failcont(v, solver)
   i = 0
@@ -801,7 +801,7 @@ exports.literal = special(1, 'literal', (solver, cont, arg) -> (v, solver) ->
 exports.followLiteral = special(1, 'followLiteral', (solver, cont, arg) -> (v, solver) ->
   arg = solver.trail.deref(arg)
   if (arg instanceof Var) then throw new exports.TypeError(arg)
-  [text, pos] = solver.parse_state
+  [text, pos] = solver.state
   length = text.length
   if pos>=length then return solver.failcont(v, solver)
   i = 0
@@ -817,7 +817,7 @@ exports.followLiteral = special(1, 'followLiteral', (solver, cont, arg) -> (v, s
 exports.notFollowLiteral = special(1, 'followLiteral', (solver, cont, arg) -> (v, solver) ->
   arg = solver.trail.deref(arg)
   if (arg instanceof Var) then throw new exports.TypeError(arg)
-  [text, pos] = solver.parse_state
+  [text, pos] = solver.state
   length = text.length
   if pos>=length then return solver.failcont(v, solver)
   i = 0
@@ -830,7 +830,7 @@ exports.notFollowLiteral = special(1, 'followLiteral', (solver, cont, arg) -> (v
 #quoteString: match a quote string quoted by quote, quote can be escapedby \
 exports.quoteString = special(1, 'quoteString', (solver, cont, quote) -> (v, solver) ->
   string = ''
-  [text, pos] = solver.parse_state
+  [text, pos] = solver.state
   length = text.length
   if pos>=length then return solver.failcont(v, solver)
   quote = solver.trail.deref(quote)
@@ -839,10 +839,10 @@ exports.quoteString = special(1, 'quoteString', (solver, cont, quote) -> (v, sol
   p = pos+1
   while p<length
     char = text[p]
-    p += 1
+    p++
     if char=='\\' then p++
     else if char==quote
-      string = text[pos+ 1...p]
+      string = text[pos+1...p]
       break
   if p is length then return solver.failcont(v, solver)
   solver.state = [data, p]

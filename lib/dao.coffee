@@ -1,19 +1,13 @@
 # ##dao
-# ###a functional logic sover, with builtin parser.
+# ###a functional logic solver, with builtin parser.
 # continuation pass style, two continuations, one for succeed, one for fail and backtracking. <br/>
 
 # #### what's new in 0.1.10
 # uobject <br/>
 # uarray <br/>
+# cons
 
 _ = require('underscore')
-
-# * **todo**: compile
-# * \#an idea: direct compile by function and compile to function?
-# * **todo**: optimazation: partial evaluation?
-# * **nottodo**: variable's applyCont:: canceled. lisp1 should be good.
-# * **nottodo**: Apply's applyCont:: lisp1 should be good.
-
 
 # ####solve
 # use this utlity to solve a dao expression exp<br/>
@@ -36,8 +30,8 @@ exports.solver = (failcont = faildone, state) -> new exports.Solver(failcont, st
 # ####class Solver
 # the solver for dao expression
 class exports.Solver
-  # @failcont is for backtracking in logic operation
-  # @state is mainly used in parsing.
+  # failcont is for backtracking in logic operation
+  # state is mainly used in parsing.
   constructor: (@failcont=faildone, @state) ->
     # @trail is used to restore varibale's binding for backtracking multiple logic choices
     @trail=new Trail
@@ -400,9 +394,22 @@ Command = class exports.Command
   register: (exports) -> exports[@name] = @callable
   toString: () -> @name
 
-commandMaker = (klass) -> (arity, name_or_fun, fun) ->
-  if not _.isNumber(arity) and arity isnt null and not _.isArray(arity) then throw new ArgumentError(arity)
-  (if fun? then new klass(fun, name_or_fun, arity) else new klass(name_or_fun, 'noname', arity)).callable
+# update when v0.1.10, according to mscdex <mscdex@gmail.com> advice.
+commandMaker = (klass) -> (arity, name, fun) ->
+  if not name? and not fun?
+    fun = arity
+    name = "noname"
+    arity = fun.length
+  else if not fun?
+    fun = name
+    if _.isString(arity) then name = arity; arity = fun.length
+    else
+      if not _.isNumber(arity) and arity isnt null and not _.isArray(arity) then throw new ArgumentError(arity)
+      name = "noname"
+  else
+    if not _.isNumber(arity) and arity isnt null and not _.isArray(arity) then throw new ArgumentError(arity)
+    if not  _.isString(name) then throw new TypeError(name)
+  new klass(fun, name, arity).callable
 
 # Speical knows solver and cont, with them the special function has full control of things.
 class exports.Special extends exports.Command
@@ -633,3 +640,9 @@ exports.debug = debug = (items...) ->
 #require("./builtins/lisp") <br/>
 #require("./builtins/logic")  <br/>
 #require("./builtins/parser")
+
+# * **todo**: compile
+# * \#an idea: direct compile by function and compile to function?
+# * **todo**: optimazation: partial evaluation?
+# * **nottodo**: variable's applyCont:: canceled. lisp1 should be good.
+# * **nottodo**: Apply's applyCont:: lisp1 should be good.

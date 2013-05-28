@@ -3,18 +3,27 @@
 {andp, orp, bind, is_} = require("../../lib/builtins/logic")
 {begin} = require("../../lib/builtins/lisp")
 {settext} = require("../../lib/builtins/parser")
-{kleene, kleenePredicate, dightsSpaces, flatString} = require("../kleene")
+{expression, operator, atom} = require("../expression")
 
 xexports = {}
 
 exports.Test =
-  "test kleenePredicate": (test) ->
+  "test operator": (test) ->
     x = vari('x')
     console.log  solve(begin(
-      settext('123 456'),
-      kleenePredicate(dightsSpaces)(x), flatString(getvalue(x))))
+                              settext('+'),
+                              operator(x), x))
+    test.equal(x.binding, '+');
+    test.equal(dao.status, dao.SUCCESS);
+    x.binding = x
+    console.log  solve(begin(
+                              settext('/'),
+                              operator(x), x))
+    test.equal(x.binding, '/');
+    test.equal(dao.status, dao.SUCCESS);
     test.done()
 
+xexports.Test =
   "test kleene": (test) ->
     x = vari('x')
     console.log  solve(begin(

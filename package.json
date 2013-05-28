@@ -3,7 +3,7 @@
   "description":  "functional logic solver with builtin parser",
   "keywords":     ["javascript", "language", "coffeescript", "daonode", "parser", "evaluator", "logic programming", "functional programming"],
   "author":       "Caoxingming",
-  "version":      "0.1.9",
+  "version":      "0.1.10",
   "licenses":     [{
     "type":       "MIT",
     "url":        "https://raw.github.com/chaosim/daonode/master/LICENSE"

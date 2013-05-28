@@ -103,8 +103,8 @@ exports.Test =
     test.equal(dao.status, dao.SUCCESS);
     test.done()
 
-exports.Test =
+xexports.Test =
   "test fun2": (test) ->
-    m = fun2(1, (x) -> if_(eq(x,0),print_(x), m(sub(x,1))))
+    m = fun2((x) -> if_(eq(x,0),print_(x), m(sub(x,1))))
     test.equal  solve(m(5)), null
     test.done()

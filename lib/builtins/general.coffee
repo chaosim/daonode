@@ -159,11 +159,11 @@ exports.index = special(2, 'index', (solver, cont, x, y) ->
   solver.cont(x, xcont))
 
 # x[0] 
-exports.first = special(1, 'first', (solver, cont, x) ->
+exports.first = exports.head = special(1, 'first', (solver, cont, x) ->
   solver.cont(x, (v, solver) -> cont(v[0], solver)))
 
 # x[1...] 
-exports.left = special(1, 'left', (solver, cont, x) ->
+exports.tail = special(1, 'tail', (solver, cont, x) ->
   solver.cont(x, (v, solver) -> cont(v[1...], solver)))
 
 # x[1] 

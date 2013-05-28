@@ -1,10 +1,18 @@
 ## daonode
 Dao is a functional logic solver, unifying code with data, grammar with program, logic with functional, compiling with running.
 Daonode is a porting, rewriting and upgrading from python to coffeecript(so just javscript) of the dao project.
-What would happen when lisp meets prolog in javascript?  
+What would happen when lisp meets prolog in javascript?
+###what'new 0.1.10
+* other unifiable term: uobject, uarray, cons
+* bug fix: avoid infinite macro extend when macro is recursive. see samples/kleene.coffee for demo.
+* arity default to func.length(thanks to mscdex)
+* samples: kleene.coffee/.js, expression.coffee/.js(not finished)
+* annotated document with docco
+* some document: overview, api(core, builtins) on https://github.com/chaosim/daonode/wiki
+
 ### Documentation
+See <https://github.com/chaosim/daonode/wiki> for documents for daonode.
 The annotated coffeescript source is in the daonode/doc.
-See <https://github.com/chaosim/daonode/wiki>
 See the tests, and you'll get some information about the api and use cases.
 Some old documents is on http://pythonhosted.org/daot/ (out of date).
 ### Web sites
