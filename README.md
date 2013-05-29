@@ -2,10 +2,10 @@
 Dao is a functional logic solver, unifying code with data, grammar with program, logic with functional, compiling with running.
 Daonode is a porting, rewriting and upgrading from python to coffeecript(so just javscript) of the dao project.
 What would happen when lisp meets prolog in javascript?
-###what'new 0.1.11
+###what'new in 0.1.11
 * memo and purememo in parser.coffee/.js
 * refactor: remove parameter "solver" from continuation
-* index.js becomes the main file in package.json
+* index.js becomes the main file in package.json  
 ### Documentation
 See <https://github.com/chaosim/daonode/wiki> for documents for daonode.
 The annotated coffeescript source is in the daonode/doc.
