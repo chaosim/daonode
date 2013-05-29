@@ -118,7 +118,7 @@ defaultPureHash = (name, caller, args...) -> (name or caller.name) + args.join('
 
 exports.purememo = (caller, name='', hash=defaultPureHash) ->
   if not _.isString(name) then hash  = name; name = '';
-  special(1, 'purememo', (solver, cont, args...) ->
+  special(null, 'purememo', (solver, cont, args...) ->
     hashValue = hash(name, caller, args...)
     if hashValue is undefined then solver.cont(caller(args...), cont)
     else
@@ -132,31 +132,31 @@ exports.purememo = (caller, name='', hash=defaultPureHash) ->
           result
        )
 
-exports.clearPureMemo = special(1, 'clearPureMemo', (solver, cont) ->
-  (v) -> solver._memoPureResult = {}; cont(v))
+exports.clearPureMemo = special(0, 'clearPureMemo', (solver, cont) ->
+  (v) -> solver._memoPureResult = {}; cont(v))()
 
 defaultHash = (name, solver, caller, args...) -> (name or caller.name)+solver.state[1]
 
 exports.memo = (caller, name='', hash=defaultHash) ->
   if not _.isString(name) then hash  = name; name = '';
-  special(1, 'memo', (solver, cont, args...) ->
-    hashValue = hash(name, solver, caller, args...)
-    if hashValue is undefined then solver.cont(caller(args...), cont)
-    else
-      fromCont = solver.cont(caller(args...), (v) -> solver.finished = true; [cont, v])
-      (v) ->
+  special(null, name, (solver, cont, args...) ->
+    (v) ->
+      hashValue = hash(name, solver, caller, args...)
+      if hashValue is undefined then solver.cont(caller(args...), cont)
+      else
+        fromCont = solver.cont(caller(args...), (v) -> solver.finished = true; [cont, v])
         if solver.memo.hasOwnProperty(hashValue)
-          [result, solver.state] = solver.memo[hashValue]
+          [result, solver.state[1]] = solver.memo[hashValue]
           cont(result)
         else
           result = [newCont, v]  = solver.run(null, fromCont)
           solver.finished = false
-          solver.memo[hashValue] =  [v, solver.state]
+          solver.memo[hashValue] =  [v, solver.state[1]]
           result
     )
 
-exports.clearmemo = special(1, 'clearmemo', (solver, cont) ->
-  (v) -> solver.memo = {}; cont(v))
+exports.clearmemo = special(0, 'clearmemo', (solver, cont) ->
+  (v) -> solver.memo = {}; cont(v))()
 
 # follow: if item is followed, succeed, else fail. after eval, state is restored
 exports.follow = special(1, 'follow', (solver, cont, item) ->
@@ -898,6 +898,8 @@ dqstring = exports.quoteString('"')
 #sqstring： single quoted string '...' <br/>
 #usage: sqstring  #!!! not sqstring()
 sqstring = exports.quoteString("'")
+
+# fsm, for keywords
 
 # todo: memo parse result: partial completed <br/>
 # var and unify need to be thinked more.

@@ -2,7 +2,7 @@
 {print_, getvalue, toString} = require("../lib/builtins/general")
 {andp, orp, rule, bind, is_} = require("../lib/builtins/logic")
 {begin} = require("../lib/builtins/lisp")
-{settext, char, digits, spaces, eoi} = require("../lib/builtins/parser")
+{settext, char, digits, spaces, eoi, memo} = require("../lib/builtins/parser")
 
 exports.flatString = flatString = special(1, 'flatString', (solver, cont, x) ->
   solver.cont(x, (v) -> cont(v.flatString?() or 'null')))
@@ -12,6 +12,15 @@ exports.kleene = kleene = rule(1, (x) ->
   [ [cons(x, y)], andp(char(x), print_(x), kleene(y)),
     [null], print_('end')
   ])
+
+# wrong implementation, don't work.
+leftkleene = rule(0, () ->
+  x = vari('x')
+  [ [], andp(leftkleene(), char(x), print_(x)),
+    [], print_('end')
+  ])
+
+exports.leftkleene = leftkleene = memo(leftkleene)
 
 exports.kleenePredicate = (pred) ->
   r = rule(1, (x) ->
