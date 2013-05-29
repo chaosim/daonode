@@ -253,13 +253,11 @@ exports.Test =
     test.equal solve(begin(fac(5), fac(5))), 120
     test.done()
 
-xexports.Test =
+exports.Test =
   "test fun2 purememo": (test) ->
-    _ = dummy('_')
-    result = vari('result')
-    n = vari('n');
     factorial = fun2((x) -> if x is 1 then begin(print_(1), 1) else mul(x, factorial(sub(x, 1))))
     fac = purememo(factorial)
     test.equal solve(begin(fac(5), fac(5))), 120
+#    test.equal solve(begin(fac(5))), 120
     test.done()
 

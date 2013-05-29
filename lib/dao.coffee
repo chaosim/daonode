@@ -23,65 +23,84 @@ _ = require('underscore')
 #when solver fails at last, @failcont is executed.<br/>
 #state: the state of solver, mainly used for parsing <br/>
 
-exports.solve = (exp, cont=done, failcont=faildone, state) ->
+exports.solve = (exp, state) ->
   exports.status = exports.UNKNOWN
-  exports.solver(failcont, state).solve(exp, cont)
-
-# ####solver
-# utility for new Solver
-exports.solver = (failcont = faildone, state) -> new exports.Solver(failcont, state)
+  new exports.Solver(state).solve(exp)
 
 # ####class Solver
 # the solver for dao expression
 class exports.Solver
   # failcont is for backtracking in logic operation
   # state is mainly used in parsing.
-  constructor: (@faildone=faildone, @state) ->
+  constructor: (@state
     # @trail is used to restore varibale's binding for backtracking multiple logic choices
-    @failcont = @faildone
-    @trail=new Trail
-    #@cutCont is used for cut like in prolog.
-    @cutCont = @failcont
+    @trail=new Trail,
     #@catches is used for lisp style catch/throw
-    @catches = {}
+    @catches = {},
     # @exits is used for block/break
-    @exits = {}
+    @exits = {},
     # like above, @continues play with block/continue
     @continues = {}
+    @purememo = {}
+    @memo = {}
+    ) ->
+    @finished = false
+    solver =  @
+    @done = (value) ->
+        solver.finished = true
+        exports.status = exports.SUCCESS
+        [null, value]
+    @faildone = (value) ->
+      solver.finished = true
+      exports.status = exports.SUCCESS
+      [null, value]
+    @failcont = @faildone
+    # @cutCont is used for cut like in prolog.
+    @cutCont = @failcont
 
-  # in callcc, callfc, callcs, the solver is needed to be cloned.
-  clone: () ->
+  # in callcc, callfc, callcs, the solver is needed to be faked and restored(save all of content in an object.
+  fake: () ->
     result = {}
-    result.constructor = @constructor
-    result:: = @::
-    result.faildone = @faildone
-    result.failcont = @failcont
-    result.trail = @trail.copy()
     state = @state
     if state? then state = state.slice?(0) or state.copy?() or state.clone?() or state
-    result.cutCont = @cutCont
+    result.state = state
+    result.trail = @trail.copy()
     result.catches = _.extend({}, @catches)
     result.exits = _.extend({}, @exits)
     result.continues = _.extend({}, @continues)
+    result.purememo = _.extend({}, @purememo)
+    result.memo = _.extend({}, @memo)
     result.done = @done
     result.faildone = @faildone
-    result
+    result.failcont = @failcont
+    result.cutCont = @cutCont
+    return result
+    
+  restore: (faked) ->
+    @state = faked.state
+    @trail = faked.trail
+    @catches = faked.catches
+    @exits = faked.exits
+    @continues = faked.continues
+    @purememo = faked.purememo
+    @memo = faked.memo
+    @done = faked.done
+    @faildone = faked.faildone
+    @failcont = faked.failcont
+    @cutCont = faked.cutCont
+    @finished = false
 
   # use this solver to solve exp, cont=done is the succeed continuation.
-  solve: (exp, toCont = done) ->
-    @done = toCont
-    # first generate the continuation to get start.
+  solve: (exp, toCont = @done) ->
     fromCont = @cont(exp, toCont)
-    # and then run the trampoline loop on continuation.
-    @trail.getvalue(@run(null, fromCont, toCont))
+    [cont, value] = @run(null, fromCont)
+    @trail.getvalue(value)
 
-  # run the trampoline from cont until @done is true.
-  run: (value, cont, toCont) ->
-    if not toCont then toCont = @done
-    while 1
+  # run the trampoline from cont until @finished is true.
+  run: (value, cont) ->
+    while not @finished
       [cont, value] = cont(value)
-      if cont is toCont then exports.status = exports.SUCCESS; return value
-      if cont is @faildone then  exports.status = exports.FAIL; return value
+    [cont, value]
 
   # generate the continuation to get start with.
   cont: (exp, cont) -> exp?.cont?(@, cont) or ((v) -> cont(exp))
@@ -209,12 +228,6 @@ class exports.Solver
 
   # utility for lisp style unwind-protect, play with block/break/continue, catch/throw and lisp.protect
   protect: (fun) -> fun
-
-# default stop continuation when succeed
-exports.done = done =(v) -> [done, v]
-
-# default stop continuation when fail
-exports.faildone = faildone = (v) -> [faildone, v]
 
 # record the trail for variable binding <br/>
 #  when multiple choices exist, a new Trail for current branch is constructored, <br/>
@@ -390,7 +403,9 @@ Command = class exports.Command
     @callable = (args...) =>
       applied = new exports.Apply(@, args)
       if Command.directRun
-        result = Command.globalSolver.solve(applied, done)
+        solver = Command.globalSolver
+        result = solver.solve(applied)
+        solver.finished = false
         result
       else applied
     @callable.arity = @arity
@@ -470,7 +485,9 @@ exports.fun = commandMaker(exports.Fun)
 # Fun2 evaluate its arguments, and evaluate the result of fun(params...) again
 class exports.Fun2 extends exports.Command
   applyCont: (solver, cont, args) ->
-    solver.argsCont(args, (params) => [solver.cont(@fun(params...), cont), params])
+    fun = @fun
+    solver.argsCont(args, (params) ->
+      solver.cont(fun(params...), cont)(params))
 
 # generate an instance of Fun from a function <br/>
 #  example:  <br/>

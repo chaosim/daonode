@@ -16,7 +16,6 @@ exports.Test =
     test.equal  solve(1), 1
     test.done()
 
-
   "test vari": (test) ->
     a = vari('a')
     test.equal  solve(a), a
@@ -61,7 +60,8 @@ exports.Test =
     a = proc(0, 'a', () ->
       i = 0
       add(1, 2))
-    test.equal solve(a()), 3
+    test.equal solve(begin(a(), a())), 3
+    test.equal solve(begin(a(), add(1,1))), 2
     test.done()
 
   "test macro tofun": (test) ->

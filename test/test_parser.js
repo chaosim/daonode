@@ -317,13 +317,10 @@
     }
   };
 
-  xexports.Test = {
+  exports.Test = {
     "test fun2 purememo": function(test) {
-      var fac, factorial, n, result, _;
+      var fac, factorial;
 
-      _ = dummy('_');
-      result = vari('result');
-      n = vari('n');
       factorial = fun2(function(x) {
         if (x === 1) {
           return begin(print_(1), 1);

@@ -116,51 +116,47 @@ exports.nextchar =  special(0, 'nextchar', (solver, cont) -> (v) ->
 
 defaultPureHash = (name, caller, args...) -> (name or caller.name) + args.join(',')
 
-exports._memoPureResult = _memoPureResult = {}
-
 exports.purememo = (caller, name='', hash=defaultPureHash) ->
   if not _.isString(name) then hash  = name; name = '';
-  special(1, 'memo', (solver, cont, args...) ->
-    realCont = solver.cont(caller(args...), cont)
-    (v) ->
-      hashValue = hash(name, caller, args...)
-      # todo: take the tramploine into account.
-      if hashValue is undefined then realCont(v)
-      else
-        if _memoPureResult.hasOwnProperty(hashValue) then cont(_memoPureResult[hashValue])
+  special(1, 'purememo', (solver, cont, args...) ->
+    hashValue = hash(name, caller, args...)
+    if hashValue is undefined then solver.cont(caller(args...), cont)
+    else
+      fromCont = solver.cont(caller(args...), (v) -> solver.finished = true; [cont, v])
+      (v) ->
+        if solver.purememo.hasOwnProperty(hashValue) then cont(solver.purememo[hashValue])
         else
-          result = [newCont, v] = realCont(v);
-          _memoPureResult[hashValue] =  v
+          result = [newCont, v] = solver.run(null, fromCont)
+          solver.finished = false
+          solver.purememo[hashValue] =  v
           result
-         )
+       )
 
 exports.clearPureMemo = special(1, 'clearPureMemo', (solver, cont) ->
-  (v) -> exports._memoPureResult = {}; cont(v))
+  (v) -> solver._memoPureResult = {}; cont(v))
 
 defaultHash = (name, solver, caller, args...) -> (name or caller.name)+solver.state[1]
-
-exports._memoResult = {}
 
 exports.memo = (caller, name='', hash=defaultHash) ->
   if not _.isString(name) then hash  = name; name = '';
   special(1, 'memo', (solver, cont, args...) ->
-    realCont = solver.cont(caller(args...), cont)
-    (v) ->
-      hash = hash(name, solver, caller, args...)
-      # todo: take the tramploine into account.
-      if hash is undefined then realCont(v)
-      else
-        if exports._memoResult.hasOwnProperty(hash)
-          [result, solver.state] = memoResult[hash]
+    hashValue = hash(name, solver, caller, args...)
+    if hashValue is undefined then solver.cont(caller(args...), cont)
+    else
+      fromCont = solver.cont(caller(args...), (v) -> solver.finished = true; [cont, v])
+      (v) ->
+        if solver.memo.hasOwnProperty(hashValue)
+          [result, solver.state] = solver.memo[hashValue]
           cont(result)
         else
-          result = [v]  = realCont(v);
-          exports._memoResult[hash] =  [v, solver.state]
+          result = [newCont, v]  = solver.run(null, fromCont)
+          solver.finished = false
+          solver.memo[hashValue] =  [v, solver.state]
           result
     )
 
-exports.todoclearmemo = special(1, 'clearmemo', (solver, cont) ->
-  (v) -> exports._memoResult = {}; cont(v))
+exports.clearmemo = special(1, 'clearmemo', (solver, cont) ->
+  (v) -> solver.memo = {}; cont(v))
 
 # follow: if item is followed, succeed, else fail. after eval, state is restored
 exports.follow = special(1, 'follow', (solver, cont, item) ->
@@ -903,5 +899,6 @@ dqstring = exports.quoteString('"')
 #usage: sqstring  #!!! not sqstring()
 sqstring = exports.quoteString("'")
 
-# todo: memo parse result <br/>
+# todo: memo parse result: partial completed <br/>
+# var and unify need to be thinked more.
 # todo: left recursive nonterminal(memo could be useful to implement this)

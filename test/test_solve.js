@@ -92,7 +92,8 @@
         i = 0;
         return add(1, 2);
       });
-      test.equal(solve(a()), 3);
+      test.equal(solve(begin(a(), a())), 3);
+      test.equal(solve(begin(a(), add(1, 1))), 2);
       return test.done();
     },
     "test macro tofun": function(test) {

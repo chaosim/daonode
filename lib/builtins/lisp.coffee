@@ -172,27 +172,32 @@ exports.protect = special(-1, 'protect', (solver, cont, form, cleanup...) ->
   result = solver.cont(form, cleanupCont)
   result)
 
-# used by callcc and callfc 
-runner = (solver, cont) -> (v) ->
-  solver.trail.getvalue(solver.run(v, cont))
 
 # callcc(someFunction(kont) -> body) <br/>
 #current continuation @cont can be captured in someFunction
-
 exports.callcc = special(1, 'callcc', (solver, cont, fun) -> (v) ->
-  cont(fun(runner(solver.clone(), cont))))
+  faked = solver.fake()
+  cc = (v) ->
+    solver.restore(faked)
+    result = solver.run(v, cont)
+    solver.trail.getvalue(result[1])
+  cont(fun(cc)))
 
 # callfc(someFunction(fc) -> body) <br/>
 #current solver.failcont can be captured in someFunction
-
 exports.callfc = special(1, 'callfc', (solver, cont, fun) -> (v) ->
-  cont(fun(runner(solver.clone(), solver.failcont))))
+  faked = solver.fake()
+  fc = (v) ->
+    solver.restore(faked)
+    result = solver.run(v,  solver.failcont)
+    solver.trail.getvalue(result[1])
+  cont(fun(fc)))
 
-# callcs(someFunction(solver, kont) -> body) <br/>
-#  the solver and current cont can be captured in someFunction
-  
+# 0.1.11 update
+# callcs(someFunction(solver, faked, kont) -> body) <br/>
+#  the solver, solver's current content and current cont can be captured in someFunction
 exports.callcs = special(1, 'callcs', (solver, cont, fun) -> (v) ->
-  cont(fun(solver.clone(), cont)))
+  cont(fun(solver, solver.fake(), cont)))
 
 # lisp style quasiquote/unquote/unquote-slice "`", "," and ",@" 
 exports.quasiquote = exports.qq = special(1, 'quasiquote', (solver, cont, item) ->
