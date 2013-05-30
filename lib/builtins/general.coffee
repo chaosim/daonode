@@ -5,7 +5,7 @@ fun = core.fun
 special = core.special
 
 # console.log(arguments) 
-exports.print_ = special(null, 'eq', (solver, cont, args...) ->
+exports.print_ = special(null, 'print_', (solver, cont, args...) ->
   solver.argsCont(args, (args,  solver) -> console.log(args...); cont(null)))
 
 # x === y 

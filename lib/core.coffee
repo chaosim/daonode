@@ -191,7 +191,7 @@ class exports.Solver
       else
         params = []
         solver = @
-        for i in [args.length-1..0] by -1
+        for i in [length-1..0] by -1
           cont = do (i=i, cont=cont) ->
             _cont = (argi) ->  (params.push(argi); cont(params))
             solver.cont(args[i], _cont)
