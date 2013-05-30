@@ -1,4 +1,4 @@
-{solve, special, vari, dummy, cons, vari, macro} = require("../lib/dao")
+{solve, special, vari, dummy, cons, vari, macro} = require("../lib/core")
 {print_, getvalue, toString} = require("../lib/builtins/general")
 {andp, orp, rule, bind, is_} = require("../lib/builtins/logic")
 {begin} = require("../lib/builtins/lisp")

@@ -1,10 +1,10 @@
 # #### logic builtins
-{ArgumentError} = solve = require "../dao"
+{ArgumentError} = core = require "../core"
 
-special = solve.special
-macro = solve.macro
-Trail = solve.Trail
-Var = solve.Var
+special = core.special
+macro = core.macro
+Trail = core.Trail
+Var = core.Var
 
 exports.succeed = special(0, 'succeed', (solver, cont) -> cont)()
 
@@ -305,9 +305,9 @@ exports.functionPredicate = (arity, name, fun) ->
 exports.between = special(3, 'between', (solver, cont, fun, x, y, z) ->
   y1 = z1 = null
   zcont = solver.cont(z,  (zz) ->
-    if x1 instanceof dao.Var then throw dao.TypeError(x)
-    else if y1 instanceof dao.Var then throw new dao.TypeError(y)
-    if y1 instanceof dao.Var
+    if x1 instanceof core.Var then throw core.TypeError(x)
+    else if y1 instanceof core.Var then throw new core.TypeError(y)
+    if y1 instanceof core.Var
       y11 = y1
       fc = solver.failcont
       solver.failcont = (v) ->
@@ -326,8 +326,8 @@ exports.rangep = special(2, 'rangep', (solver, cont, x, y) ->
   # select all of values between x and y as choices
   x1 = null
   ycont = solver.cont(y,  (y) ->
-    if x1 instanceof dao.Var then throw dao.TypeError(x)
-    else if y1 instanceof dao.Var then throw new dao.TypeError(y)
+    if x1 instanceof core.Var then throw core.TypeError(x)
+    else if y1 instanceof core.Var then throw new core.TypeError(y)
     else if x1>y1 then return solver.failcont(false)
     result = x1
     fc = solver.failcont
@@ -341,13 +341,13 @@ exports.rangep = special(2, 'rangep', (solver, cont, x, y) ->
 # if x is Var then succeed else fail 
 exports.varp = special(1, 'varp', (solver, cont, x) ->
    solver.cont(x, (x1) ->
-     if (x1 instanceof dao.Var) then cont(true)
+     if (x1 instanceof core.Var) then cont(true)
      else solver.failcont(false)))
 
 # if x is NOT Var then succeed else fail 
 exports.nonvarp = special(1, 'notvarp', (solver, cont, x) ->
   solver.cont(x, (x1) ->
-    if (x1 not instanceof dao.Var) then cont(true)
+    if (x1 not instanceof core.Var) then cont(true)
     else solver.failcont(false)))
 
 #  if x is Var and is bound to itself then succeed else fail 
@@ -384,5 +384,5 @@ exports.listp = special(1, 'listp', (solver, cont, x) ->
 #  if x is callable then succeed else fail 
 exports.callablep = special(1, 'callablep', (solver, cont, x) ->
   solver.cont(x, (x1) ->
-  if x1 instanceof dao.Apply then cont(true)
+  if x1 instanceof core.Apply then cont(true)
   else solver.failcont(false)))

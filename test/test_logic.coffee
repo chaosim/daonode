@@ -2,8 +2,8 @@ I = require "./importer"
 
 base  =  "../lib/"
 
-dao  = require base+"dao"
-I.use base+"dao: Trail, solve, fun, macro vari"
+core  = require base+"core"
+I.use base+"core: Trail, solve, fun, macro vari"
 I.use base+"builtins/general: add print_"
 I.use base+"builtins/lisp: quote eval_"
 I.use base+"builtins/logic: andp orp notp succeed fail unify findall once rule"
@@ -86,7 +86,7 @@ exports.Test =
     r = rule(2, (x, y)->
       [[x,y], 1, null])
     test.equal  solve(r(1,1)), 1
-    test.equal dao.status, dao.SUCCESS
+    test.equal core.status, core.SUCCESS
     test.done()
 
 
@@ -106,5 +106,5 @@ exports.Test =
     test.deepEqual  solve(andp(findall(fail, result, x), result)), []
     test.deepEqual  solve(andp(findall(succeed, result, 1), result)), [1]
     test.deepEqual  solve(andp(findall(once(orp(print_(1), print_(2))), result, 1), result)), [1]
-    test.equal(dao.status, dao.SUCCESS);
+    test.equal(core.status, core.SUCCESS);
     test.done()

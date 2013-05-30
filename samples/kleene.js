@@ -2,7 +2,7 @@
 (function() {
   var andp, begin, bind, char, cons, digits, dummy, eoi, flatString, getvalue, is_, kleene, leftkleene, macro, memo, orp, print_, rule, settext, solve, spaces, special, toString, vari, _ref, _ref1, _ref2, _ref3;
 
-  _ref = require("../lib/dao"), solve = _ref.solve, special = _ref.special, vari = _ref.vari, dummy = _ref.dummy, cons = _ref.cons, vari = _ref.vari, macro = _ref.macro;
+  _ref = require("../lib/core"), solve = _ref.solve, special = _ref.special, vari = _ref.vari, dummy = _ref.dummy, cons = _ref.cons, vari = _ref.vari, macro = _ref.macro;
 
   _ref1 = require("../lib/builtins/general"), print_ = _ref1.print_, getvalue = _ref1.getvalue, toString = _ref1.toString;
 

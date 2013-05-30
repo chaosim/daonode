@@ -5,7 +5,7 @@
 
   _ = require('underscore');
 
-  _ref = require("../lib/dao"), solve = _ref.solve, special = _ref.special, vari = _ref.vari, dummy = _ref.dummy, cons = _ref.cons, vari = _ref.vari, macro = _ref.macro;
+  _ref = require("../lib/core"), solve = _ref.solve, special = _ref.special, vari = _ref.vari, dummy = _ref.dummy, cons = _ref.cons, vari = _ref.vari, macro = _ref.macro;
 
   _ref1 = require("../lib/builtins/general"), print_ = _ref1.print_, getvalue = _ref1.getvalue, toString = _ref1.toString;
 

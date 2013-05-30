@@ -1,4 +1,4 @@
-exports.core = core = require("./lib/dao")
+exports.core = core = require("./lib/core")
 exports.solve = core.solve
 exports.solver = core.solver
 exports.special = core.special

@@ -1,8 +1,8 @@
 # #### general builtins
 
-solve = require "../dao"
-fun = solve.fun
-special = solve.special
+core = require "../core"
+fun = core.fun
+special = core.special
 
 # console.log(arguments) 
 exports.print_ = special(null, 'eq', (solver, cont, args...) ->

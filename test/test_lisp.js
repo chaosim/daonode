@@ -9,7 +9,7 @@
 
   base = "../lib/";
 
-  I.use(base + "dao: Trail, solve, solver, fun, macro proc vari debug done faildone UnquoteSliceValue");
+  I.use(base + "core: Trail, solve, solver, fun, macro proc vari debug done faildone UnquoteSliceValue");
 
   I.use(base + "builtins/general: add print_ inc dec eq le");
 

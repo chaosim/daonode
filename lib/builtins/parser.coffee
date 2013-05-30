@@ -10,13 +10,13 @@
 
 _ = require('underscore')
 
-dao = require "../dao"
+core = require "../core"
 
 logic = require "./logic"
 general = require "./general"
 lisp = require "./lisp"
 
-[Trail, solve, Var,  ExpressionError, TypeError, special] = (dao[name]  for name in\
+[Trail, solve, Var,  ExpressionError, TypeError, special] = (core[name]  for name in\
 "Trail, solve, Var,  ExpressionError, TypeError, special".split(", "))
 
 # ####parser control/access
@@ -258,7 +258,7 @@ exports.greedymay = special(1, 'greedymay', (solver, cont, exp) ->
 
 # #### any, lazyany, greedyany
 # any: zero or more exp, normal mode <br/>
-#  result should be an dao.Var, and always be bound to the result array. <br/>
+#  result should be an core.Var, and always be bound to the result array. <br/>
 #  template: the item in result array is getvalue(template)
 exports.any = (exp, result, template) -> if not result then any1(exp) else any2(exp, result, template)
 
@@ -266,7 +266,7 @@ any1 = special(1, 'any', (solver, cont, exp) ->
   anyCont = (v) ->
     fc = solver.failcont
     trail = solver.trail
-    solver.trail = new dao.Trail
+    solver.trail = new core.Trail
     state = solver.state
     solver.failcont = (v) ->
       solver.trail.undo()
@@ -283,7 +283,7 @@ any2 = special(3, 'any', (solver, cont, exp, result, template) ->
   anyCont = (v) ->
     fc = solver.failcont
     trail = solver.trail
-    solver.trail = new dao.Trail
+    solver.trail = new core.Trail
     state = solver.state
     solver.failcont = (v) ->
       solver.trail.undo()
@@ -298,7 +298,7 @@ any2 = special(3, 'any', (solver, cont, exp, result, template) ->
   (v) -> result1 = [];  result.bind(result1, solver.trail); anyCont(v))
 
 # lazyany: zero or more exp, lazy mode <br/>
-#  result should be an dao.Var, and always be bound to the result array. <br/>
+#  result should be an core.Var, and always be bound to the result array. <br/>
 #  template: the item in reuslt array is getvalue(template)
 exports.lazyany = (exp, result, template) ->
   if not result then lazyany1(exp) else lazyany2(exp, result, template)
@@ -329,7 +329,7 @@ lazyany2 = special(3, 'lazyany', (solver, cont, exp, result, template) ->
   (v) -> result1 = []; fc = solver.failcont; anyCont(v))
 
 # greedyany: zero or more exp, greedy mode
-#  result should be an dao.Var, and always be bound to the result array.
+#  result should be an core.Var, and always be bound to the result array.
 #  template: the item in reuslt array is getvalue(template)
 exports.greedyany = (exp, result, template) -> if not result then greedyany1(exp) else greedyany2(exp, result, template)
 
@@ -353,7 +353,7 @@ greedyany2 = special(3, 'greedyany', (solver, cont, exp, result, template) ->
 
 # ##### some, lazysome, greedysome
 # some: one or more exp, normal mode <br/>
-#  result should be an dao.Var, and always be bound to the result array. <br/>
+#  result should be an core.Var, and always be bound to the result array. <br/>
 #  template: the item in reuslt array is getvalue(template)
 exports.some = (exp, result, template) -> if not result then some1(exp) else some2(exp, result, template)
 
@@ -361,7 +361,7 @@ some1 = special(1, 'some', (solver, cont, exp) ->
   someCont = (v) ->
     fc = solver.failcont
     trail = solver.trail
-    solver.trail = new dao.Trail
+    solver.trail = new core.Trail
     state = solver.state
     solver.failcont = (v) ->
       solver.trail.undo()
@@ -378,7 +378,7 @@ some2 = special(3, 'some', (solver, cont, exp, result, template) ->
   someCont = (v) ->
     fc = solver.failcont
     trail = solver.trail
-    solver.trail = new dao.Trail
+    solver.trail = new core.Trail
     state = solver.state
     solver.failcont = (v) ->
       solver.trail.undo()
@@ -393,7 +393,7 @@ some2 = special(3, 'some', (solver, cont, exp, result, template) ->
   (v) -> result1 = []; result.bind(result1, solver.trail); expCont(v))
 
 # lazysome: one or more exp, lazy mode <br/>
-#  result should be an dao.Var, and always be bound to the result array. <br/>
+#  result should be an core.Var, and always be bound to the result array. <br/>
 #  template: the item in reuslt array is getvalue(template)
 exports.lazysome = (exp, result, template) -> if not result then lazysome1(exp) else lazysome2(exp, result, template)
 
@@ -425,7 +425,7 @@ lazysome2 = special(3, 'lazysome', (solver, cont, exp, result, template) ->
     expcont(v))
 
 # greedysome: one or more exp, greedy mode<br/>
-#  result should be an dao.Var, and always be bound to the result array. <br/>
+#  result should be an core.Var, and always be bound to the result array. <br/>
 #  template: the item in reuslt array is getvalue(template)
 exports.greedysome = (exp, result, template) -> if not result then greedysome1(exp) else greedysome2(exp, result, template)
 
@@ -449,9 +449,9 @@ greedysome2 = special(3, 'greedysome', (solver, cont, exp, result, template) ->
     solver.failcont = (v) -> (solver.failcont = fc; result.bind(result1, solver.trail); cont(v))
     expCont(v))
 
-# times: given times of exp, expectTimes should be integer or dao.Var <br/>
-#  if @expectTimes is free dao.Var, then times behaviour like any(normal node).<br/>
-#  result should be an dao.Var, and always be bound to the result array.<br/>
+# times: given times of exp, expectTimes should be integer or core.Var <br/>
+#  if @expectTimes is free core.Var, then times behaviour like any(normal node).<br/>
+#  result should be an core.Var, and always be bound to the result array.<br/>
 #  template: the item in reuslt array is getvalue(template)
 exports.times = (exp, expectTimes, result, template) ->
   if not result then times1(exp, expectTimes)
@@ -481,7 +481,7 @@ times1Fun = (solver, cont, exp, expectTimes) ->
     anyCont = (v) ->
       fc = solver.failcont
       trail = solver.trail
-      solver.trail = new dao.Trail
+      solver.trail = new core.Trail
       state = solver.state
       solver.failcont = (v) ->
         solver.trail.undo()
@@ -532,7 +532,7 @@ times2Fun = (solver, cont, exp, expectTimes, result, template) ->
     anyCont = (v) ->
       fc = solver.failcont
       trail = solver.trail
-      solver.trail = new dao.Trail
+      solver.trail = new core.Trail
       state = solver.state
       solver.failcont = (v) ->
         solver.trail.undo()
@@ -550,10 +550,10 @@ times2Fun = (solver, cont, exp, expectTimes, result, template) ->
 
 times2 = special(4, 'times', times2Fun)
 
-# seplist: sep separated exp, expectTimes should be integer or dao.Var <br/>
+# seplist: sep separated exp, expectTimes should be integer or core.Var <br/>
 #  at least one exp is matched.<br/>
-#  if expectTimes is free dao.Var, then seplist behaviour like some(normal node).<br/>
-#  result should be an dao.Var, and always be bound to the result array.<br/>
+#  if expectTimes is free core.Var, then seplist behaviour like some(normal node).<br/>
+#  result should be an core.Var, and always be bound to the result array.<br/>
 #  template: the item in reuslt array is getvalue(template)
 exports.seplist = (exp, options={}) ->
   # one or more exp separated by sep
@@ -562,7 +562,7 @@ exports.seplist = (exp, options={}) ->
   result = options.result or null;
   template = options.template or null
 
-  vari = dao.vari
+  vari = core.vari
   succeed = logic.succeed; andp = logic.andp; bind = logic.bind; is_ = logic.is_
   freep = logic.freep; ifp = logic.ifp; prependFailcont = logic.prependFailcont
   list = general.list; push = general.push; pushp = general.pushp
@@ -795,7 +795,7 @@ exports.whitespaces0 = exports.stringIn0(' \t\r\n')
 exports.newlines0 = exports.stringIn0('\r\n')
 
 # float: match a number, which can be float format..<br/>
-#  if arg is free dao.Var, arg would be bound to the number <br/>
+#  if arg is free core.Var, arg would be bound to the number <br/>
 #  else arg should equal to the number.
 exports.number = exports.float = special(1, 'float', (solver, cont, arg) -> (v) ->
   [text, pos] = solver.state

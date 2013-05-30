@@ -3,13 +3,13 @@
 # lisp knows cont only.
 
 _ = require('underscore')
-dao = require "../dao"
+core = require "../core"
 general = require "./general"
 
-special = dao.special
-macro = dao.macro
+special = core.special
+macro = core.macro
 
-debug = dao.debug
+debug = core.debug
 
 # aka lisp's quote, like in lisp, 'x==x, quote(x) === x 
 exports.quote = special(1, 'quote', (solver, cont, exp) ->
@@ -27,8 +27,8 @@ exports.assign = special(2, 'assign', (solver, cont, vari, exp) ->
   # EXCEPT the vari has been in solver.trail in the logic branch before.
 
   solver.cont(exp, (v) ->
-    if v instanceof dao.Var
-      new dao.TypeError(v, "do NOT assign free logic var to var")
+    if v instanceof core.Var
+      new core.TypeError(v, "do NOT assign free logic var to var")
     vari.binding = v;
     cont(v)))
 
