@@ -14,56 +14,27 @@ debug = core.debug
 
 # aka lisp's quote, like in lisp, 'x==x, quote(x) === x 
 exports.quote = special(1, 'quote', (compiler, cont, exp) ->
-  v = compiler.vari('v')
-  il.clamda(v, il.return(il.array(cont, exp))))
+  il.return(cont.call(exp)))
 
 # aka lisp's eval, solve(eval_(quote(x))) means solve(x),  
 exports.eval_ = special(1, 'eval', (compiler, cont, exp) ->
-  compiler.cont(exp, (v) -> [compiler.cont(v, cont), null]))
+  v = compiler.vari('v')
+  compiler.cont(exp, il.clamda(v, compiler.cont(v, cont))))
 
-# vari.binding = exp 
-exports.assign = special(2, 'assign', (compiler, cont, vari, exp) ->
-  # different from is_ in logic.coffee: <br/>
-  # Because not using vari.bind, this is not saved in compiler.trail  <br/>
-  # and so it can NOT be restored in compiler.failcont <br/>
-  # EXCEPT the vari has been in compiler.trail in the logic branch before.
-
-  compiler.cont(exp, (v) ->
-    if v instanceof core.Var
-      new core.TypeError(v, "do NOT assign free logic var to var")
-    vari.binding = v;
-    cont(v)))
-
-# vari.binding = 0 <br/>
-#  provide this for reducing continuation, and make code running faster.
-exports.zero = special(1, 'zero', (compiler, cont, vari, exp) ->
-  (v) -> (vari.binding = 0; cont(v)))
-
-# vari.binding = 1 <br/>
-#  provide this for reducing continuation, and make code running faster.
-exports.one = special(1, 'one', (compiler, cont, vari, exp) ->
- (v) -> (vari.binding = 1; cont(v)))
+exports.assign = special(2, 'assign', (compiler, cont, item, exp) ->
+  v = compiler.vari('v')
+  compiler.cont(exp, il.clamda(v, il.assign(item.interlang(), v), il.return(cont.call(v)))))
 
 # aka lisp's begin, same as logic.andp 
 exports.begin = special(null, 'begin', (compiler, cont, exps...) -> compiler.expsCont(exps, cont))
 
 if_fun = (compiler, cont, test, then_, else_) ->
-  then_cont = compiler.cont(then_, cont)
-  if else_?
-    else_cont = compiler.cont(else_, cont)
-    action = (v) ->
-      if (v) then then_cont(v)
-      else else_cont(v)
-    compiler.cont(test, action)
-  else
-    action =  (v) ->
-      if (v) then then_cont(null)
-      else cont(null)
-    compiler.cont(test, action)
+  v = compiler.vari('v')
+  compiler.cont(test, il.clamda(v, il.if_(v, compiler.cont(then_, cont), compiler.cont(else_, cont))))
 
 # lisp style if. <br/>
 #  different from logic.ifp, when test fail, it do not run else_ clause.
-exports.if_ = special([2,3], 'if_', if_fun)
+exports.if_ = if_ = special([2,3], 'if_', if_fun)
 
 iff_fun = (compiler, cont, clauses, else_) ->
   length = clauses.length
@@ -73,13 +44,9 @@ iff_fun = (compiler, cont, clauses, else_) ->
     if_fun(compiler, cont, test, then_, else_)
   else
     [test, then_] = clauses[0]
-    then_cont = compiler.cont(then_, cont)
-    iff_else_cont = iff_fun(compiler, cont, clauses[1...], else_)
-    action = (v) ->
-      if (v) then [then_cont, v]
-      else [iff_else_cont, v]
-    compiler.cont(test, action)
-
+    v = compiler.vari('v')
+    compiler.cont(test, il.clamda(v, il.if_(v, compiler.cont(then_, cont),
+                                     iff_fun(compiler, cont, clauses[1...], else_))))
 
 #iff [ [test1, body1], <br/>
 #      [test2, body2]  <br/>
@@ -88,7 +55,7 @@ iff_fun = (compiler, cont, clauses, else_) ->
 
 exports.iff = special(-2, 'iff', iff_fun)
 
-# lisp style block 
+# lisp style block
 exports.block = block = special(null, 'block', (compiler, cont, label, body...) ->
   if not _.isString(label) then (label = ''; body = [label].concat(body))
 
@@ -96,19 +63,22 @@ exports.block = block = special(null, 'block', (compiler, cont, label, body...) 
   exits.push(cont)
   defaultExits = compiler.exits[''] ?= []  # if no label, go here
   defaultExits.push(cont)
-  holder = [null]
   continues = compiler.continues[label] ?= []
-  continues.push(holder)
+  f = compiler.vari('block'+label)
+  fun = il.clamda(compiler.vari('v'), null)
+  continues.push(f)
   defaultContinues = compiler.continues[''] ?= []   # if no label, go here
-  defaultContinues.push(holder)
-  holder[0] = fun = compiler.expsCont(body, cont)
+  defaultContinues.push(f)
+  fun.body = compiler.expsCont(body, cont)
   exits.pop()
   if exits.length is 0 then delete compiler.exits[label]
   continues.pop()
   if continues.length is 0 then delete compiler.continues[label]
   defaultExits.pop()
   defaultContinues.pop()
-  fun)
+  il.begin(
+    il.assign(f, fun),
+    il.return(f.apply([null]))))
 
 # break a block 
 exports.break_ = break_ = special([0, 1,2], 'break_', (compiler, cont, label='', value=null) ->
@@ -117,15 +87,14 @@ exports.break_ = break_ = special([0, 1,2], 'break_', (compiler, cont, label='',
   exits = compiler.exits[label]
   if not exits or exits==[] then throw Error(label)
   exitCont = exits[exits.length-1]
-  valCont = (v) -> compiler.protect(exitCont)(v)
-  compiler.cont(value, valCont))
+  compiler.cont(value, compiler.protect(exitCont)))
 
 # continue a block 
 exports.continue_ = continue_ = special([0,1], 'continue_', (compiler, cont, label='') ->
   continues = compiler.continues[label]
   if not continues or continues==[] then throw Error(label)
   continueCont = continues[continues.length-1]
-  (v) -> [compiler.protect(continueCont[0]), v])
+  il.return(compiler.protect(continueCont).call(null)))
 
 not_ = general.not_
 
@@ -145,46 +114,53 @@ exports.until_ = macro(null, 'until_', (label,body..., test) ->
    body = body.concat([if_(not_(test), continue_(label))])
    block(label, body...))
 
-# aka. lisp style catch/throw  
+
+# aka. lisp style catch/throw
 exports.catch_ = special(-1, 'catch_', (compiler, cont, tag, forms...) ->
-  tagCont = (v) ->
-    compiler.pushCatch(v, cont)
-    formsCont = compiler.expsCont(forms, (v2) -> compiler.popCatch(v); [cont, v2])
-    [formsCont, v]
-  compiler.cont(tag, tagCont))
+  v = compiler.vari('v'); v2 = compiler.vari('v')
+  formsCont = compiler.expsCont(forms, il.clamda(v2
+        il.popCatch.apply([v]),
+        il.return(cont.call(v2))))
+  compiler.cont(tag, il.clamda(v,
+    il.pushCatch.apply([v, cont]),
+    formsCont)))
 
 # aka lisp style throw 
 exports.throw_ = special(2, 'throw_', (compiler, cont, tag, form) ->
-  formCont =  (v) ->
-    compiler.cont(form, (v2) ->
-      compiler.protect(compiler.findCatch(v))(v2))(v)
+  v = compiler.vari('v'); v2 = compiler.vari('v')
+  formCont =  il.clamda(v,
+    compiler.cont(form, il.clamda(v2,
+      il.return(compiler.protect(il.findCatch.apply([v])).call(v2)))))
   compiler.cont(tag, formCont))
+
 
 # aka. lisp's unwind-protect 
 exports.protect = special(-1, 'protect', (compiler, cont, form, cleanup...) ->
   oldprotect = compiler.protect
-  compiler.protect = (fun) -> (v1) ->
-                               compiler.expsCont(cleanup, (v2) ->
-                                 compiler.protect = oldprotect;
-                                 oldprotect(fun)(v1))(v1)
-  cleanupCont = (v1) ->
-    compiler.expsCont(cleanup, (v2) ->
-                    compiler.protect = oldprotect
-                    cont(v1))(v1)
-  result = compiler.cont(form, cleanupCont)
+  v1 = compiler.vari('v'); v2 = compiler.vari('v')
+  compiler.protect = (cont) -> il.clamda(v1,
+                               compiler.expsCont(cleanup, il.clamda(v2,
+                                il.return(oldprotect(cont).call(v1)))))
+  result = compiler.cont(form,  il.clamda(v1,
+                  compiler.expsCont(cleanup, il.clamda(v2,
+                    il.return(cont.call(v1))))))
+  compiler.protect = oldprotect
   result)
-
 
 # callcc(someFunction(kont) -> body) <br/>
 #current continuation @cont can be captured in someFunction
-exports.callcc = special(1, 'callcc', (compiler, cont, fun) -> (v) ->
-  faked = compiler.fake()
-  cc = (v) ->
-    compiler.restore(faked)
-    result = compiler.run(v, cont)
-    compiler.trail.getvalue(result[1])
-  cont(fun(cc)))
+exports.callcc = special(1, 'callcc', (compiler, cont, fun) ->
+  if not fun.toCode? then fun = il.fun(fun)
+  faked = compiler.vari('faked');  result = compiler.vari('result'); v = compiler.vari('v')
+  cc = il.clamda(v,
+    il.restore.apply([faked]),
+    il.assign(result, il.getvalue.apply([il.index.apply([il.run.apply([cont, v]), 1])])),
+    il.code("solver.finished = false;"),
+    il.return(result))
+  il.begin(il.assign(faked, il.fake),
+    il.return(cont.call(fun.apply([cc])))))
 
+###
 # callfc(someFunction(fc) -> body) <br/>
 #current compiler.failcont can be captured in someFunction
 exports.callfc = special(1, 'callfc', (compiler, cont, fun) -> (v) ->
@@ -210,3 +186,4 @@ exports.unquote = exports.uq = special(1, 'unquote', (compiler, cont, item) ->
 
 exports.unquoteSlice = exports.uqs = special(1, 'unquoteSlice', (compiler, cont, item) ->
   throw "unquoteSlice: too many unquote and unquoteSlice")
+###

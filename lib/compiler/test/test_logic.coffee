@@ -1,17 +1,22 @@
-I = require "./importer"
+_ = require "underscore"
 
-base  =  "../lib/"
-
-core  = require base+"core"
-I.use base+"core: Trail, solve, fun, macro vari"
-I.use base+"builtins/general: add print_"
-I.use base+"builtins/lisp: quote eval_"
-I.use base+"builtins/logic: andp orp notp succeed fail unify findall once rule"
-I.use base+"builtins/parser: char parsetext may any"
+{solve, vari, fun, macro, fun2, recursive} = core = require('../core')
+#{ quote, eval_, begin, assign, if_, iff, block, break_, continue_, loop_, while_, until_,
+#catch_, throw_, protect, callcc} = require('../builtins/lisp')
+{ andp, orp, succeed, fail} = require('../builtins/logic')
+{print_, le, eq, add, sub, inc, suffixinc} = require('../builtins/general')
 
 xexports = {}
 
 exports.Test =
+  "test succeed fail": (test) ->
+#    test.equal solve(succeed), true
+#    test.equal(core.status, core.SUCCESS);
+    test.equal solve(fail), false
+    test.equal(core.status, core.FAIL);
+    test.done()
+
+xexports.Test =
   "test and print": (test) ->
     test.equal  solve(andp(print_(1), print_(2))), null
     test.done()
@@ -22,11 +27,6 @@ exports.Test =
     test.equal  solve(orp(fail, print_(2))), null
     test.equal  solve(orp(fail, print_(2), print_(3))), null
     test.equal  solve(orp(fail, fail, print_(3))), null
-    test.done()
-
-  "test succeed fail": (test) ->
-    test.equal solve(succeed), null
-    test.equal solve(fail), null
     test.done()
 
   "test not succeed fail": (test) ->

@@ -1,146 +1,48 @@
 # #### general builtins
 
 core = require "../core"
-clamda = core.clamda
-
 il = require "../interlang"
 
 fun = core.fun
 special = core.special
 
 # console.log(arguments) 
-exports.print_ = special(null, 'print', (compiler, cont, args...) ->
-  compiler.argsCont(args, clamda(args, il.print(args...), il.return(cont, null))))
+exports.print_ = fun(null, 'print',il.jscallable('console.log'))
 
-# x === y 
-exports.eq = special(2, 'eq', (compiler, cont, x, y) ->
-  x1 = compiler.vari('x')
-  y1 = compiler.vari('y')
-  compiler.cont(x, clamda(x1, compiler.cont(y, clamda(y1, cont.call(il.eq(x1, y1))).call(null)).call(null))))
+exports.eq = fun(2, 'eq', il.eq)
+exports.ne = fun(2, 'ne', il.ne)
+exports.lt = fun(2, 'lt', il.lt)
+exports.le = fun(2, 'le', il.le)
+exports.gt = fun(2, 'gt', il.gt)
+exports.ge = fun(2, 'ge', il.ge)
+exports.add = fun(2, 'add', il.add)
+exports.sub = fun(2, 'sub', il.sub)
+exports.mul = fun(2, 'mul', il.mul)
+exports.div = fun(2, 'div', il.div)
+exports.and_ = fun(2, 'and_', il.and_)
+exports.or_ = fun(2, 'or_', il.or_)
+exports.not_ = fun(1, 'not_', il.not_)
+exports.lshift = fun(2, 'lshift', il.lshift)
+exports.rshift = fun(2, 'rshift', il.rshift)
+exports.bitand = fun(2, 'bitand', il.bitand)
+exports.bitor = fun(2, 'bitor', il.bitor)
+exports.bitnot = fun(1, 'bitnot', il.bitnot)
 
-# x !== y 
-exports.ne = special(2, 'ne', (compiler, cont, x, y) ->
-  ycont =  compiler.cont(y, (v) -> cont(x!=v))
-  xcont = (v) ->  x = v; ycont(null)
-  compiler.cont(x, xcont))
 
-# x < y 
-exports.lt = special(2, 'lt', (compiler, cont, x, y) ->
-  ycont =  compiler.cont(y, (v) -> cont(x<=v))
-  xcont = (v) ->  (x = v; ycont(null))
-  compiler.cont(x, xcont))
+exports.inc = special(1, 'inc', (compiler, cont, item) ->
+  il.return(cont.call(il.inc.apply([item.interlang()]))))
 
-# x <= y 
-exports.le = special(2, 'le', (compiler, cont, x, y) ->
-  ycont =  compiler.cont(y, (v) -> cont(x<=v))
-  xcont = (v) ->  x = v; ycont(null)
-  compiler.cont(x, xcont))
+exports.suffixinc = special(1, 'suffixinc', (compiler, cont, item) ->
+  il.return(cont.call(il.suffixinc.apply([item.interlang()]))))
 
-#  x > y 
-exports.gt = special(2, 'gt', (compiler, cont, x, y) ->
-  ycont =  compiler.cont(y, (v) -> cont(x>v))
-  xcont = (v) ->  (x = v; ycont(null))
-  compiler.cont(x, xcont))
+exports.dec = special(1, 'dec', (compiler, cont, item) ->
+  il.return(cont.call(il.dec.apply([item.interlang()]))))
 
-# x >= y 
-exports.ge = special(2, 'ge', (compiler, cont, x, y) ->
-  ycont =  compiler.cont(y, (v) -> cont(x>=v))
-  xcont = (v) ->  x = v; ycont(null)
-  compiler.cont(x, xcont))
+exports.suffixdec = special(1, 'suffixdec', (compiler, cont, item) ->
+  il.return(cont.call(il.suffixdec.apply([item.interlang()]))))
 
-# x + y 
-exports.add = special(2, 'add', (compiler, cont, x, y) ->
-  ycont =  compiler.cont(y, (v) -> cont(x+v))
-  xcont = (v) ->  x = v; ycont(null)
-  compiler.cont(x, xcont))
-
-# x - y 
-exports.sub = special(2, 'sub', (compiler, cont, x, y) ->
-  ycont =  compiler.cont(y, (v) -> cont(x-v))
-  xcont = (v) ->  (x = v; ycont(null))
-  compiler.cont(x, xcont))
-
-# x * y 
-exports.mul = special(2, 'mul', (compiler, cont, x, y) ->
-  ycont =  compiler.cont(y, (v) -> cont(x*v))
-  xcont = (v) ->  x = v; ycont(null)
-  compiler.cont(x, xcont))
-
-# x / y 
-exports.div = special(2, 'div', (compiler, cont, x, y) ->
-  ycont =  compiler.cont(y, (v) -> cont(x/v))
-  xcont = (v) ->  (x = v; ycont(null))
-  compiler.cont(x, xcont))
-
-# x % y 
-exports.mod = special(2, 'mod', (compiler, cont, x, y) ->
-  ycont =  compiler.cont(y, (v) -> cont(x%v))
-  xcont = (v) ->  x = v; ycont(null)
-  compiler.cont(x, xcont))
-
-# x && y 
-exports.and_ = special(2, 'and_', (compiler, cont, x, y) ->
-  ycont =  compiler.cont(y, (v) -> cont(x and v))
-  xcont = (v) ->  x = v; ycont(null)
-  compiler.cont(x, xcont))
-
-# x || y 
-exports.or_ = special(2, 'or_', (compiler, cont, x, y) ->
-  ycont =  compiler.cont(y, (v) -> cont(x and v))
-  xcont = (v) ->  x = v; ycont(null)
-  compiler.cont(x, xcont))
-
-# !x 
-exports.not_ = special(1, 'not_', (compiler, cont, x) ->
-  compiler.cont(x, (v) -> cont(not v)))
-
-# x << y 
-exports.lshift = special(2, 'lshift', (compiler, cont, x, y) ->
-  ycont =  compiler.cont(y, (v) -> cont(x << v))
-  xcont = (v) ->  x = v; ycont(null)
-  compiler.cont(x, xcont))
-
-# x >> y 
-exports.rshift = special(2, 'rshift', (compiler, cont, x, y) ->
-  ycont =  compiler.cont(y, (v) -> cont(x >> v))
-  xcont = (v) ->  x = v; ycont(null)
-  compiler.cont(x, xcont))
-
-# x & y 
-exports.bitand = special(2, 'bitand', (compiler, cont, x, y) ->
-  ycont =  compiler.cont(y, (v) -> cont(x & v))
-  xcont = (v) ->  x = v; ycont(null)
-  compiler.cont(x, xcont))
-
-# x | y 
-exports.bitor = special(2, 'bitor', (compiler, cont, x, y) ->
-  ycont =  compiler.cont(y, (v) -> cont(x | v))
-  xcont = (v) ->  x = v; ycont(null)
-  compiler.cont(x, xcont))
-
-# ~x 
-exports.bitnot = special(1, 'not_', (compiler, cont, x) ->
-  compiler.cont(x, (v) -> cont(~v)))
-
-# Because not using vari.bind, these are not saved in compiler.trail  <br/>
-# and so it can NOT be restored in compiler.failcont <br/>
-# EXCEPT the vari has been in compiler.trail in the logic branch before vari.binding ++
-exports.inc = special(1, 'inc', (compiler, cont, vari) ->
-  (v) -> cont(++vari.binding))
-
-# vari.binding += 2 
-exports.inc2 = special(1, 'inc2', (compiler, cont, vari) ->
-  (v) -> (vari.binding++; cont(++vari.binding)))
-
-# vari.binding -- 
-exports.dec = special(1, 'dec', (compiler, cont, vari) ->
-  (v) -> (cont(--vari.binding)))
-
-# vari.binding -= 2 
-exports.dec2 = special(1, 'dec2', (compiler, cont, vari) ->
-  (v) -> (vari.binding--; cont(--vari.binding)))
-
-# x.getvalue 
+###
+# x.getvalue
 exports.getvalue = special(1, 'getvalue', (compiler, cont, x) ->
   compiler.cont(x, (v) -> cont(compiler.trail.getvalue(v))))
 
@@ -211,3 +113,4 @@ exports.free = special(1, 'freep', (compiler, cont, x) ->
 # toString: x.toString
 exports.toString = special(1, 'toString', (compiler, cont, x) ->
   compiler.cont(x, (v) -> cont(v?.toString?() or JSON.stringify(v))))
+###

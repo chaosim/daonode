@@ -638,7 +638,7 @@ exports.unifiable = (x) ->
   else if _.isObject(x) then new UObject(x)
   else x
 
-exports.BindingError = class Error
+exports.Error = class Error
   constructor: (@exp, @message='', @stack = @) ->  # @stack: to make webstorm nodeunit happy.
   toString: () -> "#{@constructor.name}: #{@exp} >>> #{@message}"
 

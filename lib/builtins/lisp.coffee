@@ -19,7 +19,7 @@ exports.quote = special(1, 'quote', (solver, cont, exp) ->
 exports.eval_ = special(1, 'eval', (solver, cont, exp) ->
   solver.cont(exp, (v) -> [solver.cont(v, cont), null]))
 
-# vari.binding = exp 
+# vari.binding = exp
 exports.assign = special(2, 'assign', (solver, cont, vari, exp) ->
   # different from is_ in logic.coffee: <br/>
   # Because not using vari.bind, this is not saved in solver.trail  <br/>
@@ -180,6 +180,7 @@ exports.callcc = special(1, 'callcc', (solver, cont, fun) -> (v) ->
   cc = (v) ->
     solver.restore(faked)
     result = solver.run(v, cont)
+    solver.finished = false
     solver.trail.getvalue(result[1])
   cont(fun(cc)))
 
@@ -190,6 +191,7 @@ exports.callfc = special(1, 'callfc', (solver, cont, fun) -> (v) ->
   fc = (v) ->
     solver.restore(faked)
     result = solver.run(v,  solver.failcont)
+    solver.finished = false
     solver.trail.getvalue(result[1])
   cont(fun(fc)))
 
