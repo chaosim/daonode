@@ -50,7 +50,7 @@ orpFun = (compiler, cont, args...) ->
     fc = compiler.failcont
     compiler.trail = trail
     compiler.failcont = orcont
-    [xcont, null])
+    [xcont, null]))
 
 # logic choices, aka ";" in prolog 
 exports.orp = orp = special(null, 'orp', orpFun)
