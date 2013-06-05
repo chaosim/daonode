@@ -1,9 +1,8 @@
 # ##dao
-
+_ = require("underscore")
 fs = require("fs")
-il = require("./interlang")
-solve = require('./solve')
 beautify = require('js-beautify').js_beautify
+il = require("./interlang")
 
 keywords = require('./keywords')
 
@@ -29,61 +28,70 @@ exports.Compiler = class Compiler
     @nameToVarIndex = {}
 
   compile: (exp) ->
-    v = vari('v')
+    v = il.vari('v')
     fromCont = @cont(exp, il.clamda(v, v))
     f = il.clamda(v, fromCont)
 #    f = f.optimize(new Env(), @)
-    f = f.jsify(@)
+    f = f.jsify()
     "exports.main = #{f.toCode(@)}"
 
   # compile to continuation
   cont: (exp, cont) ->
+    if not _.isArray(exp) then return cont.call(exp)
     length = exp.length
-    if length is 0 then cont.call(exp)
-    else
-      head = exp[0]
-      if head typeof Number
-        switch head
-          when keywords.quote then cont.call(exp[1])
-          when keywords.eval_
-            v = compiler.vari('v')
-            compiler.cont(exp[1], il.clamda(v, compiler.cont(v, cont)))
-          when keywords.begin then @expsCont(exp[1...], cont)
-          when keywords.assign
-            v = compiler.vari('v')
-            compiler.cont(exp[1], il.clamda(v, il.assign(exp[2].interlang(), v), cont.call(v)))
-          when keywors.if_
-            v = @vari('v')
-            compiler.cont(exp[1], il.clamda(v, il.if_(v, compiler.cont(exp[2], cont),
-                                                 compiler.cont(exp[3], cont))))
-          when keywords.vari
-            todo
-          when keywords.jsfun
-            todo
-          when keywords.jsmacro
-            todo
-          when keywords.lamda
-            params = exp[1]; body = exp[2...]
-            k = compiler.vari('k')
-            il.lamda([k].concat(params), compiler.cont(body, k))
-          when keywords.macro
-            params = exp[1]; body = exp[2...]
-            k = compiler.vari('k')
-            il.lamda([k].concat(params), compiler.cont(body, k))
-          when keywords.let_
-            todo
-          when keywords.funcall
-            params = (compiler.vari('a') for x in args)
-            fun = exp[1]
-            args = exp[2...]
-            for i in [length-1..0] by -1
-              cont = do (i=i, cont=cont) ->
-                compiler.cont(args[i], il.clamda(params[i], cont))
-            cont
-          when keywords.macrocall
-            m = exp[1]
-          else cont.call(exp)
-      else cont.call(exp)
+    if length is 0 then return cont.call(exp)
+    head = exp[0]
+    if not _.isString(head) then return cont.call(exp)
+    if not @specials.hasOwnProperty(head) then return cont.call(exp)
+    @specials[head].call(this, exp[1...])
+  specials:
+    "quote": (cont, exp) -> cont.call(exp)
+    "begin": (cont, exps...) -> @expsCont(exp, cont)
+    "assign": (cont, left, exp) ->
+        if _.isString(left)
+          v = il.vari('v')
+          return @cont(exp, il.clamda(v, il.assign(il.vari(left), v), cont.call(v)))
+        if not _.isArray(left) then throw "should be an sexpression."
+        length = left.length
+        if left is 0 then throw "should be an sexpression."
+        head = left[0]
+        if not _.isString(head) then throw "wrong keyword."
+        if head is "index"
+          object = left[1]; index = left[2]
+          obj = il.vari('obj'); i = il.vari('i'); v = il.vari('v')
+          @cont(object, il.clamda(obj, @cont(index, il.clamda(i,  @cont(exp, il.clamda(v,  il.assign(il.index(obj, i), v)))))))
+    "if": (cont, test, then_, else_) ->
+        v = il.vari('v')
+        compiler.cont(test, il.clamda(v, il.if_(v, compiler.cont(then_, cont),
+                                             compiler.cont(else_, cont))))
+    'var': (cont, name) ->
+        todo
+    "jsfun": (cont, func) ->
+        todo
+    "jsmacro": (cont, func) -> todo
+    "lamdda": (cont, params, body...) ->
+        params = exp[1]; body = exp[2...]
+        k = compiler.vari('k')
+        il.lamda([k].concat(params), compiler.cont(body, k))
+    "macro": (cont, params, body...) ->
+        params = exp[1]; body = exp[2...]
+        k = compiler.vari('k')
+        il.lamda([k].concat(params), compiler.cont(body, k))
+    "let": (cont, bindings, body...) ->
+        todo
+    "funcall": (cont, caller, args...) ->
+        params = (compiler.vari('a') for x in args)
+        fun = exp[1]
+        args = exp[2...]
+        for i in [length-1..0] by -1
+          cont = do (i=i, cont=cont) ->
+            compiler.cont(args[i], il.clamda(params[i], cont))
+        cont
+    "macrocall": (cont, caller, args...) ->
+        m = exp[1]
+    "eval": (cont, exp) ->
+        v = compiler.vari('v')
+        compiler.cont(exp[1], il.clamda(v, compiler.cont(v, cont)))
 
   optimize: (exp, env) ->
     expOptimize = exp?.optimize
@@ -108,7 +116,7 @@ exports.Compiler = class Compiler
     if length is 0 then throw exports.TypeError(exps)
     else if length is 1 then @cont(exps[0], cont)
     else
-      v = @vari('v')
+      v = il.vari('v')
       @cont(exps[0], il.clamda(v, @expsCont(exps[1...], cont)))
 
   argsCont: (args, cont) ->
@@ -134,29 +142,9 @@ class Env
       outer = @outer
       if outer then outer.lookup(vari) else vari
 
-# ####class Var
-# Var for logic bindings, used in unify, lisp.assign, inc/dec, parser operation, etc.
-exports.Var = class Var
-  constructor: (@name) ->
-  cont: (compiler, cont) -> il.return(cont.call(il.deref(@interlang())))
-  interlang: () -> il.vari(@name)
-  toString:() -> "vari(#{@name})"
-
-reElements = /\s*,\s*|\s+/
-
-# utilities for new variables
-exports.vari = (name) ->  new Var(name)
-exports.vars = (names) -> vari(name) for name in split names,  reElements
-
 # A flag class is used to process unquoteSlice
 UnquoteSliceValue = class exports.UnquoteSliceValue
   constructor: (@value) ->
-
-# generate a instance of Macro from a function <br/>
-#  example:   <br/>
-#  orpm = fun((x, y) -> orp(x,y ) # coffeescript<br/>
-#  orpm = fun(function(x,y){  return orp(x,y ); } # javascript
-exports.macro = commandMaker(exports.Macro)
 
 exports.Error = class Error
   constructor: (@exp, @message='', @stack = @) ->  # @stack: to make webstorm nodeunit happy.

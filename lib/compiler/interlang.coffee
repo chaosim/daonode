@@ -9,6 +9,7 @@ toString = (o) -> o?.toString?() or o
 
 class Element
   constructor: () ->  @name = @toString()
+  isStatement: () -> false
   call: (args...) -> new Apply(@, args)
   toCode: (compiler) -> throw NotImplement(@)
   Object.defineProperty @::, '$', get: -> @constructor
@@ -30,6 +31,11 @@ class Array extends Begin
   toString: () -> "[#{(toString(e) for e in @exps).join(',')}]"
 class Print extends Begin
   toString: () -> "print(#{(toString(e) for e in @exps).join(',')})"
+class Lamda extends Element
+  constructor: (@params, @body) -> super
+  toString: () -> "(#{(toString(e) for e in @params).join(', ')} -> #{toString(@body)})"
+  call: (args...) -> il.apply(@, args)
+  apply: (args) -> il.apply(@, args)
 class Clamda extends Element
   constructor: (@v, @body) -> super
   toString: () -> "(#{toString(@v)} -> #{toString(@body)})"
@@ -77,6 +83,53 @@ class Code extends Element
 class If extends Element
   constructor: (@test, @then_, @else_) -> super
   toString: () -> "if_(#{toString(@test)}, #{toString(@then_)}, #{toString(@else_)})"
+
+If::isStatement = () -> isStatement(@then_) or isStatement(@else_)
+Begin::isStatement = () -> true
+Return::isStatement = () -> true
+Assign::isStatement = () -> true
+
+jsify = (exp) ->
+  exp_jsify = exp?.jsify
+  if exp_jsify then exp_jsify.call(exp)
+  else exp
+
+insertReturn = (exp) ->
+  exp_insertReturn = exp?.insertReturn
+  if exp_insertReturn then exp_insertReturn.call(exp)
+  else new Return(exp)
+
+isStatement = (exp) ->
+  exp_isStatement = exp?.isStatement
+  if exp_isStatement then exp_isStatement.call(exp)
+  else false
+
+Var::jsify = (compiler) -> @
+Assign::jsify = (compiler) -> @
+#  vari = @vari
+#  [exps, bStatement] = compiler.jsify(@exp)
+#  [exps[0...exps.length-1].concat([new Assign(vari, exps[exps.length-1]), vari]), true]
+Return::jsify = (compiler) -> throw "Return should not occur before jsify."
+If::jsify = (compiler) -> new If(@test, compiler.jsify(@then_), compiler.jsify(@else_))
+Begin::jsify = (compiler) ->
+  exps = @exps
+  length = exps.length
+  if length is 0 or length is 1
+    throw "begin should have at least one exp"
+  result = []
+  for e in exps
+    result.push(compiler.jsify(e))
+  il.begin(result)
+Lamda::jsify = (compiler) ->
+  body = @body.jsify(compiler)
+  body = insertReturn(body)
+  new Lamda(@params, body)
+Clamda::jsify = (compiler) ->
+  body = @body.jsify(compiler)
+  body = insertReturn(body)
+  new Clamda(@v, body)
+Apply::jsify = (compiler) -> new Apply(compiler.jsify(@caller), @args)
+CApply::jsify = (compiler) -> new CApply(@cont.jsify(compiler), @value)
 
 Var::optimize = (env, compiler) -> env.lookup(@)
 Assign::optimize = (env, compiler) ->  new Assign(compiler.optimize(@vari, env),  compiler.optimize(@exp, env))
@@ -129,9 +182,13 @@ il.apply = (caller, args) -> new Apply(caller, args)
 il.capply = (cont, value) -> new CApply(cont, value)
 il.begin = (exps...) ->
   length = exps.length
-  if length is 0 then il.undefined
-  else if length is 1 then exps[0]
-  else new Begin(exps)
+  if length is 0 then throw "begin should have at least one exp"
+  if length is 1 then return exps[0]
+  result = []
+  for e in exps
+    if e instanceof Begin then result.concat(e.exps)
+    else result.push result
+  new Begin(result)
 il.array = (exps...) -> new Array(exps)
 il.print = (exps...) -> new Print(exps)
 il.return = (value) -> new Return(value)

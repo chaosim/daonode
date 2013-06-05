@@ -1,7 +1,5 @@
-{solve, vari, fun, macro, fun2, recursive} = core = require('../core')
-{quote, eval_, begin, assign, if_} = require('../builtins/lisp')
-{print_, eq, add, sub, inc, suffixinc} = require('../builtins/general')
-
+{solve, vari} = core = require('../core')
+{begin, quote, vari, assign, print_, jsobject} = require('../util')
 xexports = {}
 
 xexports.Test =
@@ -22,11 +20,22 @@ exports.Test =
     test.equal  solve(begin(1, 2)), 2
     test.done()
 
-  "test eval_ quote": (test) ->
+  "test quote": (test) ->
     test.equal  solve(quote(1)), 1
+    test.done()
+
+exports.Test =
+  "test assign": (test) ->
+    a = vari('a')
+    test.equal  solve(assign(a, 1)), 1
+    test.done()
+
+xexports.Test =
+  "test eval_ quote": (test) ->
     test.equal  solve(eval_(quote(1))), 1
     test.done()
 
+xexports.Test =
   "test assign inc suffixinc vari": (test) ->
     a = vari('a')
 #    test.equal  solve(begin(assign(a, 1), a)), 1
@@ -34,10 +43,17 @@ exports.Test =
 #    test.equal  solve(begin(assign(a, 1), suffixinc(a))), 1
     test.done()
 
+xexports.Test =
   "test print_": (test) ->
     test.equal  solve(print_('a', 1)), null
     test.done()
 
+xexports.Test =
+  "test jsobject": (test) ->
+    test.equal  solve(jsobject('console.log')), console.log
+    test.done()
+
+xexports.Test =
   "test eq add": (test) ->
     test.equal  solve(eq(1, 1)), true
     test.equal  solve(add(1, 2)), 3
