@@ -42,6 +42,7 @@ exports.Compiler = class Compiler
     if not _.isString(head) then return cont.call(exp)
     if not @specials.hasOwnProperty(head) then return cont.call(exp)
     @specials[head].call(this, cont, exp[1...]...)
+
   specials:
     "quote": (cont, exp) -> cont.call(exp)
     'var': (cont, name) -> cont.call(il.vari(name))
@@ -88,6 +89,7 @@ exports.Compiler = class Compiler
         params = exp[1]; body = exp[2...]
         k = compiler.vari('k')
         il.lamda([k].concat(params), compiler.cont(body, k))
+
     "macro": (cont, params, body...) ->
         params = exp[1]; body = exp[2...]
         k = compiler.vari('k')
@@ -99,6 +101,19 @@ exports.Compiler = class Compiler
     "eval": (cont, exp) ->
         v = compiler.vari('v')
         compiler.cont(exp[1], il.clamda(v, compiler.cont(v, cont)))
+  Compiler = @
+  for name, vop of il
+    if vop instanceof il.VirtualOperation
+      do (name=name, vop=vop) -> Compiler::specials['vop_'+name] = (cont, args...) ->
+        compiler = @
+        length = args.length
+        params = (il.vari('a'+i) for i in [0...length])
+        cont = cont.call(vop.apply(params))
+        for i in [length-1..0] by -1
+          cont = do (i=i, cont=cont) ->
+            compiler.cont(args[i], il.clamda(params[i], cont))
+        cont
+
 
   optimize: (exp, env) ->
     expOptimize = exp?.optimize

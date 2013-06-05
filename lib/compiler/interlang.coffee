@@ -44,7 +44,7 @@ class JSFun extends Element
   constructor: (@fun) -> super
   toString: () -> "jsfun(#{@fun})"
   apply: (args) -> il.apply(@, args)
-class VirtualOperation extends Element
+exports.VirtualOperation = class VirtualOperation extends Element
   constructor: (@name) -> super
   toString: () -> "#{@name}"
   call: (args...) -> new VirtualOperationApply(@, args)
@@ -236,12 +236,10 @@ il.bitnot = unary("~")
 il.inc = unary("++")
 il.dec = unary("--")
 
-vopMap = {}
 vop = (name, toCode) ->
   class Vop extends VirtualOperation
     applyToCode: toCode
-  vopMap[name] = v = new Vop(name)
-  v
+  new Vop(name)
 
 il.suffixinc = vop('suffixdec', (compiler, args)->"#{compiler.toCode(args[0])}++")
 il.suffixdec = vop('suffixdec', (compiler, args)->"#{compiler.toCode(args[0])}--")
