@@ -1,9 +1,7 @@
 _ = require "underscore"
 
-{solve, vari, fun, macro, fun2, recursive} = core = require('../core')
-{ quote, eval_, begin, assign, if_, iff, block, break_, continue_, loop_, while_, until_,\
-  catch_, throw_, protect, callcc} = require('../builtins/lisp')
-{print_, le, eq, add, sub, inc, suffixinc} = require('../builtins/general')
+{solve} = core = require('../core')
+{ quote, begin, assign, if_} = require('../util')
 
 xexports = {}
 
@@ -14,7 +12,7 @@ xexports.Test =
     test.equal  solve(begin(assign(a, 1),  block('a', if_(eq(a, 10000000), break_('a', a)), inc(a), continue_('a')))), 10000000
     test.done()
 
-exports.Test =
+xexports.Test =
   "test eval_ quote": (test) ->
     test.equal  solve(quote(1)), 1
     test.equal  solve(eval_(quote(1))), 1
@@ -26,17 +24,20 @@ exports.Test =
     test.equal  solve(begin(assign(a, 1), inc(a))), 2
     test.done()
 
+xexports.Test =
   "test begin": (test) ->
     test.equal  solve(begin(1)), 1
     test.equal  solve(begin(1, 2)), 2
     test.equal  solve(begin(1, 2, 3)), 3
     test.done()
 
+exports.Test =
   "test if_": (test) ->
     test.equal  solve(if_(1, 2, 3)), 2
     test.equal  solve(if_(0, 2, 3)), 3
     test.done()
 
+xexports.Test =
   "test iff": (test) ->
     test.equal  solve(iff([[1, 2]], 3)), 2
     test.equal  solve(iff([[0, 2], [1, 3]], 5)), 3

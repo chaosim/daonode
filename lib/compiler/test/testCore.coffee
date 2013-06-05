@@ -1,5 +1,5 @@
 {solve, vari} = core = require('../core')
-{begin, quote, vari, assign, print_, jsobject} = require('../util')
+{begin, quote, vari, assign, print_, jsobject, funcall, jsfun, vop, add} = require('../util')
 xexports = {}
 
 xexports.Test =
@@ -24,10 +24,35 @@ exports.Test =
     test.equal  solve(quote(1)), 1
     test.done()
 
-exports.Test =
   "test assign": (test) ->
     a = vari('a')
     test.equal  solve(assign(a, 1)), 1
+    test.done()
+
+  "test vari": (test) ->
+    x = vari('x')
+    test.equal  solve(begin(assign(x, 1), x)), 1
+    test.done()
+
+  "test js vari": (test) ->
+    console_log = vari('console.log')
+    test.equal  solve(console_log), console.log
+    test.done()
+
+  "test jsfun": (test) ->
+    console_log = vari('console.log')
+    test.equal  solve(funcall(jsfun(console_log), 1)), null
+    test.equal  solve(print_(1, 2)), null
+    test.done()
+
+xexports.Test =
+  "test vop": (test) ->
+    test.equal  solve(funcall(vop('eq'), 1, 1)), true
+    test.done()
+
+exports.Test =
+  "test add": (test) ->
+    test.equal  solve(add(1, 1)), 2
     test.done()
 
 xexports.Test =

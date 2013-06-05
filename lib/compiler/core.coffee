@@ -4,8 +4,6 @@ fs = require("fs")
 beautify = require('js-beautify').js_beautify
 il = require("./interlang")
 
-keywords = require('./keywords')
-
 exports.solve = (exp) ->
   path = compile(exp)
   delete require.cache[require.resolve(path)]
@@ -43,33 +41,50 @@ exports.Compiler = class Compiler
     head = exp[0]
     if not _.isString(head) then return cont.call(exp)
     if not @specials.hasOwnProperty(head) then return cont.call(exp)
-    @specials[head].call(this, exp[1...])
+    @specials[head].call(this, cont, exp[1...]...)
   specials:
     "quote": (cont, exp) -> cont.call(exp)
-    "begin": (cont, exps...) -> @expsCont(exp, cont)
+    'var': (cont, name) -> cont.call(il.vari(name))
+    "begin": (cont, exps...) -> @expsCont(exps, cont)
     "assign": (cont, left, exp) ->
-        if _.isString(left)
-          v = il.vari('v')
-          return @cont(exp, il.clamda(v, il.assign(il.vari(left), v), cont.call(v)))
-        if not _.isArray(left) then throw "should be an sexpression."
+        if not _.isArray(left) then throw "Assign's left side should be an sexpression."
         length = left.length
-        if left is 0 then throw "should be an sexpression."
+        if length is 0 then throw "Assign's left side should not be empty list."
         head = left[0]
-        if not _.isString(head) then throw "wrong keyword."
-        if head is "index"
+        if not _.isString(head) then throw "Keyword should be a string."
+        if  head is "var"
+          v = il.vari('v')
+          @cont(exp, il.clamda(v, il.assign(il.vari(left[1]), v), cont.call(v)))
+        else if head is "index"
           object = left[1]; index = left[2]
           obj = il.vari('obj'); i = il.vari('i'); v = il.vari('v')
           @cont(object, il.clamda(obj, @cont(index, il.clamda(i,  @cont(exp, il.clamda(v,  il.assign(il.index(obj, i), v)))))))
     "if": (cont, test, then_, else_) ->
         v = il.vari('v')
-        compiler.cont(test, il.clamda(v, il.if_(v, compiler.cont(then_, cont),
-                                             compiler.cont(else_, cont))))
-    'var': (cont, name) ->
-        todo
+        @cont(test, il.clamda(v, il.if_(v, @cont(then_, cont),
+                                             @cont(else_, cont))))
     "jsfun": (cont, func) ->
-        todo
+      v = il.vari('v')
+      @cont(func, il.clamda(v, cont.call(il.jsfun(v))))
+
+    "vop_add": (cont, x, y) ->
+      x1 = il.vari('x'); y1 = il.vari('y')
+      @cont(x, il.clamda(x1, @cont(y, il.clamda(y1, cont.call(il.add.call(x1, y1))))))
+
+    "funcall": (cont, caller, args...) ->
+      compiler = @
+      f = il.vari('f')
+      length = args.length
+      params = (il.vari('a'+i) for i in [0...length])
+      cont = f.apply([cont].concat(params))
+      for i in [length-1..0] by -1
+        cont = do (i=i, cont=cont) ->
+          compiler.cont(args[i], il.clamda(params[i], cont))
+      @cont(caller, il.clamda(f, cont))
+
     "jsmacro": (cont, func) -> todo
-    "lamdda": (cont, params, body...) ->
+
+    "lambda": (cont, params, body...) ->
         params = exp[1]; body = exp[2...]
         k = compiler.vari('k')
         il.lamda([k].concat(params), compiler.cont(body, k))
@@ -79,15 +94,7 @@ exports.Compiler = class Compiler
         il.lamda([k].concat(params), compiler.cont(body, k))
     "let": (cont, bindings, body...) ->
         todo
-    "funcall": (cont, caller, args...) ->
-        params = (compiler.vari('a') for x in args)
-        fun = exp[1]
-        args = exp[2...]
-        for i in [length-1..0] by -1
-          cont = do (i=i, cont=cont) ->
-            compiler.cont(args[i], il.clamda(params[i], cont))
-        cont
-    "macrocall": (cont, caller, args...) ->
+    "macall": (cont, caller, args...) ->
         m = exp[1]
     "eval": (cont, exp) ->
         v = compiler.vari('v')
