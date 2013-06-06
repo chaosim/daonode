@@ -1,7 +1,7 @@
 _ = require("underscore")
 il = exports
 
-exports.NotImplement = class NotImplement
+exports.NotImplement = class NotImplement extends Error
   constructor: (@exp, @message='', @stack = @) ->  # @stack: to make webstorm nodeunit happy.
   toString: () -> "#{@name} >>> #{@message}"
 
@@ -91,6 +91,7 @@ Assign::optimize = (env, compiler) ->  new Assign(compiler.optimize(@left, env),
 If::optimize = (env, compiler) ->
   new If(compiler.optimize(@test, env),  compiler.optimize(@then_, env),  compiler.optimize(@else_, env))
 Return::optimize = (env, compiler) -> new Return(compiler.optimize(@value, env))
+Lamda::optimize = (env, compiler) -> return new Lamda(@params, compiler.optimize(@body, env))
 Clamda::optimize = (env, compiler) -> return new Clamda(@v, compiler.optimize(@body, env))
 Apply::optimize = (env, compiler) -> @
 CApply::optimize = (env, compiler) -> compiler.optimize(@cont.body, env.extend(@cont.v, compiler.optimize(@value, env)))
@@ -126,8 +127,11 @@ Clamda::jsify = () ->
   body = jsify(@body)
   body = insertReturn(body)
   new Clamda(@v, body)
-Apply::jsify = () -> new Apply(jsify(@caller), @args)
-CApply::jsify = () -> new CApply(@cont.jsify(), @value)
+Apply::jsify = () ->
+  args = @args
+  if args.length>0 then args = [jsify(args[0])].concat(args[1...])
+  new @constructor(jsify(@caller), args)
+CApply::jsify = () -> new CApply(@cont.jsify(), jsify(@value))
 
 insertReturn = (exp) ->
   exp_insertReturn = exp?.insertReturn
@@ -135,9 +139,6 @@ insertReturn = (exp) ->
   else new Return(exp)
 
 Assign::insertReturn = () -> il.begin(@, il.return(@left))
-#  vari = @vari
-#  [exps, bStatement] = insertReturn(@exp)
-#  [exps[0...exps.length-1].concat([new Assign(vari, exps[exps.length-1]), vari]), true]
 Return::insertReturn = () -> @
 If::insertReturn = () -> new If(@test, insertReturn(@then_), insertReturn(@else_))
 Begin::insertReturn = () ->
@@ -146,9 +147,8 @@ Begin::insertReturn = () ->
   exps[length-1] = insertReturn(exps[length-1])
   il.begin(exps...)
 
-Clamda::toCode = (compiler) ->
-    body = (compiler.toCode(exp) for exp in @body).join ';'
-    "function(#{compiler.toCode(@v)}){#{compiler.toCode(@body)}}"
+Lamda::toCode = (compiler) -> "function(#{(a.name for a in @params).join(', ')}){#{compiler.toCode(@body)}}"
+Clamda::toCode = (compiler) -> "function(#{@v.name}){#{compiler.toCode(@body)}}"
 Fun::toCode = (compiler) -> @func.toString()
 Return::toCode = (compiler) -> "return #{compiler.toCode(@value)};"
 Var::toCode = (compiler) -> @name
@@ -204,6 +204,7 @@ il.begin = (exps...) ->
 il.array = (exps...) -> new Array(exps)
 il.print = (exps...) -> new Print(exps)
 il.return = (value) -> new Return(value)
+il.lamda = (params, body...) -> new Lamda(params, il.begin(body...))
 il.clamda = (v, body...) -> new Clamda(v, il.begin(body...))
 il.code = (string) -> new Code(string)
 il.jsfun = (fun) -> new JSFun(fun)

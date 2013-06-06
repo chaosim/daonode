@@ -68,9 +68,18 @@ exports.Compiler = class Compiler
       v = il.vari('v')
       @cont(func, il.clamda(v, cont.call(il.jsfun(v))))
 
-    "vop_add": (cont, x, y) ->
-      x1 = il.vari('x'); y1 = il.vari('y')
-      @cont(x, il.clamda(x1, @cont(y, il.clamda(y1, cont.call(il.add.call(x1, y1))))))
+    "lambda": (cont, params, body...) ->
+      k = il.vari('cont')
+      params = (il.vari(p[1]) for p in params)
+      cont.call(il.lamda([k].concat(params), @expsCont(body, k)))
+
+    "macro": (cont, params, body...) ->
+      k = il.vari('cont')
+      params1 = (il.vari(p[1]) for p in params)
+      body = (@substMacroArgs(e, params) for e in body)
+      cont.call(il.lamda([k].concat(params1), @expsCont(body, k)))
+
+    "evalarg": (cont, name) -> cont.call(il.vari(name).call(cont))
 
     "funcall": (cont, caller, args...) ->
       compiler = @
@@ -83,21 +92,22 @@ exports.Compiler = class Compiler
           compiler.cont(args[i], il.clamda(params[i], cont))
       @cont(caller, il.clamda(f, cont))
 
-    "jsmacro": (cont, func) -> todo
+    "macall": (cont, caller, args...) ->
+      compiler = @
+      f = il.vari('f'); v = il.vari('v')
+      length = args.length
+      params = (il.vari('a'+i) for i in [0...length])
+      cont = f.apply([cont].concat(params))
+      for i in [length-1..0] by -1
+        cont = do (i=i, cont=cont) ->
+          il.clamda(params[i], cont).call(il.lamda([], compiler.cont(args[i], il.clamda(v, v))))
+      @cont(caller, il.clamda(f, cont))
 
-    "lambda": (cont, params, body...) ->
-        params = exp[1]; body = exp[2...]
-        k = compiler.vari('k')
-        il.lamda([k].concat(params), compiler.cont(body, k))
-
-    "macro": (cont, params, body...) ->
-        params = exp[1]; body = exp[2...]
-        k = compiler.vari('k')
-        il.lamda([k].concat(params), compiler.cont(body, k))
     "let": (cont, bindings, body...) ->
         todo
-    "macall": (cont, caller, args...) ->
-        m = exp[1]
+
+    "jsmacro": (cont, func) -> todo
+
     "eval": (cont, exp) ->
         v = compiler.vari('v')
         compiler.cont(exp[1], il.clamda(v, compiler.cont(v, cont)))
@@ -153,6 +163,21 @@ exports.Compiler = class Compiler
 
   # used by lisp style quasiquote, unquote, unquoteSlice
   quasiquote: (exp, cont) -> exp?.quasiquote?(@, cont) or ((v) -> cont(exp))
+
+  substMacroArgs: (exp, params) ->
+    if not _.isArray(exp) then return exp
+    length = exp.length
+    if length is 0 then return exp
+    head = exp[0]
+    if not _.isString(head) then return exp
+    if not @specials.hasOwnProperty(head) then return exp
+    if exp in params then return ['evalarg', exp[1]]
+    if head is 'lambda' or head is 'macro'
+      params = (e for e in params if e not in exp[1])
+      exp[0..1].concat(@substMacroArgs(e, params) for e in exp[2...])
+    else if head is 'quote' then exp
+    else if head is 'quasiquote' then exp
+    else [exp[0]].concat(@substMacroArgs(e, params) for e in exp[1...])
 
 class Env
   constructor: (@outer, @data={}) ->

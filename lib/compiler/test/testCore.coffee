@@ -1,5 +1,8 @@
 {solve, vari} = core = require('../core')
-{begin, quote, vari, assign, print_, jsobject, funcall, jsfun, vop, add} = require('../util')
+{begin, quote, vari, assign, print_, jsobject,\
+  funcall, macall, lamda, macro, jsfun, \
+  if_, add, eq, inc, suffixinc} = require('../util')
+
 xexports = {}
 
 xexports.Test =
@@ -24,14 +27,11 @@ exports.Test =
     test.equal  solve(quote(1)), 1
     test.done()
 
-  "test assign": (test) ->
-    a = vari('a')
-    test.equal  solve(assign(a, 1)), 1
-    test.done()
-
-  "test vari": (test) ->
+  "test vari assign": (test) ->
     x = vari('x')
     test.equal  solve(begin(assign(x, 1), x)), 1
+    test.equal  solve(begin(assign(x, 1), inc(x))), 2
+    test.equal  solve(begin(assign(x, 1), suffixinc(x))), 1
     test.done()
 
   "test js vari": (test) ->
@@ -45,14 +45,24 @@ exports.Test =
     test.equal  solve(print_(1, 2)), null
     test.done()
 
-xexports.Test =
-  "test vop": (test) ->
-    test.equal  solve(funcall(vop('eq'), 1, 1)), true
+  "test vop: add, eq": (test) ->
+    test.equal  solve(add(1, 1)), 2
+    test.equal  solve(eq(1, 1)), true
+    test.done()
+
+  "test lambda": (test) ->
+    x = vari('x'); y = vari('y')
+    test.equal  solve(funcall(lamda([x], 1), 1)), 1
+    test.equal  solve(funcall(lamda([x, y], add(x, y)), 1, 1)), 2
     test.done()
 
 exports.Test =
-  "test add": (test) ->
-    test.equal  solve(add(1, 1)), 2
+  "test macro": (test) ->
+    x = vari('x'); y = vari('y'); z = vari('z')
+#    test.equal  solve(macall(macro([x], 1), print_(1))), 1
+#    test.equal  solve(macall(macro([x], x), print_(1))), null
+    test.equal  solve(macall(macro([x, y, z], if_(x, y, z)), eq(1, 1), print_(1), print_(2))), null
+#    test.equal  solve(funcall(lamda([x, y], add(x, y)), 1, 1)), 2
     test.done()
 
 xexports.Test =
@@ -61,29 +71,11 @@ xexports.Test =
     test.done()
 
 xexports.Test =
-  "test assign inc suffixinc vari": (test) ->
-    a = vari('a')
-#    test.equal  solve(begin(assign(a, 1), a)), 1
-    test.equal  solve(begin(assign(a, 1), inc(a))), 2
-#    test.equal  solve(begin(assign(a, 1), suffixinc(a))), 1
-    test.done()
-
-xexports.Test =
-  "test print_": (test) ->
-    test.equal  solve(print_('a', 1)), null
-    test.done()
-
-xexports.Test =
   "test jsobject": (test) ->
     test.equal  solve(jsobject('console.log')), console.log
     test.done()
 
 xexports.Test =
-  "test eq add": (test) ->
-    test.equal  solve(eq(1, 1)), true
-    test.equal  solve(add(1, 2)), 3
-    test.done()
-
   "test macro": (test) ->
     same = macro((x) -> 1)
     test.equal  solve(same(print_(1))), 1
