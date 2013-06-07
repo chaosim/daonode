@@ -109,6 +109,7 @@ jsify = (exp) ->
   if exp_jsify then exp_jsify.call(exp)
   else exp
 
+Assign::jsify = () -> new Assign(@left, jsify(@exp))
 If::jsify = () -> new If(@test, jsify(@then_), jsify(@else_))
 Begin::jsify = () ->
   exps = @exps
@@ -251,8 +252,13 @@ il.findCatch = vop('findCatch', (compiler, args)->"solver.findCatch(#{compiler.t
 il.fake = vop('fake', (compiler, args)->"solver.fake(#{compiler.toCode(args[0])})").apply([])
 il.restore = vop('restore', (compiler, args)->"solver.restore(#{compiler.toCode(args[0])})")
 il.getvalue = vop('getvalue', (compiler, args)->"solver.trail.getvalue(#{compiler.toCode(args[0])})")
+il.list = vop('list', (compiler, args)->"[#{(compiler.toCode(a) for a in args).join(', ')}]")
 il.index = vop('index', (compiler, args)->"(#{compiler.toCode(args[0])})[#{compiler.toCode(args[1])}]")
+il.push = vop('push', (compiler, args)->"(#{compiler.toCode(args[0])}).push(#{compiler.toCode(args[1])})")
+il.concat = vop('concat', (compiler, args)->"(#{compiler.toCode(args[0])}).concat(#{compiler.toCode(args[1])})")
 il.run = vop('run', (compiler, args)->"solver.run(#{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})")
 il.failcont = vop('failcont', (compiler, args)->"solver.failcont(#{compiler.toCode(args[0])})")
+
+il.evalexpr = vop('evalexpr', (compiler, args)->"solve(#{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})")
 
 il.fun = (f) -> new Fun(f)

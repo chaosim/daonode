@@ -1,7 +1,8 @@
-{solve, vari} = core = require('../core')
-{begin, quote, vari, assign, print_, jsobject,\
+{solve} = core = require('../core')
+{string, begin, quote, assign, print_, jsobject,\
   funcall, macall, lamda, macro, jsfun, \
-  if_, add, eq, inc, suffixinc} = require('../util')
+  if_, add, eq, inc, suffixinc,\
+  eval_, qq, uq, uqs} = require('../util')
 
 xexports = {}
 
@@ -28,19 +29,19 @@ exports.Test =
     test.done()
 
   "test vari assign": (test) ->
-    x = vari('x')
+    x = 'x'
     test.equal  solve(begin(assign(x, 1), x)), 1
     test.equal  solve(begin(assign(x, 1), inc(x))), 2
     test.equal  solve(begin(assign(x, 1), suffixinc(x))), 1
     test.done()
 
   "test js vari": (test) ->
-    console_log = vari('console.log')
+    console_log = 'console.log'
     test.equal  solve(console_log), console.log
     test.done()
 
   "test jsfun": (test) ->
-    console_log = vari('console.log')
+    console_log = 'console.log'
     test.equal  solve(funcall(jsfun(console_log), 1)), null
     test.equal  solve(print_(1, 2)), null
     test.done()
@@ -51,28 +52,31 @@ exports.Test =
     test.done()
 
   "test lambda": (test) ->
-    x = vari('x'); y = vari('y')
+    x = 'x'; y = 'y'
     test.equal  solve(funcall(lamda([x], 1), 1)), 1
     test.equal  solve(funcall(lamda([x, y], add(x, y)), 1, 1)), 2
     test.done()
 
-exports.Test =
   "test macro": (test) ->
-    x = vari('x'); y = vari('y'); z = vari('z')
-#    test.equal  solve(macall(macro([x], 1), print_(1))), 1
-#    test.equal  solve(macall(macro([x], x), print_(1))), null
+    x = 'x'; y = 'y'; z = 'z'
+    test.equal  solve(macall(macro([x], 1), print_(1))), 1
+    test.equal  solve(macall(macro([x], x), print_(1))), null
     test.equal  solve(macall(macro([x, y, z], if_(x, y, z)), eq(1, 1), print_(1), print_(2))), null
-#    test.equal  solve(funcall(lamda([x, y], add(x, y)), 1, 1)), 2
     test.done()
 
-xexports.Test =
   "test eval_ quote": (test) ->
-    test.equal  solve(eval_(quote(1))), 1
+    test.equal  solve(eval_(quote(1), string('f:/daonode/lib/compiler/test/compiled2.js'))), 1
+    test.equal  solve(eval_(quote(print_(1)), string('f:/daonode/lib/compiler/test/compiled2.js'))), null
     test.done()
 
-xexports.Test =
-  "test jsobject": (test) ->
-    test.equal  solve(jsobject('console.log')), console.log
+  "test quasiquote": (test) ->
+    test.equal solve(qq(1)), 1
+    a = add(1, 2)
+    test.deepEqual solve(qq(a)), a
+    test.deepEqual solve(qq(uq(a))), 3
+    test.deepEqual solve(qq(uqs([1,2]))), [1,2]
+    test.deepEqual solve(qq(add(uqs([1,2])))), a
+#    test.deepEqual solve(qq(add(uqs(uqs([1,2]))))), a
     test.done()
 
 xexports.Test =
@@ -105,7 +109,7 @@ xexports.Test =
 xexports.Test =
   "test var bind unify trail": (test) ->
     trail = new Trail
-    x = vari('x')
+    x = 'x'
     test.equal x.binding, x
     x.bind(1, trail)
     test.ok trail.unify(1, x)

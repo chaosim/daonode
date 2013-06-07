@@ -6,3 +6,5 @@
 /*.log
 
 /.js
+
+/lib/compiler/test/compiled2.js

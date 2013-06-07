@@ -1,18 +1,24 @@
 _ = require "underscore"
 
 {solve} = core = require('../core')
-{ quote, begin, assign, if_} = require('../util')
+{string, begin, quote, assign, print_, jsobject,
+funcall, macall, lamda, macro, jsfun,
+if_, add, eq, le, inc, suffixinc, print_, loop_, until_, while_, not_
+eval_, qq, uq, uqs, iff
+block, break_, continue_, makeLabel} = require('../util')
 
 xexports = {}
 
-xexports.Test =
+vari = (name) -> name
+
+exports.Test =
   "test assign inc dec": (test) ->
     a = vari('a')
-    #3.772s    ---> 1.274s: see git log  -> 1.242s
-    test.equal  solve(begin(assign(a, 1),  block('a', if_(eq(a, 10000000), break_('a', a)), inc(a), continue_('a')))), 10000000
+    blk = makeLabel('x')
+    test.equal  solve(begin(assign(a, 1),  block(blk, if_(eq(a, 10), break_(blk, a)), inc(a), continue_(blk)))), 10
     test.done()
 
-xexports.Test =
+exports.Test =
   "test eval_ quote": (test) ->
     test.equal  solve(quote(1)), 1
     test.equal  solve(eval_(quote(1))), 1
@@ -24,43 +30,44 @@ xexports.Test =
     test.equal  solve(begin(assign(a, 1), inc(a))), 2
     test.done()
 
-xexports.Test =
   "test begin": (test) ->
     test.equal  solve(begin(1)), 1
     test.equal  solve(begin(1, 2)), 2
     test.equal  solve(begin(1, 2, 3)), 3
     test.done()
 
-exports.Test =
   "test if_": (test) ->
     test.equal  solve(if_(1, 2, 3)), 2
     test.equal  solve(if_(0, 2, 3)), 3
     test.done()
 
-xexports.Test =
   "test iff": (test) ->
     test.equal  solve(iff([[1, 2]], 3)), 2
     test.equal  solve(iff([[0, 2], [1, 3]], 5)), 3
     test.done()
 
   "test block break continue": (test) ->
-    test.equal  solve(block('a', 1)), 1
-    test.equal  solve(block('a', break_('a', 2), 1)), 2
-    test.equal  solve(block('a', block('b', break_('b', 2), 1), 3)), 3
+    a = makeLabel('x')
+    b = makeLabel('b')
+    test.equal  solve(block(a, 1)), 1
+    test.equal  solve(block(a, break_(a, 2), 1)), 2
+    test.equal  solve(block(a, block(b, break_(b, 2), 1), 3)), 3
     x = vari('x')
-    test.equal  solve(begin(assign(x, 1),  block('a', if_(eq(x, 5), break_('a', x)), inc(x), continue_('a')))), 5
+    test.equal  solve(begin(assign(x, 1),  block(a, if_(eq(x, 5), break_(a, x)), inc(x), continue_(a)))), 5
     test.done()
 
   "test loop while until": (test) ->
     x = vari('x')
-    test.equal  solve(begin(assign(x, 1),  block('x', if_(eq(x, 5), break_('x', x)), print_(x), inc(x), continue_('x')))), 5
-    test.equal  solve(begin(assign(x, 1),  block('x', if_(eq(x, 5), break_(x)), print_(x), inc(x), continue_()))), 5
-    test.equal  solve(begin(assign(x, 1),  loop_('x', if_(eq(x, 5), break_('x', x)), print_(x), inc(x)))), 5
-    test.equal  solve(begin(assign(x, 1),  loop_('x', print_(x), if_(eq(x, 5), break_(x)), inc(x)))), 5
-    test.equal  solve(begin(assign(x, 1),  while_('x', le(x, 5), print_(x), inc(x)))), null
-    test.equal  solve(begin(assign(x, 1),  until_('x', print_(x), inc(x), eq(x, 5)))), null
+    a = makeLabel('x')
+    test.equal  solve(begin(assign(x, 1),  block(a, if_(eq(x, 5), break_(a, x)), print_(x), inc(x), continue_(a)))), 5
+    test.equal  solve(begin(assign(x, 1),  block(a, if_(eq(x, 5), break_(x)), print_(x), inc(x), continue_()))), 5
+    test.equal  solve(begin(assign(x, 1),  loop_(a, if_(eq(x, 5), break_(a, x)), print_(x), inc(x)))), 5
+    test.equal  solve(begin(assign(x, 1),  loop_(a, print_(x), if_(eq(x, 5), break_(x)), inc(x)))), 5
+    test.equal  solve(begin(assign(x, 1),  while_(a, le(x, 5), print_(x), inc(x)))), null
+    test.equal  solve(begin(assign(x, 1),  until_(a, print_(x), inc(x), eq(x, 5)))), null
     test.done()
 
+xexports.Test =
   "test catch throw": (test) ->
     a = vari('a')
     test.equal  solve(catch_(1, 2)), 2
