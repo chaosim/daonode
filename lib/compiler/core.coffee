@@ -34,7 +34,7 @@ exports.Compiler = class Compiler
     v = il.vari('v')
     fromCont = @cont(exp, il.clamda(v, v))
     f = il.clamda(v, fromCont)
-#    f = f.optimize(new Env(), @)
+    f = f.optimize(new Env(), @)
     f = f.jsify()
     f.toCode(@)
 
@@ -264,10 +264,6 @@ class Env
     else
       outer = @outer
       if outer then outer.lookup(vari) else vari
-
-# A flag class is used to process unquoteSlice
-UnquoteSliceValue = class exports.UnquoteSliceValue
-  constructor: (@value) ->
 
 exports.Error = class Error
   constructor: (@exp, @message='', @stack = @) ->  # @stack: to make webstorm nodeunit happy.

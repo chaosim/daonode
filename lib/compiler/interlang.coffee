@@ -92,8 +92,9 @@ If::optimize = (env, compiler) ->
   new If(compiler.optimize(@test, env),  compiler.optimize(@then_, env),  compiler.optimize(@else_, env))
 Return::optimize = (env, compiler) -> new Return(compiler.optimize(@value, env))
 Lamda::optimize = (env, compiler) -> return new Lamda(@params, compiler.optimize(@body, env))
-Clamda::optimize = (env, compiler) -> return new Clamda(@v, compiler.optimize(@body, env))
-Apply::optimize = (env, compiler) -> @
+Clamda::optimize = (env, compiler) ->
+  return new Clamda(@v, compiler.optimize(@body, env.extend(@v, @v)))
+Apply::optimize = (env, compiler) -> new @constructor(compiler.optimize(@caller, env), (compiler.optimize(a, env) for a in @args))
 CApply::optimize = (env, compiler) -> compiler.optimize(@cont.body, env.extend(@cont.v, compiler.optimize(@value, env)))
 Begin::optimize = (env, compiler) ->
   return new @constructor(compiler.optimize(exp, env) for exp in @exps)
@@ -102,7 +103,7 @@ Deref::optimize = (env, compiler) ->
   else if _.isNumber(@exp) then exp
   else @
 Code::optimize = (env, compiler) -> @
-JSFun::optimize = (env, compiler) -> @
+JSFun::optimize = (env, compiler) -> new JSFun(compiler.optimize(@fun, env))
 
 jsify = (exp) ->
   exp_jsify = exp?.jsify
@@ -199,7 +200,7 @@ il.begin = (exps...) ->
   if length is 1 then return exps[0]
   result = []
   for e in exps
-    if e instanceof Begin then result.concat(e.exps)
+    if e instanceof Begin then result = result.concat(e.exps)
     else result.push e
   new Begin(result)
 il.array = (exps...) -> new Array(exps)
