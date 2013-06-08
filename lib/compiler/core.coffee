@@ -146,7 +146,7 @@ exports.Compiler = class Compiler
       label = label[1]
       if not _.isString(label) then (label = ''; body = [label].concat(body))
       exits = @exits[label] ?= []
-      exits.push(cont)
+      exits.push(@globalCont)
       defaultExits = @exits[''] ?= []  # if no label, go here
       defaultExits.push(cont)
       continues = @continues[label] ?= []
@@ -247,9 +247,9 @@ exports.Compiler = class Compiler
       for i in [exp.length-1..1] by -1
         e = exp[i]
         if  _.isArray(e) and e.length>0 and e[0] is "unquote-slice"
-          cont = @quasiquote(e, il.clamda(v, il.assign(quasilist, il.concat.call(quasilist, v)), cont))
+          cont = @quasiquote(e, @clamda(v, il.assign(quasilist, il.concat.call(quasilist, v)), cont))
         else
-          cont = @quasiquote(e, il.clamda(v, il.push.call(quasilist, v), cont))
+          cont = @quasiquote(e, @clamda(v, il.push.call(quasilist, v), cont))
       il.begin( il.assign(quasilist, il.list.call(head)),
         cont)
 
@@ -272,15 +272,16 @@ exports.Compiler = class Compiler
   Compiler = @
   for name, vop of il
     if vop instanceof il.VirtualOperation
-      do (name=name, vop=vop) -> Compiler::specials['vop_'+name] = (cont, args...) ->
-        compiler = @
-        length = args.length
-        params = (il.vari('a'+i) for i in [0...length])
-        cont = cont.call(vop.apply(params))
-        for i in [length-1..0] by -1
-          cont = do (i=i, cont=cont) ->
-            compiler.cont(args[i], il.clamda(params[i], cont))
-        cont
+      do (name=name, vop=vop) ->
+        Compiler::specials['vop_'+name] = (cont, args...) ->
+          compiler = @
+          length = args.length
+          params = (il.vari('a'+i) for i in [0...length])
+          cont = cont.call(vop.apply(params))
+          for i in [length-1..0] by -1
+            cont = do (i=i, cont=cont) ->
+              compiler.cont(args[i], compiler.clamda(params[i], cont))
+          cont
 
 class Env
   constructor: (@outer, @data={}) ->

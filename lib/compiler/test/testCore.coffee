@@ -65,13 +65,11 @@ exports.Test =
     test.equal  solve(begin(assign(x, 1), suffixinc(x))), 1
     test.done()
 
-exports.Test =
   "test eval_ quote": (test) ->
     test.equal  solve(eval_(quote(1), string('f:/daonode/lib/compiler/test/compiled2.js'))), 1
     test.equal  solve(eval_(quote(print_(1)), string('f:/daonode/lib/compiler/test/compiled2.js'))), null
     test.done()
 
-xexports.Test =
   "test quasiquote": (test) ->
     test.equal solve(qq(1)), 1
     a = add(1, 2)

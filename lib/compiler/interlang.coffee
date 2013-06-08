@@ -201,7 +201,7 @@ il.begin = (exps...) ->
   if length is 1 then return exps[0]
   result = []
   for e in exps
-    if e instanceof Begin then result.concat(e.exps)
+    if e instanceof Begin then result = result.concat(e.exps)
     else result.push e
   new Begin(result)
 il.array = (exps...) -> new Array(exps)
