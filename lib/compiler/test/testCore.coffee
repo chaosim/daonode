@@ -22,17 +22,11 @@ exports.Test =
 
   "test begin": (test) ->
     test.equal  solve(begin(1, 2)), 2
+    test.equal  solve(begin(1, 2, 3)), 3
     test.done()
 
   "test quote": (test) ->
     test.equal  solve(quote(1)), 1
-    test.done()
-
-  "test vari assign": (test) ->
-    x = 'x'
-    test.equal  solve(begin(assign(x, 1), x)), 1
-    test.equal  solve(begin(assign(x, 1), inc(x))), 2
-    test.equal  solve(begin(assign(x, 1), suffixinc(x))), 1
     test.done()
 
   "test js vari": (test) ->
@@ -40,15 +34,15 @@ exports.Test =
     test.equal  solve(console_log), console.log
     test.done()
 
+  "test vop: add, eq": (test) ->
+    test.equal  solve(add(1, 1)), 2
+    test.equal  solve(eq(1, 1)), true
+    test.done()
+
   "test jsfun": (test) ->
     console_log = 'console.log'
     test.equal  solve(funcall(jsfun(console_log), 1)), null
     test.equal  solve(print_(1, 2)), null
-    test.done()
-
-  "test vop: add, eq": (test) ->
-    test.equal  solve(add(1, 1)), 2
-    test.equal  solve(eq(1, 1)), true
     test.done()
 
   "test lambda": (test) ->
@@ -64,11 +58,20 @@ exports.Test =
     test.equal  solve(macall(macro([x, y, z], if_(x, y, z)), eq(1, 1), print_(1), print_(2))), null
     test.done()
 
+  "test vari assign": (test) ->
+    x = 'x'
+    test.equal  solve(begin(assign(x, 1), x)), 1
+    test.equal  solve(begin(assign(x, 1), inc(x))), 2
+    test.equal  solve(begin(assign(x, 1), suffixinc(x))), 1
+    test.done()
+
+exports.Test =
   "test eval_ quote": (test) ->
     test.equal  solve(eval_(quote(1), string('f:/daonode/lib/compiler/test/compiled2.js'))), 1
     test.equal  solve(eval_(quote(print_(1)), string('f:/daonode/lib/compiler/test/compiled2.js'))), null
     test.done()
 
+xexports.Test =
   "test quasiquote": (test) ->
     test.equal solve(qq(1)), 1
     a = add(1, 2)

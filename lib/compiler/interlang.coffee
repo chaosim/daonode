@@ -11,7 +11,7 @@ class Element
   constructor: () ->  @name = @toString()
   isStatement: () -> false
   call: (args...) -> new Apply(@, args)
-  toCode: (compiler) -> throw NotImplement(@)
+  toCode: (compiler) -> throw new NotImplement(@)
   Object.defineProperty @::, '$', get: -> @constructor
 
 class Var extends Element
@@ -93,7 +93,13 @@ If::optimize = (env, compiler) ->
 Return::optimize = (env, compiler) -> new Return(compiler.optimize(@value, env))
 Lamda::optimize = (env, compiler) -> return new Lamda(@params, compiler.optimize(@body, env))
 Clamda::optimize = (env, compiler) -> return new Clamda(@v, compiler.optimize(@body, env))
-Apply::optimize = (env, compiler) -> @
+Apply::optimize = (env, compiler) ->
+  caller = @caller
+  if caller instanceof Lamda
+     body = caller.body
+     newEnv = env.extend(params, @args)
+     compiler.optimize(body, newEnv)
+  new @constructor(compiler.optimize(@caller, env), (compiler.optimize(a, env) for a in @args))
 CApply::optimize = (env, compiler) -> compiler.optimize(@cont.body, env.extend(@cont.v, compiler.optimize(@value, env)))
 Begin::optimize = (env, compiler) ->
   return new @constructor(compiler.optimize(exp, env) for exp in @exps)
@@ -102,7 +108,7 @@ Deref::optimize = (env, compiler) ->
   else if _.isNumber(@exp) then exp
   else @
 Code::optimize = (env, compiler) -> @
-JSFun::optimize = (env, compiler) -> @
+JSFun::optimize = (env, compiler) -> new JSFun(compiler.optimize(@fun, env))
 
 jsify = (exp) ->
   exp_jsify = exp?.jsify
@@ -169,11 +175,7 @@ Array::toCode = (compiler) ->  "[#{(compiler.toCode(exp) for exp in @exps).join(
 Print::toCode = (compiler) ->  "console.log(#{(compiler.toCode(exp) for exp in @exps).join(', ')})"
 Deref::toCode = (compiler) ->  "solver.trail.deref(#{compiler.toCode(@exp)})"
 Code::toCode = (compiler) ->  @string
-JSFun::toCode = (compiler) ->  "function() {\n"+\
-                               " var args, cont;\n "+\
-                               "  cont = arguments[0], args = 2 <= arguments.length ? [].slice.call(arguments, 1) : [];\n"+\
-                               "   return cont(#{@fun}.apply(this, args));"+\
-                               "   }"
+JSFun::toCode = (compiler) ->  "#{@fun}"
 BinaryOperationApply::toCode = (compiler) ->  "(#{compiler.toCode(@args[0])})#{@caller.symbol}(#{compiler.toCode(@args[1])})"
 UnaryOperationApply::toCode = (compiler) ->  "#{@caller.symbol}(#{compiler.toCode(@args[0])})"
 
@@ -245,7 +247,6 @@ vop = (name, toCode) ->
 
 il.suffixinc = vop('suffixdec', (compiler, args)->"#{compiler.toCode(args[0])}++")
 il.suffixdec = vop('suffixdec', (compiler, args)->"#{compiler.toCode(args[0])}--")
-il.protect = vop('protect', (compiler, args)->"solver.protect(#{compiler.toCode(args[0])})")
 il.pushCatch = vop('pushCatch', (compiler, args)->"solver.pushCatch(#{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})")
 il.popCatch = vop('popCatch', (compiler, args)->"solver.popCatch(#{compiler.toCode(args[0])})")
 il.findCatch = vop('findCatch', (compiler, args)->"solver.findCatch(#{compiler.toCode(args[0])})")
@@ -258,7 +259,6 @@ il.push = vop('push', (compiler, args)->"(#{compiler.toCode(args[0])}).push(#{co
 il.concat = vop('concat', (compiler, args)->"(#{compiler.toCode(args[0])}).concat(#{compiler.toCode(args[1])})")
 il.run = vop('run', (compiler, args)->"solver.run(#{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})")
 il.failcont = vop('failcont', (compiler, args)->"solver.failcont(#{compiler.toCode(args[0])})")
-
 il.evalexpr = vop('evalexpr', (compiler, args)->"solve(#{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})")
 
 il.fun = (f) -> new Fun(f)

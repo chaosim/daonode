@@ -133,7 +133,6 @@ exports.throw_ = special(2, 'throw_', (compiler, cont, tag, form) ->
       il.return(compiler.protect(il.findCatch.apply([v])).call(v2)))))
   compiler.cont(tag, formCont))
 
-
 # aka. lisp's unwind-protect 
 exports.protect = special(-1, 'protect', (compiler, cont, form, cleanup...) ->
   oldprotect = compiler.protect

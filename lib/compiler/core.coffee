@@ -29,14 +29,21 @@ exports.Compiler = class Compiler
     @exits = {}
     @continues = {}
     @protect = (cont) -> cont
+    v = il.vari('v')
+    @globalCont = il.clamda(v, v)
 
   compile: (exp) ->
     v = il.vari('v')
-    fromCont = @cont(exp, il.clamda(v, v))
+    fromCont = @cont(exp, @clamda(v, v))
     f = il.clamda(v, fromCont)
-#    f = f.optimize(new Env(), @)
+    f = f.optimize(new Env(), @)
     f = f.jsify()
     f.toCode(@)
+
+  clamda: (v, body...) ->
+    cont = il.clamda(v, body...)
+    @globalCont = il.clamda(v, @globalCont.call(il.clamda(v, body...).call(v)))
+    cont
 
   # compile to continuation
   cont: (exp, cont) ->
@@ -52,7 +59,7 @@ exports.Compiler = class Compiler
   leftValueCont: (cont, op, item, exp) ->
     if  _.isString(item)
       v = il.vari('v')
-      if op is 'assign' then return @cont(exp, il.clamda(v, il.assign(il.vari(item), v), cont.call(v)))
+      if op is 'assign' then return @cont(exp, @clamda(v, il.assign(il.vari(item), v), cont.call(v)))
       else return cont.call(il[op].call(il.vari(item)))
     if not _.isArray(item) then throw "Left Value should be an sexpression."
     length = item.length
@@ -62,17 +69,16 @@ exports.Compiler = class Compiler
     if head is "index"
       object = item[1]; index = item[2]
       obj = il.vari('obj'); i = il.vari('i'); v = il.vari('v')
-      if op is 'assign' then cont1 = @cont(exp, il.clamda(v,  il.assign(il.index.call(obj, i), cont.call(v))))
+      if op is 'assign' then cont1 = @cont(exp, @clamda(v,  il.assign(il.index.call(obj, i), cont.call(v))))
       else cont1 = cont.call(il[op].call(il.index.call(obj, i)))
-      @cont(object, il.clamda(obj, @cont(index, il.clamda(i, cont1))))
+      @cont(object, @clamda(obj, @cont(index, il.clamda(i, cont1))))
     else throw "Left Value side should be assignable expression."
 
   specials:
     "quote": (cont, exp) -> cont.call(exp)
     "eval": (cont, exp, path) ->
-      v = il.vari('v')
-      p = il.vari('path')
-      @cont(exp, il.clamda(v, @cont(path, il.clamda(p, cont.call(il.evalexpr.call(v, p))))))
+      v = il.vari('v');  p = il.vari('path')
+      @cont(exp, @clamda(v, @cont(path, @clamda(p, cont.call(il.evalexpr.call(v, p))))))
     'string': (cont, exp) -> cont.call(exp)
     "begin": (cont, exps...) -> @expsCont(exps, cont)
 
@@ -84,46 +90,46 @@ exports.Compiler = class Compiler
 
     "if": (cont, test, then_, else_) ->
         v = il.vari('v')
-        @cont(test, il.clamda(v, il.if_(v, @cont(then_, cont), @cont(else_, cont))))
+        @cont(test, @clamda(v, il.if_(v, @cont(then_, cont), @cont(else_, cont))))
 
     "jsfun": (cont, func) ->
       v = il.vari('v')
-      @cont(func, il.clamda(v, cont.call(il.jsfun(v))))
+      @cont(func, @clamda(v, cont.call(il.jsfun(v))))
 
     "lambda": (cont, params, body...) ->
-      k = il.vari('cont')
+      v = il.vari('v')
       params = (il.vari(p) for p in params)
-      cont.call(il.lamda([k].concat(params), @expsCont(body, k)))
-
-    "macro": (cont, params, body...) ->
-      k = il.vari('cont')
-      params1 = (il.vari(p) for p in params)
-      body = (@substMacroArgs(e, params) for e in body)
-      cont.call(il.lamda([k].concat(params1), @expsCont(body, k)))
-
-    "evalarg": (cont, name) -> cont.call(il.vari(name).call(cont))
+      cont.call(il.lamda(params, @expsCont(body, @clamda(v, v))))
 
     "funcall": (cont, caller, args...) ->
       compiler = @
       f = il.vari('f')
       length = args.length
       params = (il.vari('a'+i) for i in [0...length])
-      cont = f.apply([cont].concat(params))
+      cont = f.apply(params)
       for i in [length-1..0] by -1
         cont = do (i=i, cont=cont) ->
-          compiler.cont(args[i], il.clamda(params[i], cont))
-      @cont(caller, il.clamda(f, cont))
+          compiler.cont(args[i], compiler.clamda(params[i], cont))
+      @cont(caller, @clamda(f, cont))
+
+    "macro": (cont, params, body...) ->
+      v = il.vari('v')
+      params1 = (il.vari(p) for p in params)
+      body = (@substMacroArgs(e, params) for e in body)
+      cont.call(il.lamda(params1, @expsCont(body, @clamda(v,v))))
+
+    "evalarg": (cont, name) -> cont.call(il.vari(name).call(cont))
 
     "macall": (cont, caller, args...) ->
       compiler = @
       f = il.vari('f'); v = il.vari('v')
       length = args.length
       params = (il.vari('a'+i) for i in [0...length])
-      cont = f.apply([cont].concat(params))
+      cont = f.apply(params)
       for i in [length-1..0] by -1
         cont = do (i=i, cont=cont) ->
-          il.clamda(params[i], cont).call(il.lamda([], compiler.cont(args[i], il.clamda(v, v))))
-      @cont(caller, il.clamda(f, cont))
+          compiler.clamda(params[i], cont).call(il.lamda([], compiler.cont(args[i], compiler.clamda(v, v))))
+      @cont(caller, @clamda(f, cont))
 
     "quasiquote": (cont, exp) -> @quasiquote(exp, cont)
 
@@ -135,7 +141,7 @@ exports.Compiler = class Compiler
 
 #    "jsmacro": (cont, func) -> todo
 
-    # lisp style block
+    # lisp style block/break/continue
     'block': (cont, label, body...) ->
       label = label[1]
       if not _.isString(label) then (label = ''; body = [label].concat(body))
@@ -145,7 +151,7 @@ exports.Compiler = class Compiler
       defaultExits.push(cont)
       continues = @continues[label] ?= []
       f = il.vari('block'+label)
-      fun = il.clamda(il.vari('v'), null)
+      fun = @clamda(il.vari('v'), null)
       continues.push(f)
       defaultContinues = @continues[''] ?= []   # if no label, go here
       defaultContinues.push(f)
@@ -158,7 +164,6 @@ exports.Compiler = class Compiler
       defaultContinues.pop()
       il.begin(il.assign(f, fun), f.apply([null]))
 
-    # break a block
     'break': (cont, label, value) ->
       label = label[1]
       exits = @exits[label]
@@ -166,7 +171,6 @@ exports.Compiler = class Compiler
       exitCont = exits[exits.length-1]
       @cont(value, @protect(exitCont))
 
-    # continue a block
     'continue': (cont, label) ->
       label = label[1]
       continues = @continues[label]
@@ -174,19 +178,29 @@ exports.Compiler = class Compiler
       continueCont = continues[continues.length-1]
       @protect(continueCont).call(null)
 
-  Compiler = @
-  for name, vop of il
-    if vop instanceof il.VirtualOperation
-      do (name=name, vop=vop) -> Compiler::specials['vop_'+name] = (cont, args...) ->
-        compiler = @
-        length = args.length
-        params = (il.vari('a'+i) for i in [0...length])
-        cont = cont.call(vop.apply(params))
-        for i in [length-1..0] by -1
-          cont = do (i=i, cont=cont) ->
-            compiler.cont(args[i], il.clamda(params[i], cont))
-        cont
+    # aka. lisp style catch/throw
+    'catch': (cont, tag, forms...) ->
+      v = il.vari('v'); v2 = il.vari('v')
+      formsCont = @expsCont(forms, il.clamda(v2
+                   il.popCatch.apply([v]),
+                   cont.call(v2)))
+      @cont(tag, il.clamda(v,
+         il.pushCatch.apply([v, cont]),
+         formsCont))
 
+    'throw': (cont, tag, form) ->
+      v = il.vari('v'); v2 = il.vari('v')
+      formCont =  il.clamda(v, @cont(form, il.clamda(v2,
+                       @protect(il.findCatch.apply([v])).call(v2))))
+      @cont(tag, formCont)
+
+    'unwind-protect': (cont, form, cleanup...) ->
+      oldprotect = @protect
+      v1 = il.vari('v'); v2 = il.vari('v')
+      @protect = (cont) -> il.clamda(v1, @expsCont(cleanup, il.clamda(v2, oldprotect(cont).call(v1))))
+      result = @cont(form,  il.clamda(v1, @expsCont(cleanup, il.clamda(v2, cont.call(v1)))))
+      @protect = oldprotect
+      result
 
   optimize: (exp, env) ->
     expOptimize = exp?.optimize
@@ -212,7 +226,7 @@ exports.Compiler = class Compiler
     else if length is 1 then @cont(exps[0], cont)
     else
       v = il.vari('v')
-      @cont(exps[0], il.clamda(v, @expsCont(exps[1...], cont)))
+      @cont(exps[0], @clamda(v, @expsCont(exps[1...], cont)))
 
   quasiquote: (exp, cont) ->
     if not _.isArray(exp) then return cont.call(exp)
@@ -255,6 +269,19 @@ exports.Compiler = class Compiler
     else if head is 'quasiquote' then exp
     else [exp[0]].concat(@substMacroArgs(e, params) for e in exp[1...])
 
+  Compiler = @
+  for name, vop of il
+    if vop instanceof il.VirtualOperation
+      do (name=name, vop=vop) -> Compiler::specials['vop_'+name] = (cont, args...) ->
+        compiler = @
+        length = args.length
+        params = (il.vari('a'+i) for i in [0...length])
+        cont = cont.call(vop.apply(params))
+        for i in [length-1..0] by -1
+          cont = do (i=i, cont=cont) ->
+            compiler.cont(args[i], il.clamda(params[i], cont))
+        cont
+
 class Env
   constructor: (@outer, @data={}) ->
   extend: (vari, value) -> data = {}; data[vari.name] = value; new Env(@, data)
@@ -264,10 +291,6 @@ class Env
     else
       outer = @outer
       if outer then outer.lookup(vari) else vari
-
-# A flag class is used to process unquoteSlice
-UnquoteSliceValue = class exports.UnquoteSliceValue
-  constructor: (@value) ->
 
 exports.Error = class Error
   constructor: (@exp, @message='', @stack = @) ->  # @stack: to make webstorm nodeunit happy.
