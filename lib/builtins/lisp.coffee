@@ -113,7 +113,7 @@ exports.break_ = break_ = special([0, 1,2], 'break_', (solver, cont, label='', v
   if value != null and not _.isString label then throw new TypeError([label, value])
   if value is null and not _.isString label then (value = label; label = '')
   exits = solver.exits[label]
-  if not exits or exits==[] then throw Error(label)
+  if not exits or exits==[] then throw new  Error(label)
   exitCont = exits[exits.length-1]
   valCont = (v) -> solver.protect(exitCont)(v)
   solver.cont(value, valCont))
@@ -121,7 +121,7 @@ exports.break_ = break_ = special([0, 1,2], 'break_', (solver, cont, label='', v
 # continue a block 
 exports.continue_ = continue_ = special([0,1], 'continue_', (solver, cont, label='') ->
   continues = solver.continues[label]
-  if not continues or continues==[] then throw Error(label)
+  if not continues or continues==[] then throw new  Error(label)
   continueCont = continues[continues.length-1]
   (v) -> [solver.protect(continueCont[0]), v])
 
@@ -206,7 +206,7 @@ exports.quasiquote = exports.qq = special(1, 'quasiquote', (solver, cont, item) 
   solver.quasiquote?(item, cont))
 
 exports.unquote = exports.uq = special(1, 'unquote', (solver, cont, item) ->
-  throw "unquote: too many unquote and unquoteSlice" )
+  throw new Error "unquote: too many unquote and unquoteSlice" )
 
 exports.unquoteSlice = exports.uqs = special(1, 'unquoteSlice', (solver, cont, item) ->
-  throw "unquoteSlice: too many unquote and unquoteSlice")
+  throw new Error "unquoteSlice: too many unquote and unquoteSlice")

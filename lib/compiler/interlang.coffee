@@ -11,7 +11,7 @@ class Element
   constructor: () ->  @name = @toString()
   isStatement: () -> false
   call: (args...) -> new Apply(@, args)
-  toCode: (compiler) -> throw NotImplement(@)
+  toCode: (compiler) -> throw new  NotImplement(@)
   Object.defineProperty @::, '$', get: -> @constructor
 
 class Var extends Element
@@ -26,7 +26,7 @@ class Return extends Element
   toString: () -> "return(#{toString(@value)})"
 class Begin extends Element
   constructor: (@exps) -> super
-  toString: () -> "begin(#{(e.toString() for e in @exps).join(',')})"
+  toString: () -> "begin(#{(toString(e) for e in @exps).join(',')})"
 class Array extends Begin
   toString: () -> "[#{(toString(e) for e in @exps).join(',')}]"
 class Print extends Begin
@@ -54,10 +54,12 @@ class BinaryOperation extends VirtualOperation
   toString: () -> "binary(#{@symbol})"
   call: (args...) -> new BinaryOperationApply(@, args)
   apply: (args) -> new BinaryOperationApply(@, args)
+  _sideEffect: false
 class UnaryOperation extends BinaryOperation
   toString: () -> "unary(#{@symbol})"
   call: (args...) -> new UnaryOperationApply(@, args)
   apply: (args) -> new UnaryOperationApply(@, args)
+  _sideEffect: false
 class Fun extends Element
   constructor: (@func) -> super
   toString: () -> "fun(#{@func})"
@@ -94,8 +96,24 @@ Return::optimize = (env, compiler) -> new Return(compiler.optimize(@value, env))
 Lamda::optimize = (env, compiler) -> return new Lamda(@params, compiler.optimize(@body, env))
 Clamda::optimize = (env, compiler) ->
   return new Clamda(@v, compiler.optimize(@body, env.extend(@v, @v)))
-Apply::optimize = (env, compiler) -> new @constructor(compiler.optimize(@caller, env), (compiler.optimize(a, env) for a in @args))
-CApply::optimize = (env, compiler) -> compiler.optimize(@cont.body, env.extend(@cont.v, compiler.optimize(@value, env)))
+Apply::optimize = (env, compiler) ->
+  caller =  compiler.optimize(@caller, env)
+  args = (compiler.optimize(a, env) for a in @args)
+  if caller instanceof JSFun
+    cont  = args[0]
+    args = args[1...]
+    cont.call(caller.fun.apply(args)).optimize(env, compiler)
+  else new @constructor(caller, args)
+CApply::optimize = (env, compiler) ->
+  cont = @cont; body = cont.body; v = cont.v; value = compiler.optimize(@value, env)
+  count = occurCount(body, v)
+  if sideEffect(value)
+    switch count
+      when 0 then il.begin(value, compiler.optimize(body, env))
+      when 1
+        compiler.optimize(body, env.extend(v, compiler.optimize(value, env)))
+      else il.begin(il.assign(v, value), compiler.optimize(body, env))
+  else compiler.optimize(body, env.extend(v, value))
 Begin::optimize = (env, compiler) ->
   return new @constructor(compiler.optimize(exp, env) for exp in @exps)
 Deref::optimize = (env, compiler) ->
@@ -104,6 +122,48 @@ Deref::optimize = (env, compiler) ->
   else @
 Code::optimize = (env, compiler) -> @
 JSFun::optimize = (env, compiler) -> new JSFun(compiler.optimize(@fun, env))
+
+occurCount = (exp, vari) ->
+  exp_occurCount = exp?.occurCount
+  if exp_occurCount then exp_occurCount.call(exp, vari)
+  else 0
+
+Var::occurCount = (vari) -> if @.name is vari.name then 1 else 0
+Assign::occurCount = (vari) -> occurCount(@exp, vari)
+If::occurCount = (vari) -> occurCount(@test, vari) + occurCount(@then_, vari) + occurCount(@else_, vari)
+Begin::occurCount = (vari) ->  _.reduce(@exps, ((memo, e) -> memo+occurCount(e, vari)), 0)
+Apply::occurCount = (vari) ->  occurCount(@caller, vari)+_.reduce(@args, ((memo, e) -> memo+occurCount(e, vari)), 0)
+CApply::occurCount = (vari) ->  occurCount(@cont, vari) + occurCount(@value, vari)
+Lamda::occurCount = (vari) ->  if vari in @params then 0 else occurCount(@body, vari)
+Clamda::occurCount = (vari) ->  if vari.name is @v.name then 0 else occurCount(@body, vari)
+
+sideEffect = (exp) ->
+  exp_sideEffect = exp?.sideEffect
+  if exp_sideEffect then exp_sideEffect.call(exp)
+  else if _.isNumber(exp) then false
+  else if _.isString(exp) then false
+  else if _.isArray(exp) then false
+  else true
+
+hasSideEffect = (exp) -> exp._sideEffect = true; exp
+noSideEffect = (exp) -> exp._sideEffect = false; exp
+
+Var::sideEffect = () -> false
+Return::sideEffect = () -> sideEffect(@value)
+If::sideEffect = () -> sideEffeft(@test) or sideEffect(@then_) or sideEffect(@else_)
+Begin::sideEffect = () -> _.reduce(@exps, ((memo, e) -> memo or sideEffect(e)), false)
+VirtualOperation::sideEffect = () -> @_sideEffects? or true
+Lamda::sideEffect = () -> false
+Clamda::sideEffect = () -> false
+Apply::sideEffect = () ->
+  caller = @caller
+  if caller instanceof Lamda and sideEffeft(caller.body) then return true
+  if caller instanceof Clamda and sideEffeft(caller.body) then return true
+  if caller instanceof Var then return true
+  if sideEffect(caller) then return true
+  for a in @args then if sideEffect(a) then return true
+  return false
+CApply::sideEffect = () -> sideEffeft(@cont.body) or sideEffect(@value)
 
 jsify = (exp) ->
   exp_jsify = exp?.jsify
@@ -116,7 +176,7 @@ Begin::jsify = () ->
   exps = @exps
   length = exps.length
   if length is 0 or length is 1
-    throw "begin should have at least one exp"
+    throw new  Error "begin should have at least one exp"
   result = []
   for e in exps
     result.push(jsify(e))
@@ -196,7 +256,7 @@ il.apply = (caller, args) -> new Apply(caller, args)
 il.capply = (cont, value) -> new CApply(cont, value)
 il.begin = (exps...) ->
   length = exps.length
-  if length is 0 then throw "begin should have at least one exp"
+  if length is 0 then throw new Error "begin should have at least one exp"
   if length is 1 then return exps[0]
   result = []
   for e in exps
@@ -236,25 +296,25 @@ il.rshift = binary(">>")
 il.not_ = unary("!")
 il.neg = unary("-")
 il.bitnot = unary("~")
-il.inc = unary("++")
-il.dec = unary("--")
+il.inc = hasSideEffect(unary("++"))
+il.dec = hasSideEffect(unary("--"))
 
 vop = (name, toCode) ->
   class Vop extends VirtualOperation
     applyToCode: toCode
+    _sideEffect: true
   new Vop(name)
 
 il.suffixinc = vop('suffixdec', (compiler, args)->"#{compiler.toCode(args[0])}++")
 il.suffixdec = vop('suffixdec', (compiler, args)->"#{compiler.toCode(args[0])}--")
-il.protect = vop('protect', (compiler, args)->"solver.protect(#{compiler.toCode(args[0])})")
 il.pushCatch = vop('pushCatch', (compiler, args)->"solver.pushCatch(#{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})")
 il.popCatch = vop('popCatch', (compiler, args)->"solver.popCatch(#{compiler.toCode(args[0])})")
-il.findCatch = vop('findCatch', (compiler, args)->"solver.findCatch(#{compiler.toCode(args[0])})")
+il.findCatch = noSideEffect(vop('findCatch', (compiler, args)->"solver.findCatch(#{compiler.toCode(args[0])})"))
 il.fake = vop('fake', (compiler, args)->"solver.fake(#{compiler.toCode(args[0])})").apply([])
 il.restore = vop('restore', (compiler, args)->"solver.restore(#{compiler.toCode(args[0])})")
-il.getvalue = vop('getvalue', (compiler, args)->"solver.trail.getvalue(#{compiler.toCode(args[0])})")
-il.list = vop('list', (compiler, args)->"[#{(compiler.toCode(a) for a in args).join(', ')}]")
-il.index = vop('index', (compiler, args)->"(#{compiler.toCode(args[0])})[#{compiler.toCode(args[1])}]")
+il.getvalue = noSideEffect(vop('getvalue', (compiler, args)->"solver.trail.getvalue(#{compiler.toCode(args[0])})"))
+il.list = noSideEffect(vop('list', (compiler, args)->"[#{(compiler.toCode(a) for a in args).join(', ')}]"))
+il.index = noSideEffect(vop('index', (compiler, args)->"(#{compiler.toCode(args[0])})[#{compiler.toCode(args[1])}]"))
 il.push = vop('push', (compiler, args)->"(#{compiler.toCode(args[0])}).push(#{compiler.toCode(args[1])})")
 il.concat = vop('concat', (compiler, args)->"(#{compiler.toCode(args[0])}).concat(#{compiler.toCode(args[1])})")
 il.run = vop('run', (compiler, args)->"solver.run(#{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})")

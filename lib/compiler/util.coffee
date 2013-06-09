@@ -10,7 +10,7 @@ exports.assign = (vari, exp) -> ["assign", vari, exp]
 exports.if_ = if_ = (test, then_, else_) -> ["if", test, then_, else_]
 exports.iff = iff = (clauses, else_) ->
   length =  clauses.length
-  if length is 0 then throw "iff clauses should have at least one clause."
+  if length is 0 then throw new Error "iff clauses should have at least one clause."
   else
     [test, then_] = clauses[0]
     if length is 1 then if_(test, then_, else_)

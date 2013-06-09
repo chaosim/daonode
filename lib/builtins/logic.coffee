@@ -305,7 +305,7 @@ exports.functionPredicate = (arity, name, fun) ->
 exports.between = special(3, 'between', (solver, cont, fun, x, y, z) ->
   y1 = z1 = null
   zcont = solver.cont(z,  (zz) ->
-    if x1 instanceof core.Var then throw core.TypeError(x)
+    if x1 instanceof core.Var then throw new core.TypeError(x)
     else if y1 instanceof core.Var then throw new core.TypeError(y)
     if y1 instanceof core.Var
       y11 = y1
@@ -326,7 +326,7 @@ exports.rangep = special(2, 'rangep', (solver, cont, x, y) ->
   # select all of values between x and y as choices
   x1 = null
   ycont = solver.cont(y,  (y) ->
-    if x1 instanceof core.Var then throw core.TypeError(x)
+    if x1 instanceof core.Var then throw new core.TypeError(x)
     else if y1 instanceof core.Var then throw new core.TypeError(y)
     else if x1>y1 then return solver.failcont(false)
     result = x1

@@ -18,16 +18,17 @@ exports.Test =
     test.equal  solve(begin(assign(a, 1),  block(blk, if_(eq(a, 10), break_(blk, a)), inc(a), continue_(blk)))), 10
     test.done()
 
-exports.Test =
   "test eval_ quote": (test) ->
     test.equal  solve(quote(1)), 1
-    test.equal  solve(eval_(quote(1))), 1
+    test.equal  solve(eval_(quote(1), string('f:/daonode/lib/compiler/test/compiled2.js'))), 1
     test.done()
 
   "test assign inc dec": (test) ->
     a = vari('a')
+    test.equal  solve(begin(assign(a, 1))), 1
     test.equal  solve(begin(assign(a, 1), a)), 1
     test.equal  solve(begin(assign(a, 1), inc(a))), 2
+    test.equal  solve(begin(assign(a, 1), inc(a), inc(a))), 3
     test.done()
 
   "test begin": (test) ->
@@ -41,30 +42,32 @@ exports.Test =
     test.equal  solve(if_(0, 2, 3)), 3
     test.done()
 
+
   "test iff": (test) ->
     test.equal  solve(iff([[1, 2]], 3)), 2
     test.equal  solve(iff([[0, 2], [1, 3]], 5)), 3
     test.done()
 
   "test block break continue": (test) ->
-    a = makeLabel('x')
+    a = makeLabel('a')
     b = makeLabel('b')
     test.equal  solve(block(a, 1)), 1
     test.equal  solve(block(a, break_(a, 2), 1)), 2
     test.equal  solve(block(a, block(b, break_(b, 2), 1), 3)), 3
     x = vari('x')
-    test.equal  solve(begin(assign(x, 1),  block(a, if_(eq(x, 5), break_(a, x)), inc(x), continue_(a)))), 5
+    test.equal  solve(begin(assign(x, 1),  block(a, if_(eq(x, 5), break_(a, x)), inc(x), continue_(a)))), 5 #print_(x),
     test.done()
 
+exports.Test =
   "test loop while until": (test) ->
     x = vari('x')
     a = makeLabel('x')
     test.equal  solve(begin(assign(x, 1),  block(a, if_(eq(x, 5), break_(a, x)), print_(x), inc(x), continue_(a)))), 5
-    test.equal  solve(begin(assign(x, 1),  block(a, if_(eq(x, 5), break_(x)), print_(x), inc(x), continue_()))), 5
-    test.equal  solve(begin(assign(x, 1),  loop_(a, if_(eq(x, 5), break_(a, x)), print_(x), inc(x)))), 5
-    test.equal  solve(begin(assign(x, 1),  loop_(a, print_(x), if_(eq(x, 5), break_(x)), inc(x)))), 5
-    test.equal  solve(begin(assign(x, 1),  while_(a, le(x, 5), print_(x), inc(x)))), null
-    test.equal  solve(begin(assign(x, 1),  until_(a, print_(x), inc(x), eq(x, 5)))), null
+#    test.equal  solve(begin(assign(x, 1),  block(a, if_(eq(x, 5), break_(x)), print_(x), inc(x), continue_()))), 5
+#    test.equal  solve(begin(assign(x, 1),  loop_(a, if_(eq(x, 5), break_(a, x)), print_(x), inc(x)))), 5
+#    test.equal  solve(begin(assign(x, 1),  loop_(a, print_(x), if_(eq(x, 5), break_(x)), inc(x)))), 5
+#    test.equal  solve(begin(assign(x, 1),  while_(a, le(x, 5), print_(x), inc(x)))), null
+#    test.equal  solve(begin(assign(x, 1),  until_(a, print_(x), inc(x), eq(x, 5)))), null
     test.done()
 
 xexports.Test =

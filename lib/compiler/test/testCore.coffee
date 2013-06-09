@@ -43,8 +43,8 @@ exports.Test =
 exports.Test =
   "test jsfun": (test) ->
     console_log = 'console.log'
-#    test.equal  solve(funcall(jsfun(console_log), 1)), null
-    test.equal  solve(print_(1, 2)), null
+    test.equal  solve(funcall(jsfun(console_log), 1)), null
+#    test.equal  solve(print_(1, 2)), null
     test.done()
 
 xexports.Test =

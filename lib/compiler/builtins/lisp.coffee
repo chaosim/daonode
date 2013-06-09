@@ -85,14 +85,14 @@ exports.break_ = break_ = special([0, 1,2], 'break_', (compiler, cont, label='',
   if value != null and not _.isString label then throw new TypeError([label, value])
   if value is null and not _.isString label then (value = label; label = '')
   exits = compiler.exits[label]
-  if not exits or exits==[] then throw Error(label)
+  if not exits or exits==[] then throw new  Error(label)
   exitCont = exits[exits.length-1]
   compiler.cont(value, compiler.protect(exitCont)))
 
 # continue a block 
 exports.continue_ = continue_ = special([0,1], 'continue_', (compiler, cont, label='') ->
   continues = compiler.continues[label]
-  if not continues or continues==[] then throw Error(label)
+  if not continues or continues==[] then throw new Error(label)
   continueCont = continues[continues.length-1]
   il.return(compiler.protect(continueCont).call(null)))
 

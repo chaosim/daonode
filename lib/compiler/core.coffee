@@ -54,18 +54,18 @@ exports.Compiler = class Compiler
       v = il.vari('v')
       if op is 'assign' then return @cont(exp, il.clamda(v, il.assign(il.vari(item), v), cont.call(v)))
       else return cont.call(il[op].call(il.vari(item)))
-    if not _.isArray(item) then throw "Left Value should be an sexpression."
+    if not _.isArray(item) then throw new Error "Left Value should be an sexpression."
     length = item.length
-    if length is 0 then throw "Left Value side should not be empty list."
+    if length is 0 then throw new Error "Left Value side should not be empty list."
     head = item[0]
-    if not _.isString(head) then throw "Keyword should be a string."
+    if not _.isString(head) then throw new Error "Keyword should be a string."
     if head is "index"
       object = item[1]; index = item[2]
       obj = il.vari('obj'); i = il.vari('i'); v = il.vari('v')
       if op is 'assign' then cont1 = @cont(exp, il.clamda(v,  il.assign(il.index.call(obj, i), cont.call(v))))
       else cont1 = cont.call(il[op].call(il.index.call(obj, i)))
       @cont(object, il.clamda(obj, @cont(index, il.clamda(i, cont1))))
-    else throw "Left Value side should be assignable expression."
+    else throw new Error "Left Value side should be assignable expression."
 
   specials:
     "quote": (cont, exp) -> cont.call(exp)
@@ -128,10 +128,10 @@ exports.Compiler = class Compiler
     "quasiquote": (cont, exp) -> @quasiquote(exp, cont)
 
     "unquote": (cont, exp) ->
-      throw "unquote: too many unquote and unquoteSlice"
+      throw new Error "unquote: too many unquote and unquoteSlice"
 
     "unquote-slice": (cont, exp) ->
-      throw "unquoteSlice: too many unquote and unquoteSlice"
+      throw new Error "unquoteSlice: too many unquote and unquoteSlice"
 
 #    "jsmacro": (cont, func) -> todo
 
@@ -162,7 +162,7 @@ exports.Compiler = class Compiler
     'break': (cont, label, value) ->
       label = label[1]
       exits = @exits[label]
-      if not exits or exits==[] then throw Error(label)
+      if not exits or exits==[] then throw new  Error(label)
       exitCont = exits[exits.length-1]
       @cont(value, @protect(exitCont))
 
@@ -170,7 +170,7 @@ exports.Compiler = class Compiler
     'continue': (cont, label) ->
       label = label[1]
       continues = @continues[label]
-      if not continues or continues==[] then throw Error(label)
+      if not continues or continues==[] then throw new  Error(label)
       continueCont = continues[continues.length-1]
       @protect(continueCont).call(null)
 
@@ -208,7 +208,7 @@ exports.Compiler = class Compiler
   # used for lisp.begin, logic.andp, etc., to generate the continuation for an expression array
   expsCont: (exps, cont) ->
     length = exps.length
-    if length is 0 then throw exports.TypeError(exps)
+    if length is 0 then throw new  exports.TypeError(exps)
     else if length is 1 then @cont(exps[0], cont)
     else
       v = il.vari('v')
