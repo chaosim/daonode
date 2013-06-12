@@ -34,6 +34,7 @@ exports.Compiler = class Compiler
     v = il.vari('v')
     fromCont = @cont(exp, il.clamda(v, v))
     f = il.clamda(v, fromCont)
+    f.analyse(@)
     f = f.optimize(new Env(), @)
     f = f.jsify()
     f.toCode(@)

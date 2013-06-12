@@ -96,6 +96,7 @@ Return::optimize = (env, compiler) -> new Return(compiler.optimize(@value, env))
 Lamda::optimize = (env, compiler) -> return new Lamda(@params, compiler.optimize(@body, env))
 Clamda::optimize = (env, compiler) ->
   return new Clamda(@v, compiler.optimize(@body, env.extend(@v, @v)))
+
 Apply::optimize = (env, compiler) ->
   caller =  compiler.optimize(@caller, env)
   args = (compiler.optimize(a, env) for a in @args)
@@ -103,10 +104,80 @@ Apply::optimize = (env, compiler) ->
     cont  = args[0]
     args = args[1...]
     cont.call(caller.fun.apply(args)).optimize(env, compiler)
+  else if caller instanceof Lamda
+    # todo: opimize call of lamda
+    params = caller.params
+    body = caller.body
+    paramsLength = params.length
+    if paramsLength is 0 then return compiler.optimize(body, env)
+    newParams = []; newArgs = []; bindings = {}
+    refMap = @refMap
+    for p, i in params
+      arg = args[i]
+      if sideEffect(arg)
+        newParams.push[p]
+        newArgs.push(arg)
+        continue
+      else
+        refCount = refMap[p]
+        switch refCount
+          when 0 then  continue
+          when 1 then bindings[p] = arg
+          else
+            if codeSize(arg)*refCount>MAX_EXTEND_CODE_SIZE
+              newParams.push(p)
+              newArgs.push(arg)
+            else bindings[p] = arg
+    if newParams.length is not 0
+      if not isEmpty(bindings) then env = new Env(env, bindings)
+      new Apply(new Lamda(newParams, compiler.optimze(body, env)), newArgs)
+    else
+      if bindings then compiler.optimze(body, new Env(env, bindings))
+      else  compiler.optimize(body, env)
   else new @constructor(caller, args)
+
+MAX_EXTEND_CODE_SIZE = 10
+
+hasOwnProperty = Object::hasOwnProperty
+isEmpty = (obj) ->
+  for key of obj  then if hasOwnProperty.call(obj, key) then return false
+  return true
+
+analyse = (exp, compiler, refMap) ->
+  exp_analyse = exp?.analyse
+  if exp_analyse then exp_analyse.call(exp, compiler, refMap)
+
+Var::analyse = (compiler, refMap) ->
+  if hasOwnProperty(refMap, @) then refMap[@]++ else refMap[@] = 0
+
+Assign::analyse = (compiler, refMap) -> analyse(@exp, compiler)
+If::analyse = (compiler, refMap) ->
+  analyse(@test, compiler, refMap) + analyse(@then_, compiler, refMap) + analyse(@else_, compiler, refMap)
+Begin::analyse = (compiler, refMap) -> analyse(e, compiler, refMap) for e in @exps
+Apply::analyse = (compiler, refMap) ->
+  analyse(@caller, compiler, refMap); analyse(e, compiler, refMap) for e in @args
+CApply::analyse = (compiler, refMap) ->  analyse(@cont, compiler, refMap); analyse(@value, compiler, refMap)
+Lamda::analyse = (compiler, refMap) ->
+  childMap = @refMap = {}
+  analyse(@body, compiler, childMap)
+  for x, i of childMap
+    if x not in @params
+      if hasOwnProperty(refMap, x) then refMap[x] += i else refMap[x] = i
+Clamda::analyse = (compiler, refMap) ->
+  childMap = @refMap = {}
+  analyse(@body, compiler, childMap)
+  for x, i of childMap
+    if x.name!=@v.name
+      if hasOwnProperty(refMap, x) then refMap[x] += i else refMap[x] = i
+
+codeSize = (exp) ->
+  exp_codeSize = exp?.codeSize
+  if exp_codeSize then exp_codeSize.call(exp)
+  else 1
+
 CApply::optimize = (env, compiler) ->
   cont = @cont; body = cont.body; v = cont.v; value = compiler.optimize(@value, env)
-  count = occurCount(body, v)
+  count = cont.refMap[v]
   if sideEffect(value)
     switch count
       when 0 then il.begin(value, compiler.optimize(body, env))
@@ -128,7 +199,8 @@ occurCount = (exp, vari) ->
   if exp_occurCount then exp_occurCount.call(exp, vari)
   else 0
 
-Var::occurCount = (vari) -> if @.name is vari.name then 1 else 0
+Var::occurCount = (vari) ->
+  if @.name is vari.name then 1 else 0
 Assign::occurCount = (vari) -> occurCount(@exp, vari)
 If::occurCount = (vari) -> occurCount(@test, vari) + occurCount(@then_, vari) + occurCount(@else_, vari)
 Begin::occurCount = (vari) ->  _.reduce(@exps, ((memo, e) -> memo+occurCount(e, vari)), 0)
@@ -136,6 +208,21 @@ Apply::occurCount = (vari) ->  occurCount(@caller, vari)+_.reduce(@args, ((memo,
 CApply::occurCount = (vari) ->  occurCount(@cont, vari) + occurCount(@value, vari)
 Lamda::occurCount = (vari) ->  if vari in @params then 0 else occurCount(@body, vari)
 Clamda::occurCount = (vari) ->  if vari.name is @v.name then 0 else occurCount(@body, vari)
+
+codeSize = (exp) ->
+  exp_codeSize = exp?.codeSize
+  if exp_codeSize then exp_codeSize.call(exp)
+  else 1
+
+Var::codeSize = () -> 1
+Return::codeSize = () -> codeSize(@value)+1
+If::codeSize = () -> sideEffeft(@test) + codeSize(@then_) + codeSize(@else_) + 1
+Begin::codeSize = () -> _.reduce(@exps, ((memo, e) -> memo + codeSize(e)), 0)
+VirtualOperation::codeSize = () -> 1
+Lamda::codeSize = () -> codeSize(@body) + 2
+Clamda::codeSize = () -> codeSize(@body) + 1
+Apply::codeSize = () -> _.reduce(@args, ((memo, e) -> memo + codeSize(e)), codeSize(@caller))
+CApply::codeSize = () -> codeSize(@cont.body) + codeSize(@value) + 2
 
 sideEffect = (exp) ->
   exp_sideEffect = exp?.sideEffect
@@ -153,6 +240,8 @@ Return::sideEffect = () -> sideEffect(@value)
 If::sideEffect = () -> sideEffeft(@test) or sideEffect(@then_) or sideEffect(@else_)
 Begin::sideEffect = () -> _.reduce(@exps, ((memo, e) -> memo or sideEffect(e)), false)
 VirtualOperation::sideEffect = () -> @_sideEffects? or true
+BinaryOperation::sideEffect = () -> @_sideEffects? or false
+UnaryOperation::sideEffect = () -> @_sideEffects? or false
 Lamda::sideEffect = () -> false
 Clamda::sideEffect = () -> false
 Apply::sideEffect = () ->
