@@ -34,7 +34,8 @@ exports.Compiler = class Compiler
     v = il.vari('v')
     fromCont = @cont(exp, il.clamda(v, v))
     f = il.clamda(v, fromCont)
-    f.analyse(@)
+    f.refMap = {}
+    f.analyze(@, f.refMap)
     f = f.optimize(new Env(), @)
     f = f.jsify()
     f.toCode(@)
@@ -256,9 +257,10 @@ exports.Compiler = class Compiler
     else if head is 'quasiquote' then exp
     else [exp[0]].concat(@substMacroArgs(e, params) for e in exp[1...])
 
-class Env
+exports.Env = class Env
   constructor: (@outer, @data={}) ->
   extend: (vari, value) -> data = {}; data[vari.name] = value; new Env(@, data)
+  extendBindings: (bindings) -> new Env(@, bindings)
   lookup: (vari) ->
     data = @data; name = vari.name;
     if data.hasOwnProperty(name) then return data[name]

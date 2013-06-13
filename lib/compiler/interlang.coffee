@@ -1,4 +1,6 @@
 _ = require("underscore")
+{Env, solve} = core = require("./core")
+
 il = exports
 
 exports.NotImplement = class NotImplement extends Error
@@ -88,14 +90,46 @@ class If extends Element
   constructor: (@test, @then_, @else_) -> super
   toString: () -> "if_(#{toString(@test)}, #{toString(@then_)}, #{toString(@else_)})"
 
+optimize = (exp, env, compiler) ->
+  exp_optimize = exp?.optimize
+  if exp_optimize then exp_optimize.call(exp, env, compiler)
+  else 1
+
 Var::optimize = (env, compiler) -> env.lookup(@)
 Assign::optimize = (env, compiler) ->  new Assign(compiler.optimize(@left, env),  compiler.optimize(@exp, env))
 If::optimize = (env, compiler) ->
-  new If(compiler.optimize(@test, env),  compiler.optimize(@then_, env),  compiler.optimize(@else_, env))
+  test = optimize(@test, env, compiler)
+  test_bool = boolize(test)
+  if test_bool is true
+    then_ = optimize(@then_, env, compiler)
+    if then_ instanceof If and then_.test is test # (if a (if a b c) d)
+      then_ = then_.then_
+    then_
+  else if test_bool is false
+    else_ = optimize(@else_, env, compiler)
+    if else_ instanceof If and else_.test is test # (if a b (if a c d))
+      else_ = else_.else_
+    else_
+  else
+    then_= optimize(@then_, env, compiler)
+    else_ = optimize(@else_, env, compiler)
+    if then_ instanceof If and then_.test is test # (if a (if a b c) d)
+      then_ = then_.then_
+    if else_ instanceof If and else_.test is test # (if a b (if a c d))
+      else_ = else_.else_
+    new If(test, then_, else_)
+
 Return::optimize = (env, compiler) -> new Return(compiler.optimize(@value, env))
-Lamda::optimize = (env, compiler) -> return new Lamda(@params, compiler.optimize(@body, env))
+Lamda::optimize = (env, compiler) ->
+  result = new Lamda(@params, compiler.optimize(@body, env))
+  result.refMap = {}
+  result.analyze(compiler,  result.refMap)
+  return result
 Clamda::optimize = (env, compiler) ->
-  return new Clamda(@v, compiler.optimize(@body, env.extend(@v, @v)))
+  result = new Clamda(@v, compiler.optimize(@body, env.extend(@v, @v)))
+  result.refMap = {}
+  result.analyze(compiler,  result.refMap)
+  return result
 
 Apply::optimize = (env, compiler) ->
   caller =  compiler.optimize(@caller, env)
@@ -105,13 +139,12 @@ Apply::optimize = (env, compiler) ->
     args = args[1...]
     cont.call(caller.fun.apply(args)).optimize(env, compiler)
   else if caller instanceof Lamda
-    # todo: opimize call of lamda
     params = caller.params
     body = caller.body
     paramsLength = params.length
     if paramsLength is 0 then return compiler.optimize(body, env)
     newParams = []; newArgs = []; bindings = {}
-    refMap = @refMap
+    refMap = caller.refMap
     for p, i in params
       arg = args[i]
       if sideEffect(arg)
@@ -121,59 +154,22 @@ Apply::optimize = (env, compiler) ->
       else
         refCount = refMap[p]
         switch refCount
-          when 0 then  continue
           when 1 then bindings[p] = arg
           else
             if codeSize(arg)*refCount>MAX_EXTEND_CODE_SIZE
               newParams.push(p)
               newArgs.push(arg)
             else bindings[p] = arg
-    if newParams.length is not 0
-      if not isEmpty(bindings) then env = new Env(env, bindings)
-      new Apply(new Lamda(newParams, compiler.optimze(body, env)), newArgs)
+    if newParams.length isnt 0
+      if not isEmpty(bindings) then env = env.extendBindings(bindings)
+      new Apply(new Lamda(newParams, compiler.optimize(body, env)), newArgs)
     else
-      if bindings then compiler.optimze(body, new Env(env, bindings))
+      if bindings then compiler.optimize(body, env.extendBindings(bindings))
       else  compiler.optimize(body, env)
-  else new @constructor(caller, args)
-
-MAX_EXTEND_CODE_SIZE = 10
-
-hasOwnProperty = Object::hasOwnProperty
-isEmpty = (obj) ->
-  for key of obj  then if hasOwnProperty.call(obj, key) then return false
-  return true
-
-analyse = (exp, compiler, refMap) ->
-  exp_analyse = exp?.analyse
-  if exp_analyse then exp_analyse.call(exp, compiler, refMap)
-
-Var::analyse = (compiler, refMap) ->
-  if hasOwnProperty(refMap, @) then refMap[@]++ else refMap[@] = 0
-
-Assign::analyse = (compiler, refMap) -> analyse(@exp, compiler)
-If::analyse = (compiler, refMap) ->
-  analyse(@test, compiler, refMap) + analyse(@then_, compiler, refMap) + analyse(@else_, compiler, refMap)
-Begin::analyse = (compiler, refMap) -> analyse(e, compiler, refMap) for e in @exps
-Apply::analyse = (compiler, refMap) ->
-  analyse(@caller, compiler, refMap); analyse(e, compiler, refMap) for e in @args
-CApply::analyse = (compiler, refMap) ->  analyse(@cont, compiler, refMap); analyse(@value, compiler, refMap)
-Lamda::analyse = (compiler, refMap) ->
-  childMap = @refMap = {}
-  analyse(@body, compiler, childMap)
-  for x, i of childMap
-    if x not in @params
-      if hasOwnProperty(refMap, x) then refMap[x] += i else refMap[x] = i
-Clamda::analyse = (compiler, refMap) ->
-  childMap = @refMap = {}
-  analyse(@body, compiler, childMap)
-  for x, i of childMap
-    if x.name!=@v.name
-      if hasOwnProperty(refMap, x) then refMap[x] += i else refMap[x] = i
-
-codeSize = (exp) ->
-  exp_codeSize = exp?.codeSize
-  if exp_codeSize then exp_codeSize.call(exp)
-  else 1
+  else if caller instanceof Clamda
+    CApply::optimize.call(new CApply(caller, args[0]), env, compiler)
+  else
+    new @constructor(caller, args)
 
 CApply::optimize = (env, compiler) ->
   cont = @cont; body = cont.body; v = cont.v; value = compiler.optimize(@value, env)
@@ -194,20 +190,39 @@ Deref::optimize = (env, compiler) ->
 Code::optimize = (env, compiler) -> @
 JSFun::optimize = (env, compiler) -> new JSFun(compiler.optimize(@fun, env))
 
-occurCount = (exp, vari) ->
-  exp_occurCount = exp?.occurCount
-  if exp_occurCount then exp_occurCount.call(exp, vari)
-  else 0
+MAX_EXTEND_CODE_SIZE = 10
 
-Var::occurCount = (vari) ->
-  if @.name is vari.name then 1 else 0
-Assign::occurCount = (vari) -> occurCount(@exp, vari)
-If::occurCount = (vari) -> occurCount(@test, vari) + occurCount(@then_, vari) + occurCount(@else_, vari)
-Begin::occurCount = (vari) ->  _.reduce(@exps, ((memo, e) -> memo+occurCount(e, vari)), 0)
-Apply::occurCount = (vari) ->  occurCount(@caller, vari)+_.reduce(@args, ((memo, e) -> memo+occurCount(e, vari)), 0)
-CApply::occurCount = (vari) ->  occurCount(@cont, vari) + occurCount(@value, vari)
-Lamda::occurCount = (vari) ->  if vari in @params then 0 else occurCount(@body, vari)
-Clamda::occurCount = (vari) ->  if vari.name is @v.name then 0 else occurCount(@body, vari)
+hasOwnProperty = Object::hasOwnProperty
+isEmpty = (obj) ->
+  for key of obj  then if hasOwnProperty.call(obj, key) then return false
+  return true
+
+analyze = (exp, compiler, refMap) ->
+  exp_analyze = exp?.analyze
+  if exp_analyze then exp_analyze.call(exp, compiler, refMap)
+
+Var::analyze = (compiler, refMap) ->
+  if hasOwnProperty.call(refMap, @) then refMap[@]++ else refMap[@] = 1
+
+Assign::analyze = (compiler, refMap) -> analyze(@exp, compiler, refMap)
+If::analyze = (compiler, refMap) ->
+  analyze(@test, compiler, refMap) + analyze(@then_, compiler, refMap) + analyze(@else_, compiler, refMap)
+Begin::analyze = (compiler, refMap) -> analyze(e, compiler, refMap) for e in @exps
+Apply::analyze = (compiler, refMap) ->
+  analyze(@caller, compiler, refMap); analyze(e, compiler, refMap) for e in @args
+CApply::analyze = (compiler, refMap) ->  analyze(@cont, compiler, refMap); analyze(@value, compiler, refMap)
+Lamda::analyze = (compiler, refMap) ->
+  childMap = @refMap = {}
+  analyze(@body, compiler, childMap)
+  for x, i of childMap
+    if x not in @params
+      if hasOwnProperty.call(refMap, x) then refMap[x] += i else refMap[x] = i
+Clamda::analyze = (compiler, refMap) ->
+  childMap = @refMap = {}
+  analyze(@body, compiler, childMap)
+  for x, i of childMap
+    if x.name!=@v.name
+      if hasOwnProperty.call(refMap, x) then refMap[x] += i else refMap[x] = i
 
 codeSize = (exp) ->
   exp_codeSize = exp?.codeSize

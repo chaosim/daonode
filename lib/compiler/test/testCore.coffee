@@ -20,6 +20,7 @@ exports.Test =
     test.equal  solve(1), 1
     test.done()
 
+
   "test begin": (test) ->
     test.equal  solve(begin(1, 2)), 2
     test.done()
@@ -52,11 +53,10 @@ exports.Test =
     test.equal  solve(begin(eq(1, 1), add(1, 1))), 2
     test.done()
 
-exports.Test =
   "test lambda": (test) ->
     x = 'x'; y = 'y'
     test.equal  solve(funcall(lamda([x], 1), 1)), 1
-#    test.equal  solve(funcall(lamda([x, y], add(x, y)), 1, 1)), 2
+    test.equal  solve(funcall(lamda([x, y], add(x, y)), 1, 1)), 2
     test.done()
 
 xexports.Test =
