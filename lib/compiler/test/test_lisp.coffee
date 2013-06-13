@@ -12,12 +12,6 @@ xexports = {}
 vari = (name) -> name
 
 exports.Test =
-  "test eval_ quote": (test) ->
-    test.equal  solve(quote(1)), 1
-    test.equal  solve(eval_(quote(1), string('f:/daonode/lib/compiler/test/compiled2.js'))), 1
-    test.done()
-
-exports.Test =
   "test assign inc dec": (test) ->
     a = vari('a')
     blk = makeLabel('x')

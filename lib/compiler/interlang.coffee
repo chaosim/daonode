@@ -92,7 +92,7 @@ class If extends Element
 optimize = (exp, env, compiler) ->
   exp_optimize = exp?.optimize
   if exp_optimize then exp_optimize.call(exp, env, compiler)
-  else 1
+  else exp
 
 Var::optimize = (env, compiler) -> env.lookup(@)
 Assign::optimize = (env, compiler) ->  new Assign(compiler.optimize(@left, env),  compiler.optimize(@exp, env))
