@@ -13,13 +13,13 @@ class Element
   constructor: () ->  @name = @toString()
   isStatement: () -> false
   call: (args...) -> new Apply(@, args)
+  apply: (args) -> new Apply(@, args)
   toCode: (compiler) -> throw new  NotImplement(@)
   Object.defineProperty @::, '$', get: -> @constructor
 
 class Var extends Element
   constructor: (@name) ->
   toString: () -> @name
-  apply: (args) -> il.apply(@, args)
 class Assign extends Element
   constructor: (@left, @exp) -> super
   toString: () -> "#{toString(@left)} = #{toString(@exp)}"
@@ -36,23 +36,23 @@ class Print extends Begin
 class Lamda extends Element
   constructor: (@params, @body) -> super
   toString: () -> "(#{(toString(e) for e in @params).join(', ')} -> #{toString(@body)})"
-  call: (args...) -> il.apply(@, args)
-  apply: (args) -> il.apply(@, args)
+  call: (args...) -> new Apply(@, args)
+  apply: (args) -> new Apply(@, args)
 class Clamda extends Element
   constructor: (@v, @body) -> @name = @toString()
   toString: () -> "(#{toString(@v)} -> #{toString(@body)})"
-  call: (value) -> il.capply(@, value)
+  call: (value) -> new CApply(@, value)
 class JSFun extends Element
   constructor: (@fun) -> super
   toString: () -> "jsfun(#{@fun})"
-  apply: (args) -> il.apply(@, args)
+  apply: (args) -> new Apply(@, args)
 exports.VirtualOperation = class VirtualOperation extends Element
   constructor: (@name) -> super
   toString: () -> "#{@name}"
   call: (args...) -> new VirtualOperationApply(@, args)
   apply: (args) -> new VirtualOperationApply(@, args)
 class BinaryOperation extends VirtualOperation
-  constructor: (@symbol) -> super
+  constructor: (@symbol, @func) -> super
   toString: () -> "binary(#{@symbol})"
   call: (args...) -> new BinaryOperationApply(@, args)
   apply: (args) -> new BinaryOperationApply(@, args)
@@ -78,8 +78,7 @@ class VirtualOperationApply extends Apply
 class UnaryOperationApply extends Apply
   toString: () -> "#{toString(@caller.symbol)}#{toString(@args[0])}"
 class CApply extends Apply
-  constructor: (@cont, @value) -> @name = @toString()
-  toString: () -> "#{toString(@cont)}(#{toString(@value)})"
+  constructor: (cont, value) -> @caller = cont; @args = [value]; @name = @toString()
 class Deref extends Element
   constructor: (@exp) -> super
   toString: () -> "deref(#{toString(@exp)})"
@@ -134,17 +133,26 @@ Clamda::optimize = (env, compiler) ->
 Apply::optimize = (env, compiler) ->
   caller =  compiler.optimize(@caller, env)
   args = (compiler.optimize(a, env) for a in @args)
-  if caller instanceof JSFun
-    cont  = args[0]
-    args = args[1...]
-    cont.call(caller.fun.apply(args)).optimize(env, compiler)
-  else if caller instanceof Lamda
-    params = caller.params
-    body = caller.body
+  caller.optimizeApply(args, env, compiler)
+
+Begin::optimize = (env, compiler) ->
+  return new @constructor(compiler.optimize(exp, env) for exp in @exps)
+Deref::optimize = (env, compiler) ->
+  if _.isString(@exp) then exp
+  else if _.isNumber(@exp) then exp
+  else @
+Code::optimize = (env, compiler) -> @
+JSFun::optimize = (env, compiler) -> new JSFun(compiler.optimize(@fun, env))
+
+Var::optimizeApply = (args, env, compiler) ->  new Apply(@, args)
+
+Lamda::optimizeApply = (args, env, compiler) ->
+    params = @params
+    body = @body
     paramsLength = params.length
     if paramsLength is 0 then return compiler.optimize(body, env)
     newParams = []; newArgs = []; bindings = {}
-    refMap = caller.refMap
+    refMap = @refMap
     for p, i in params
       arg = args[i]
       if sideEffect(arg)
@@ -166,13 +174,9 @@ Apply::optimize = (env, compiler) ->
     else
       if bindings then compiler.optimize(body, env.extendBindings(bindings))
       else  compiler.optimize(body, env)
-  else if caller instanceof Clamda
-    CApply::optimize.call(new CApply(caller, args[0]), env, compiler)
-  else
-    new @constructor(caller, args)
 
-CApply::optimize = (env, compiler) ->
-  cont = @cont; body = cont.body; v = cont.v; value = compiler.optimize(@value, env)
+Clamda::optimizeApply = (args, env, compiler) ->
+  cont = @; body = cont.body; v = cont.v; value = compiler.optimize(args[0], env)
   count = cont.refMap[v]
   if sideEffect(value)
     switch count
@@ -181,14 +185,26 @@ CApply::optimize = (env, compiler) ->
         compiler.optimize(body, env.extend(v, compiler.optimize(value, env)))
       else il.begin(il.assign(v, value), compiler.optimize(body, env))
   else compiler.optimize(body, env.extend(v, value))
-Begin::optimize = (env, compiler) ->
-  return new @constructor(compiler.optimize(exp, env) for exp in @exps)
-Deref::optimize = (env, compiler) ->
-  if _.isString(@exp) then exp
-  else if _.isNumber(@exp) then exp
-  else @
-Code::optimize = (env, compiler) -> @
-JSFun::optimize = (env, compiler) -> new JSFun(compiler.optimize(@fun, env))
+
+JSFun::optimizeApply = (args, env, compiler) ->
+  cont  = args[0]
+  args = args[1...]
+  myBoolize = (memo, x) ->
+    if memo is undefined then undefined
+    else if boolize(x) is undefined then undefined
+    else true
+  bool = _.reduce(args, myBoolize, true)
+  if bool then cont.call(@fun.apply(args)).optimize(env, compiler)
+  else new Apply(@, args)
+
+VirtualOperation::optimizeApply = (args, env, compiler) ->
+  myBoolize = (memo, x) ->
+    if memo is undefined then undefined
+    else if boolize(x) is undefined then undefined
+    else true
+  bool = _.reduce(args, myBoolize, true)
+  if bool and @func then @func.apply(null, args)
+  else @apply(args)
 
 MAX_EXTEND_CODE_SIZE = 10
 
@@ -221,7 +237,7 @@ Clamda::analyze = (compiler, refMap) ->
   childMap = @refMap = {}
   analyze(@body, compiler, childMap)
   for x, i of childMap
-    if x.name!=@v.name
+    if x!=@v.name
       if hasOwnProperty.call(refMap, x) then refMap[x] += i else refMap[x] = i
 
 codeSize = (exp) ->
@@ -237,7 +253,35 @@ VirtualOperation::codeSize = () -> 1
 Lamda::codeSize = () -> codeSize(@body) + 2
 Clamda::codeSize = () -> codeSize(@body) + 1
 Apply::codeSize = () -> _.reduce(@args, ((memo, e) -> memo + codeSize(e)), codeSize(@caller))
-CApply::codeSize = () -> codeSize(@cont.body) + codeSize(@value) + 2
+CApply::codeSize = () -> codeSize(@caller.body) + codeSize(@args[0]) + 2
+
+boolize = (exp) ->
+  exp_boolize = exp?.boolize
+  if exp_boolize then exp_boolize.call(exp)
+  else !!exp
+
+Var::boolize = () -> undefined
+Return::boolize = () -> boolize(@value)
+If::boolize = () ->
+  b = boolize(@test)
+  if b is undefined then undefined
+  if b is true then boolize(@then_) else boolize(@else_)
+Begin::boolize = () -> exps = @exps; boolize(exps[exps.length-1])
+VirtualOperation::boolize = () -> undefined
+BinaryOperation::boolize = () -> undefined
+UnaryOperation::boolize = () -> undefined
+Lamda::boolize = () -> true
+Clamda::boolize = () -> true
+Apply::boolize = () ->
+  caller = @caller
+  if caller instanceof Lamda or caller instanceof Clamda then return boolize(caller.body)
+  if caller instanceof Var then return undefined
+  for a in @args then if boolize(a) is undefined then return undefined
+  !!(caller.func.apply(null, args))
+CApply::boolize = () -> boolize(@caller.body)
+
+hasSideEffect = (exp) -> exp._sideEffect = true; exp
+noSideEffect = (exp) -> exp._sideEffect = false; exp
 
 sideEffect = (exp) ->
   exp_sideEffect = exp?.sideEffect
@@ -247,27 +291,24 @@ sideEffect = (exp) ->
   else if _.isArray(exp) then false
   else true
 
-hasSideEffect = (exp) -> exp._sideEffect = true; exp
-noSideEffect = (exp) -> exp._sideEffect = false; exp
-
 Var::sideEffect = () -> false
 Return::sideEffect = () -> sideEffect(@value)
 If::sideEffect = () -> sideEffeft(@test) or sideEffect(@then_) or sideEffect(@else_)
 Begin::sideEffect = () -> _.reduce(@exps, ((memo, e) -> memo or sideEffect(e)), false)
-VirtualOperation::sideEffect = () -> @_sideEffects? or true
-BinaryOperation::sideEffect = () -> @_sideEffects? or false
-UnaryOperation::sideEffect = () -> @_sideEffects? or false
+VirtualOperation::sideEffect = () -> @_sideEffect? or true
+BinaryOperation::sideEffect = () -> @_sideEffect? or false
+UnaryOperation::sideEffect = () -> @_sideEffect? or false
 Lamda::sideEffect = () -> false
 Clamda::sideEffect = () -> false
 Apply::sideEffect = () ->
   caller = @caller
-  if caller instanceof Lamda and sideEffeft(caller.body) then return true
-  if caller instanceof Clamda and sideEffeft(caller.body) then return true
+  if caller instanceof Lamda and sideEffect(caller.body) then return true
+  if caller instanceof Clamda and sideEffect(caller.body) then return true
   if caller instanceof Var then return true
   if sideEffect(caller) then return true
   for a in @args then if sideEffect(a) then return true
   return false
-CApply::sideEffect = () -> sideEffeft(@cont.body) or sideEffect(@value)
+CApply::sideEffect = () -> sideEffect(@caller.body) or sideEffect(@args[0])
 
 jsify = (exp) ->
   exp_jsify = exp?.jsify
@@ -297,7 +338,7 @@ Apply::jsify = () ->
   args = @args
   if args.length>0 then args = [jsify(args[0])].concat(args[1...])
   new @constructor(jsify(@caller), args)
-CApply::jsify = () -> new CApply(@cont.jsify(), jsify(@value))
+CApply::jsify = () -> new CApply(@caller.jsify(), jsify(@args[0]))
 
 insertReturn = (exp) ->
   exp_insertReturn = exp?.insertReturn
@@ -328,7 +369,7 @@ BinaryOperationApply::toCode = (compiler) ->
 UnaryOperationApply::toCode = (compiler) ->
   "#{compiler.toCode(@caller.symbol)}#{compiler.toCode(@args[0])}"
 VirtualOperationApply::toCode = (compiler) -> @caller.applyToCode(compiler, @args)
-CApply::toCode = (compiler) -> "(#{compiler.toCode(@cont)})(#{compiler.toCode(@value)})"
+CApply::toCode = (compiler) -> "(#{compiler.toCode(@caller)})(#{compiler.toCode(@args[0])})"
 Begin::toCode = (compiler) -> (compiler.toCode(exp) for exp in @exps).join("; ")
 Array::toCode = (compiler) ->  "[#{(compiler.toCode(exp) for exp in @exps).join(', ')}]"
 Print::toCode = (compiler) ->  "console.log(#{(compiler.toCode(exp) for exp in @exps).join(', ')})"
@@ -356,8 +397,6 @@ il.vari = (name) -> new Var(name)
 il.assign = (left, exp) -> new Assign(left, exp)
 il.if_ = (test, then_, else_) -> new If(test, then_, else_)
 il.deref = (exp) -> new Deref(exp)
-il.apply = (caller, args) -> new Apply(caller, args)
-il.capply = (cont, value) -> new CApply(cont, value)
 il.begin = (exps...) ->
   length = exps.length
   if length is 0 then throw new Error "begin should have at least one exp"
@@ -375,31 +414,31 @@ il.clamda = (v, body...) -> new Clamda(v, il.begin(body...))
 il.code = (string) -> new Code(string)
 il.jsfun = (fun) -> new JSFun(fun)
 
-binary = (symbol) -> new BinaryOperation(symbol)
-unary = (symbol) -> new UnaryOperation(symbol)
+binary = (symbol, func) -> new BinaryOperation(symbol, func)
+unary = (symbol, func) -> new UnaryOperation(symbol, func)
 
-il.eq = binary("===")
-il.ne = binary("!==")
-il.lt = binary("<")
-il.le = binary("<=")
-il.gt = binary(">")
-il.ge = binary(">=")
+il.eq = binary("===", (x, y) -> x is y)
+il.ne = binary("!==", (x, y) -> x isnt y)
+il.lt = binary("<", (x, y) -> x < y)
+il.le = binary("<=", (x, y) -> x <= y)
+il.gt = binary(">", (x, y) -> x > y)
+il.ge = binary(">=", (x, y) -> x >= y)
 
-il.add = binary("+")
-il.sub = binary("-")
-il.mul = binary("*")
-il.div = binary("/")
-il.mod = binary("%")
-il.and_ = binary("&&")
-il.or_ = binary("||")
-il.bitand = binary("&")
-il.bitor = binary("|")
-il.lshift = binary("<<")
-il.rshift = binary(">>")
+il.add = binary("+", (x, y) -> x + y)
+il.sub = binary("-", (x, y) -> x - y)
+il.mul = binary("*", (x, y) -> x * y)
+il.div = binary("/", (x, y) -> x / y)
+il.mod = binary("%", (x, y) -> x % y)
+il.and_ = binary("&&", (x, y) -> x && y)
+il.or_ = binary("||", (x, y) -> x || y)
+il.bitand = binary("&", (x, y) -> x & y)
+il.bitor = binary("|", (x, y) -> x | y)
+il.lshift = binary("<<", (x, y) -> x << y)
+il.rshift = binary(">>", (x, y) -> x >> y)
 
-il.not_ = unary("!")
-il.neg = unary("-")
-il.bitnot = unary("~")
+il.not_ = unary("!", (x) -> !x)
+il.neg = unary("-", (x) -> -x)
+il.bitnot = unary("~", (x) -> ~x)
 il.inc = hasSideEffect(unary("++"))
 il.dec = hasSideEffect(unary("--"))
 

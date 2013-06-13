@@ -12,6 +12,12 @@ xexports = {}
 vari = (name) -> name
 
 exports.Test =
+  "test eval_ quote": (test) ->
+    test.equal  solve(quote(1)), 1
+    test.equal  solve(eval_(quote(1), string('f:/daonode/lib/compiler/test/compiled2.js'))), 1
+    test.done()
+
+exports.Test =
   "test assign inc dec": (test) ->
     a = vari('a')
     blk = makeLabel('x')
@@ -42,23 +48,23 @@ exports.Test =
     test.equal  solve(if_(0, 2, 3)), 3
     test.done()
 
-
   "test iff": (test) ->
     test.equal  solve(iff([[1, 2]], 3)), 2
     test.equal  solve(iff([[0, 2], [1, 3]], 5)), 3
     test.done()
 
+xexports.Test =
   "test block break continue": (test) ->
     a = makeLabel('a')
     b = makeLabel('b')
     test.equal  solve(block(a, 1)), 1
-    test.equal  solve(block(a, break_(a, 2), 1)), 2
-    test.equal  solve(block(a, block(b, break_(b, 2), 1), 3)), 3
-    x = vari('x')
-    test.equal  solve(begin(assign(x, 1),  block(a, if_(eq(x, 5), break_(a, x)), inc(x), continue_(a)))), 5 #print_(x),
+#    test.equal  solve(block(a, break_(a, 2), 1)), 2
+#    test.equal  solve(block(a, block(b, break_(b, 2), 1), 3)), 3
+#    x = vari('x')
+#    test.equal  solve(begin(assign(x, 1),  block(a, if_(eq(x, 5), break_(a, x)), inc(x), continue_(a)))), 5 #print_(x),
     test.done()
 
-exports.Test =
+xexports.Test =
   "test loop while until": (test) ->
     x = vari('x')
     a = makeLabel('x')

@@ -20,7 +20,6 @@ exports.Test =
     test.equal  solve(1), 1
     test.done()
 
-
   "test begin": (test) ->
     test.equal  solve(begin(1, 2)), 2
     test.done()
