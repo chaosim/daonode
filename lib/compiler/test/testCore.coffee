@@ -62,7 +62,6 @@ exports.Test =
     test.equal  solve(funcall(lamda([x, y], add(x, y)), 1, 1)), 2
     test.done()
 
-xexports.Test =
   "test macro": (test) ->
     x = 'x'; y = 'y'; z = 'z'
     test.equal  solve(macall(macro([x], 1), print_(1))), 1
@@ -112,7 +111,6 @@ xexports.Test =
     test.equal  solve(f(1)), 0
     test.done()
 
-xexports.Test =
   "test var bind unify trail": (test) ->
     trail = new Trail
     x = 'x'

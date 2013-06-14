@@ -21,6 +21,10 @@ exports.macall = (caller, args...) -> ["macall", caller].concat(args)
 
 exports.jsobject = (exp) -> ["jsobject", exp]
 exports.jsfun = jsfun = (exp) -> ["jsfun", exp]
+
+exports.sideEffect = sideEffect = (exp) -> ["sideEffect", exp]
+exports.io = io = (exp) -> ["io", exp]
+
 exports.lamda = lambda = (params, body...) -> ["lambda", params].concat(body)
 exports.macro = macro = (params, body...) -> ["macro", params].concat(body)
 exports.qq  = quasiquote = (exp) -> ["quasiquote", exp]
@@ -60,7 +64,7 @@ exports.until_ = (label,body..., test) ->
   body = body.concat([if_(not_(test), continue_(label))])
   block(label, body...)
 
-exports.print_ = (exps...) -> ['funcall', jsfun('console.log')].concat(exps)
+exports.print_ = (exps...) -> ['funcall', io(jsfun('console.log'))].concat(exps)
 
 exports.vop = vop = (name, args...) -> ["vop_"+name].concat(args)
 

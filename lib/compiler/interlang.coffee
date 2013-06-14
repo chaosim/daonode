@@ -11,7 +11,6 @@ toString = (o) -> o?.toString?() or o
 
 class Element
   constructor: () ->  @name = @toString()
-  isStatement: () -> false
   call: (args...) -> new Apply(@, args)
   apply: (args) -> new Apply(@, args)
   toCode: (compiler) -> throw new  NotImplement(@)
@@ -190,17 +189,7 @@ Clamda::optimizeApply = (args, env, compiler) ->
       else il.begin(il.assign(v, value), compiler.optimize(body, env))
   else compiler.optimize(body, env.extend(v, value))
 
-JSFun::optimizeApply = (args, env, compiler) ->
-  cont  = args[0]
-  args = args[1...]
-  cont.call(@fun.apply(args)).optimize(env, compiler)
-#  myBoolize = (memo, x) ->
-#    if memo is undefined then undefined
-#    else if boolize(x) is undefined then undefined
-#    else true
-#  bool = _.reduce(args, myBoolize, true)
-#  if bool then cont.call(@fun.apply(args)).optimize(env, compiler)
-#  else new Apply(@, args)
+JSFun::optimizeApply = (args, env, compiler) -> args[0].call(@fun.apply(args[1...])).optimize(env, compiler)
 
 VirtualOperation::optimizeApply = (args, env, compiler) ->
   myBoolize = (memo, x) ->
@@ -222,9 +211,7 @@ analyze = (exp, compiler, refMap) ->
   exp_analyze = exp?.analyze
   if exp_analyze then exp_analyze.call(exp, compiler, refMap)
 
-Var::analyze = (compiler, refMap) ->
-  if hasOwnProperty.call(refMap, @) then refMap[@]++ else refMap[@] = 1
-
+Var::analyze = (compiler, refMap) -> if hasOwnProperty.call(refMap, @) then refMap[@]++ else refMap[@] = 1
 Assign::analyze = (compiler, refMap) -> analyze(@exp, compiler, refMap)
 If::analyze = (compiler, refMap) ->
   analyze(@test, compiler, refMap) + analyze(@then_, compiler, refMap) + analyze(@else_, compiler, refMap)
@@ -310,12 +297,41 @@ applySideEffect = (exp) ->
 
 Element::applySideEffect = () -> throw new NotImplement(@)
 Var::applySideEffect = () -> true
-VirtualOperation::applySideEffect = () -> if @_sideEffect? then  return @_sideEffect else true
-BinaryOperation::applySideEffect = () -> if @_sideEffect? then  return @_sideEffect else false
-UnaryOperation::applySideEffect = () -> if @_sideEffect? then  return @_sideEffect else false
-JSFun::applySideEffect = () -> if @_sideEffect? then  return @_sideEffect else true
+VirtualOperation::applySideEffect = () -> if @_io then true else if @_sideEffect? then  @_sideEffect else true
+BinaryOperation::applySideEffect = () -> if @_io then true else if @_sideEffect? then  @_sideEffect else false
+UnaryOperation::applySideEffect = () -> if @_io then true else if @_sideEffect? then  @_sideEffect else false
+JSFun::applySideEffect = () -> if @_io then true else if @_sideEffect? then  @_sideEffect else true
 Lamda::applySideEffect = () -> sideEffect(@body)
 Clamda::applySideEffect = () -> sideEffect(@body)
+
+IO = (exp) ->
+  exp_io = exp?.IO
+  if exp_io then exp_io.call(exp)
+  else false
+
+Var::IO = () -> false
+Return::IO = () -> IO(@value)
+If::IO = () -> sideEffeft(@test) or IO(@then_) or IO(@else_)
+Begin::IO = () -> _.reduce(@exps, ((memo, e) -> memo or IO(e)), false)
+Apply::IO = () ->
+  for a in @args then if IO(a) then return true
+  if applyIO(@caller) then return true
+  return false
+CApply::IO = () -> applyIO(@caller) or IO(@args[0])
+
+applyIO = (exp) ->
+  exp_applyIO = exp?.applyIO
+  if exp_applyIO then exp_applyIO.call(exp)
+  else  throw new Error(exp)
+
+Element::applyIO = () -> throw new NotImplement(@)
+Var::applyIO = () -> true
+VirtualOperation::applyIO = () -> if @_io then true else if @_io? then  @_io else true
+BinaryOperation::applyIO = () -> if @_io then true else if @_io? then  @_io else false
+UnaryOperation::applyIO = () -> if @_io then true else if @_io? then  @_io else false
+JSFun::applyIO = () -> if @_io then true else if @_io? then  @_io else true
+Lamda::applyIO = () -> IO(@body)
+Clamda::applyIO = () -> IO(@body)
 
 jsify = (exp) ->
   exp_jsify = exp?.jsify
@@ -354,7 +370,9 @@ insertReturn = (exp) ->
 
 Assign::insertReturn = () -> il.begin(@, il.return(@left))
 Return::insertReturn = () -> @
-If::insertReturn = () -> new If(@test, insertReturn(@then_), insertReturn(@else_))
+If::insertReturn = () ->
+  if @isStatement() then new If(@test, insertReturn(@then_), insertReturn(@else_))
+  else new Return(@)
 Begin::insertReturn = () ->
   exps = @exps
   length = exps.length
@@ -373,7 +391,14 @@ Var::toCode = (compiler) -> @name
 Assign::toCode = (compiler) -> "#{compiler.toCode(@left)} = #{compiler.toCode(@exp)}"
 If::toCode = (compiler) ->
   compiler.parent = @
-  "if (#{compiler.toCode(@test)}) #{compiler.toCode(@then_)} else #{compiler.toCode(@else_)};"
+  else_ = @else_
+  if @isStatement()
+    if else_ is undefined then "if (#{compiler.toCode(@test)}) #{compiler.toCode(@then_)};"
+    else "if (#{compiler.toCode(@test)}) #{compiler.toCode(@then_)} else #{compiler.toCode(@else_)};"
+  else
+    "(#{compiler.toCode(@test)}) ? (#{compiler.toCode(@then_)}) : (#{compiler.toCode(@else_)})"
+#    if else_ is undefined then "((#{compiler.toCode(@test)}) && (#{compiler.toCode(@then_)}))"
+#    else "(#{compiler.toCode(@test)}) ? (#{compiler.toCode(@then_)}) : (#{compiler.toCode(@else_)})"
 Apply::toCode = (compiler) ->
   "(#{compiler.toCode(@caller)})(#{(compiler.toCode(arg) for arg in @args).join(', ')})"
 BinaryOperationApply::toCode = (compiler) ->
