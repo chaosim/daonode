@@ -71,11 +71,9 @@ class Apply extends Element
   toString: () -> "(#{toString(@caller)})(#{(toString(arg) for arg in @args).join(', ')})"
 class VirtualOperationApply extends Apply
   toString: () -> "vop(#{toString(@caller)})(#{(toString(arg) for arg in @args).join(', ')})"
-class BinaryOperationApply extends Apply
+class BinaryOperationApply extends VirtualOperationApply
   toString: () -> "#{toString(@args[0])}#{toString(@caller.symbol)}#{toString(@args[1])}"
-class VirtualOperationApply extends Apply
-  toString: () -> "#{toString(@args[0])}#{toString(@caller.symbol)}#{toString(@args[1])}"
-class UnaryOperationApply extends Apply
+class UnaryOperationApply extends VirtualOperationApply
   toString: () -> "#{toString(@caller.symbol)}#{toString(@args[0])}"
 class CApply extends Apply
   constructor: (cont, value) -> @caller = cont; @args = [value]; @name = @toString()
@@ -95,7 +93,13 @@ optimize = (exp, env, compiler) ->
   else exp
 
 Var::optimize = (env, compiler) -> env.lookup(@)
-Assign::optimize = (env, compiler) ->  new Assign(compiler.optimize(@left, env),  compiler.optimize(@exp, env))
+Assign::optimize = (env, compiler) ->
+  left = @left
+  if left instanceof VirtualOperationApply
+    caller = left.caller
+    args = (compiler.optimize(a, env) for a in left.args)
+    left = left.constructor(caller, args)
+  new Assign(left, compiler.optimize(@exp, env))
 If::optimize = (env, compiler) ->
   test = optimize(@test, env, compiler)
   test_bool = boolize(test)
