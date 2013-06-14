@@ -184,23 +184,23 @@ Clamda::optimizeApply = (args, env, compiler) ->
   count = cont.refMap[v]
   if sideEffect(value)
     switch count
-      when 0 then il.begin(value, compiler.optimize(body, env))
-      when undefined then il.begin(value, compiler.optimize(body, env))
-      when 1
-        compiler.optimize(body, env.extend(v, compiler.optimize(value, env)))
+      when 0 then il.begin(value, compiler.optimize(body, env.extend(v, value)))
+      when undefined then il.begin(value, compiler.optimize(body, env.extend(v, value)))
+      when 1 then compiler.optimize(body, env.extend(v, value))
       else il.begin(il.assign(v, value), compiler.optimize(body, env))
   else compiler.optimize(body, env.extend(v, value))
 
 JSFun::optimizeApply = (args, env, compiler) ->
   cont  = args[0]
   args = args[1...]
-  myBoolize = (memo, x) ->
-    if memo is undefined then undefined
-    else if boolize(x) is undefined then undefined
-    else true
-  bool = _.reduce(args, myBoolize, true)
-  if bool then cont.call(@fun.apply(args)).optimize(env, compiler)
-  else new Apply(@, args)
+  cont.call(@fun.apply(args)).optimize(env, compiler)
+#  myBoolize = (memo, x) ->
+#    if memo is undefined then undefined
+#    else if boolize(x) is undefined then undefined
+#    else true
+#  bool = _.reduce(args, myBoolize, true)
+#  if bool then cont.call(@fun.apply(args)).optimize(env, compiler)
+#  else new Apply(@, args)
 
 VirtualOperation::optimizeApply = (args, env, compiler) ->
   myBoolize = (memo, x) ->

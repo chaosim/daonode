@@ -4,6 +4,8 @@
   if_, add, eq, inc, suffixinc,\
   eval_, qq, uq, uqs} = require('../util')
 
+vari = (name) -> name
+
 xexports = {}
 
 xexports.Test =
@@ -44,6 +46,8 @@ exports.Test =
     console_log = 'console.log'
     test.equal  solve(funcall(jsfun(console_log), 1)), null
     test.equal  solve(print_(1, 2)), null
+    x = vari('x')
+    test.equal  solve(begin(assign(x, 1),print_(x))), null
     test.done()
 
   "test vop: add, eq": (test) ->
