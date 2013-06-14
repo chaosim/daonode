@@ -185,6 +185,7 @@ Clamda::optimizeApply = (args, env, compiler) ->
   if sideEffect(value)
     switch count
       when 0 then il.begin(value, compiler.optimize(body, env))
+      when undefined then il.begin(value, compiler.optimize(body, env))
       when 1
         compiler.optimize(body, env.extend(v, compiler.optimize(value, env)))
       else il.begin(il.assign(v, value), compiler.optimize(body, env))
@@ -290,29 +291,31 @@ noSideEffect = (exp) -> exp._sideEffect = false; exp
 sideEffect = (exp) ->
   exp_sideEffect = exp?.sideEffect
   if exp_sideEffect then exp_sideEffect.call(exp)
-  else if _.isNumber(exp) then false
-  else if _.isString(exp) then false
-  else if _.isArray(exp) then false
-  else true
+  else false
 
 Var::sideEffect = () -> false
 Return::sideEffect = () -> sideEffect(@value)
 If::sideEffect = () -> sideEffeft(@test) or sideEffect(@then_) or sideEffect(@else_)
 Begin::sideEffect = () -> _.reduce(@exps, ((memo, e) -> memo or sideEffect(e)), false)
-VirtualOperation::sideEffect = () -> @_sideEffect? or true
-BinaryOperation::sideEffect = () -> @_sideEffect? or false
-UnaryOperation::sideEffect = () -> @_sideEffect? or false
-Lamda::sideEffect = () -> false
-Clamda::sideEffect = () -> false
 Apply::sideEffect = () ->
-  caller = @caller
-  if caller instanceof Lamda and sideEffect(caller.body) then return true
-  if caller instanceof Clamda and sideEffect(caller.body) then return true
-  if caller instanceof Var then return true
-  if sideEffect(caller) then return true
   for a in @args then if sideEffect(a) then return true
+  if applySideEffect(@caller) then return true
   return false
-CApply::sideEffect = () -> sideEffect(@caller.body) or sideEffect(@args[0])
+CApply::sideEffect = () -> applySideEffect(@caller) or sideEffect(@args[0])
+
+applySideEffect = (exp) ->
+  exp_applySideEffect = exp?.applySideEffect
+  if exp_applySideEffect then exp_applySideEffect.call(exp)
+  else  throw new Error(exp)
+
+Element::applySideEffect = () -> throw new NotImplement(@)
+Var::applySideEffect = () -> true
+VirtualOperation::applySideEffect = () -> if @_sideEffect? then  return @_sideEffect else true
+BinaryOperation::applySideEffect = () -> if @_sideEffect? then  return @_sideEffect else false
+UnaryOperation::applySideEffect = () -> if @_sideEffect? then  return @_sideEffect else false
+JSFun::applySideEffect = () -> if @_sideEffect? then  return @_sideEffect else true
+Lamda::applySideEffect = () -> sideEffect(@body)
+Clamda::applySideEffect = () -> sideEffect(@body)
 
 jsify = (exp) ->
   exp_jsify = exp?.jsify
