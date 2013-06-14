@@ -14,21 +14,11 @@ vari = (name) -> name
 exports.Test =
   "test assign inc dec": (test) ->
     a = vari('a')
-#    test.equal  solve(begin(assign(a, 1))), 1
-#    test.equal  solve(begin(assign(a, 1), a)), 1
-#    test.equal  solve(begin(assign(a, 1), inc(a))), 2
-    test.equal  solve(begin(assign(a, 1), inc(a), inc(a))), 3
-#    test.equal  solve(begin(inc(a), inc(a))), 3
-#    test.equal  solve(begin(inc(a), inc(a), inc(a))), 3
-    test.done()
-
-xexports.Test =
-  "test assign inc dec": (test) ->
-    a = vari('a')
     blk = makeLabel('x')
     test.equal  solve(begin(assign(a, 1),  block(blk, if_(eq(a, 10), break_(blk, a)), inc(a), continue_(blk)))), 10
     test.done()
 
+xexports.Test =
   "test eval_ quote": (test) ->
     test.equal  solve(quote(1)), 1
     test.equal  solve(eval_(quote(1), string('f:/daonode/lib/compiler/test/compiled2.js'))), 1
@@ -40,6 +30,7 @@ xexports.Test =
     test.equal  solve(begin(assign(a, 1), a)), 1
     test.equal  solve(begin(assign(a, 1), inc(a))), 2
     test.equal  solve(begin(assign(a, 1), inc(a), inc(a))), 3
+    test.equal  solve(begin(assign(a, 1), inc(a), inc(a), inc(a))), 4
     test.done()
 
   "test begin": (test) ->

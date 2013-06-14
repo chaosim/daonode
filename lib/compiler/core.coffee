@@ -86,6 +86,10 @@ exports.Compiler = class Compiler
 
     "if": (cont, test, then_, else_) ->
         v = il.vari('v')
+#        if else_ isnt undefined
+#          @cont(test, il.clamda(v, il.if_(v, @cont(then_, cont), @cont(else_, cont))))
+#        else
+#          @cont(test, il.clamda(v, il.if_(v, @cont(then_, cont)))
         @cont(test, il.clamda(v, il.if_(v, @cont(then_, cont), @cont(else_, cont))))
 
     "jsfun": (cont, func) ->

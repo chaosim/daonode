@@ -38,7 +38,7 @@ class Lamda extends Element
   toString: () -> "(#{(toString(e) for e in @params).join(', ')} -> #{toString(@body)})"
   call: (args...) -> new Apply(@, args)
   apply: (args) -> new Apply(@, args)
-class Clamda extends Element
+class Clamda extends Lamda
   constructor: (@v, @body) -> @name = @toString()
   toString: () -> "(#{toString(@v)} -> #{toString(@body)})"
   call: (value) -> new CApply(@, value)
@@ -358,13 +358,18 @@ Begin::insertReturn = () ->
   exps[length-1] = insertReturn(exps[length-1])
   il.begin(exps...)
 
-Lamda::toCode = (compiler) -> "function(#{(a.name for a in @params).join(', ')}){#{compiler.toCode(@body)}}"
-Clamda::toCode = (compiler) -> "function(#{@v.name}){#{compiler.toCode(@body)}}"
+Lamda::toCode = (compiler) ->
+  compiler.parent = @
+  "function(#{(a.name for a in @params).join(', ')}){#{compiler.toCode(@body)}}"
+Clamda::toCode = (compiler) ->
+  compiler.parent = @
+  "function(#{@v.name}){#{compiler.toCode(@body)}}"
 Fun::toCode = (compiler) -> @func.toString()
 Return::toCode = (compiler) -> "return #{compiler.toCode(@value)};"
 Var::toCode = (compiler) -> @name
 Assign::toCode = (compiler) -> "#{compiler.toCode(@left)} = #{compiler.toCode(@exp)}"
 If::toCode = (compiler) ->
+  compiler.parent = @
   "if (#{compiler.toCode(@test)}) #{compiler.toCode(@then_)} else #{compiler.toCode(@else_)};"
 Apply::toCode = (compiler) ->
   "(#{compiler.toCode(@caller)})(#{(compiler.toCode(arg) for arg in @args).join(', ')})"
@@ -374,7 +379,11 @@ UnaryOperationApply::toCode = (compiler) ->
   "#{compiler.toCode(@caller.symbol)}#{compiler.toCode(@args[0])}"
 VirtualOperationApply::toCode = (compiler) -> @caller.applyToCode(compiler, @args)
 CApply::toCode = (compiler) -> "(#{compiler.toCode(@caller)})(#{compiler.toCode(@args[0])})"
-Begin::toCode = (compiler) -> (compiler.toCode(exp) for exp in @exps).join("; ")
+Begin::toCode = (compiler) ->
+  if compiler.parent instanceof Lamda
+    compiler.parent = @; "#{(compiler.toCode(exp) for exp in @exps).join('; ')}"
+  else
+    compiler.parent = @; "{#{(compiler.toCode(exp) for exp in @exps).join('; ')}}"
 Array::toCode = (compiler) ->  "[#{(compiler.toCode(exp) for exp in @exps).join(', ')}]"
 Print::toCode = (compiler) ->  "console.log(#{(compiler.toCode(exp) for exp in @exps).join(', ')})"
 Deref::toCode = (compiler) ->  "solver.trail.deref(#{compiler.toCode(@exp)})"
