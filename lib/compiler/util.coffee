@@ -22,7 +22,8 @@ exports.macall = (caller, args...) -> ["macall", caller].concat(args)
 exports.jsobject = (exp) -> ["jsobject", exp]
 exports.jsfun = jsfun = (exp) -> ["jsfun", exp]
 
-exports.sideEffect = sideEffect = (exp) -> ["sideEffect", exp]
+exports.pure = io = (exp) -> ["pure", exp]
+exports.effect = sideEffect = (exp) -> ["effect", exp]
 exports.io = io = (exp) -> ["io", exp]
 
 exports.lamda = lambda = (params, body...) -> ["lambda", params].concat(body)

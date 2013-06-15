@@ -95,23 +95,28 @@ exports.Compiler = class Compiler
     "jsfun": (cont, func) ->
       v = il.vari('v')
       f = il.jsfun(v)
-      f._io = @io; f._sideEffect = @sideEffect
+      f._effect = @_effect
       @cont(func, il.clamda(v, cont.call(f)))
 
-    "sideEffect": (cont, exp) ->
-      #todo side effect
-      oldSideEffect = @sideEffect
-      @sideEffect = true
+    "pure": (cont, exp) ->
+      oldEffect = @_effect
+      @_effect = il.PURE
       result = @cont(exp, cont)
-      @sideEffect = oldSideEffect
+      @_effect = oldEffect
+      result
+
+    "effect": (cont, exp) ->
+      oldEffect = @_effect
+      @_effect = il.EFFECT
+      result = @cont(exp, cont)
+      @_effect = oldEffect
       result
 
     "io": (cont, exp) ->
-      #todo io
-      oldio = @oldio
-      @oldio = true
+      oldEffect = @_effect
+      @_effect = il.IO
       result = @cont(exp, cont)
-      @io = oldio
+      @_effect = oldEffect
       result
 
     "lambda": (cont, params, body...) ->

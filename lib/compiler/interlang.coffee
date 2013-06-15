@@ -55,12 +55,12 @@ class BinaryOperation extends VirtualOperation
   toString: () -> "binary(#{@symbol})"
   call: (args...) -> new BinaryOperationApply(@, args)
   apply: (args) -> new BinaryOperationApply(@, args)
-  _sideEffect: false
+  _effect: false
 class UnaryOperation extends BinaryOperation
   toString: () -> "unary(#{@symbol})"
   call: (args...) -> new UnaryOperationApply(@, args)
   apply: (args) -> new UnaryOperationApply(@, args)
-  _sideEffect: false
+  _effect: false
 class Fun extends Element
   constructor: (@func) -> super
   toString: () -> "fun(#{@func})"
@@ -272,23 +272,30 @@ Apply::boolize = () ->
   !!(caller.func.apply(null, args))
 CApply::boolize = () -> boolize(@caller.body)
 
-hasSideEffect = (exp) -> exp._sideEffect = true; exp
-noSideEffect = (exp) -> exp._sideEffect = false; exp
+il.PURE = 0; il.EFFECT = 1; il.IO = 2
+il.pure = pure = (exp) -> exp._effect = il.PURE; exp
+il.effect = (exp) -> exp._effect = il.EFFECT; exp
+il.io = (exp) -> exp._effect = il.IO; exp
 
 sideEffect = (exp) ->
-  exp_sideEffect = exp?.sideEffect
-  if exp_sideEffect then exp_sideEffect.call(exp)
-  else false
+  exp_effect = exp?.sideEffect
+  if exp_effect then exp_effect.call(exp)
+  else il.PURE
 
-Var::sideEffect = () -> false
+expsEffect = (exps) ->
+  effect = il.PURE
+  for e in exps
+    eff = sideEffect(e)
+    if eff = il.IO then return il.IO
+    if eff = il.EFFECT then effect = eff
+  effect
+
+Var::sideEffect = () -> il.PURE
 Return::sideEffect = () -> sideEffect(@value)
-If::sideEffect = () -> sideEffeft(@test) or sideEffect(@then_) or sideEffect(@else_)
-Begin::sideEffect = () -> _.reduce(@exps, ((memo, e) -> memo or sideEffect(e)), false)
-Apply::sideEffect = () ->
-  for a in @args then if sideEffect(a) then return true
-  if applySideEffect(@caller) then return true
-  return false
-CApply::sideEffect = () -> applySideEffect(@caller) or sideEffect(@args[0])
+If::sideEffect = () -> expsEffect [@test, @then_, @else_]
+Begin::sideEffect = () -> expsEffect(@exps)
+Apply::sideEffect = () ->  Math.max(applySideEffect(@caller), expsEffect(@args))
+CApply::sideEffect = () -> Math.max(applySideEffect(@caller), sideEffect(@args[0]))
 
 applySideEffect = (exp) ->
   exp_applySideEffect = exp?.applySideEffect
@@ -296,42 +303,18 @@ applySideEffect = (exp) ->
   else  throw new Error(exp)
 
 Element::applySideEffect = () -> throw new NotImplement(@)
-Var::applySideEffect = () -> true
-VirtualOperation::applySideEffect = () -> if @_io then true else if @_sideEffect? then  @_sideEffect else true
-BinaryOperation::applySideEffect = () -> if @_io then true else if @_sideEffect? then  @_sideEffect else false
-UnaryOperation::applySideEffect = () -> if @_io then true else if @_sideEffect? then  @_sideEffect else false
-JSFun::applySideEffect = () -> if @_io then true else if @_sideEffect? then  @_sideEffect else true
-Lamda::applySideEffect = () -> sideEffect(@body)
-Clamda::applySideEffect = () -> sideEffect(@body)
+Var::applySideEffect = () -> il.IO
+VirtualOperation::applySideEffect = () -> if @_effect? then  @_effect else il.IO
+BinaryOperation::applySideEffect = () -> if @_effect? then  @_effect else il.PURE
+UnaryOperation::applySideEffect = () ->if @_effect? then  @_effect else il.PURE
+JSFun::applySideEffect = () -> if @_effect? then  @_effect else il.IO
+Lamda::applySideEffect = () -> if @_effect? then  @_effect else sideEffect(@body)
+Clamda::applySideEffect = () -> if @_effect? then  @_effect else sideEffect(@body)
 
 IO = (exp) ->
-  exp_io = exp?.IO
-  if exp_io then exp_io.call(exp)
+  exp_IO = exp?.IO
+  if exp_IO then exp_IO.call(exp)
   else false
-
-Var::IO = () -> false
-Return::IO = () -> IO(@value)
-If::IO = () -> sideEffeft(@test) or IO(@then_) or IO(@else_)
-Begin::IO = () -> _.reduce(@exps, ((memo, e) -> memo or IO(e)), false)
-Apply::IO = () ->
-  for a in @args then if IO(a) then return true
-  if applyIO(@caller) then return true
-  return false
-CApply::IO = () -> applyIO(@caller) or IO(@args[0])
-
-applyIO = (exp) ->
-  exp_applyIO = exp?.applyIO
-  if exp_applyIO then exp_applyIO.call(exp)
-  else  throw new Error(exp)
-
-Element::applyIO = () -> throw new NotImplement(@)
-Var::applyIO = () -> true
-VirtualOperation::applyIO = () -> if @_io then true else if @_io? then  @_io else true
-BinaryOperation::applyIO = () -> if @_io then true else if @_io? then  @_io else false
-UnaryOperation::applyIO = () -> if @_io then true else if @_io? then  @_io else false
-JSFun::applyIO = () -> if @_io then true else if @_io? then  @_io else true
-Lamda::applyIO = () -> IO(@body)
-Clamda::applyIO = () -> IO(@body)
 
 jsify = (exp) ->
   exp_jsify = exp?.jsify
@@ -480,25 +463,25 @@ il.rshift = binary(">>", (x, y) -> x >> y)
 il.not_ = unary("!", (x) -> !x)
 il.neg = unary("-", (x) -> -x)
 il.bitnot = unary("~", (x) -> ~x)
-il.inc = hasSideEffect(unary("++"))
-il.dec = hasSideEffect(unary("--"))
+il.inc = il.effect(unary("++"))
+il.dec = il.effect(unary("--"))
 
 vop = (name, toCode) ->
   class Vop extends VirtualOperation
     applyToCode: toCode
-    _sideEffect: true
+    _effect: true
   new Vop(name)
 
 il.suffixinc = vop('suffixdec', (compiler, args)->"#{compiler.toCode(args[0])}++")
 il.suffixdec = vop('suffixdec', (compiler, args)->"#{compiler.toCode(args[0])}--")
 il.pushCatch = vop('pushCatch', (compiler, args)->"solver.pushCatch(#{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})")
 il.popCatch = vop('popCatch', (compiler, args)->"solver.popCatch(#{compiler.toCode(args[0])})")
-il.findCatch = noSideEffect(vop('findCatch', (compiler, args)->"solver.findCatch(#{compiler.toCode(args[0])})"))
+il.findCatch = il.pure(vop('findCatch', (compiler, args)->"solver.findCatch(#{compiler.toCode(args[0])})"))
 il.fake = vop('fake', (compiler, args)->"solver.fake(#{compiler.toCode(args[0])})").apply([])
 il.restore = vop('restore', (compiler, args)->"solver.restore(#{compiler.toCode(args[0])})")
-il.getvalue = noSideEffect(vop('getvalue', (compiler, args)->"solver.trail.getvalue(#{compiler.toCode(args[0])})"))
-il.list = noSideEffect(vop('list', (compiler, args)->"[#{(compiler.toCode(a) for a in args).join(', ')}]"))
-il.index = noSideEffect(vop('index', (compiler, args)->"(#{compiler.toCode(args[0])})[#{compiler.toCode(args[1])}]"))
+il.getvalue = il.pure(vop('getvalue', (compiler, args)->"solver.trail.getvalue(#{compiler.toCode(args[0])})"))
+il.list = il.pure(vop('list', (compiler, args)->"[#{(compiler.toCode(a) for a in args).join(', ')}]"))
+il.index = il.pure(vop('index', (compiler, args)->"(#{compiler.toCode(args[0])})[#{compiler.toCode(args[1])}]"))
 il.push = vop('push', (compiler, args)->"(#{compiler.toCode(args[0])}).push(#{compiler.toCode(args[1])})")
 il.concat = vop('concat', (compiler, args)->"(#{compiler.toCode(args[0])}).concat(#{compiler.toCode(args[1])})")
 il.run = vop('run', (compiler, args)->"solver.run(#{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})")
