@@ -1,0 +1,31 @@
+just javascript:
+  ☐ function without cont as parameter
+  ☐ augment assign
+  ☐ while
+  ☐ javascript's try/catch/throw
+  ☐ javascript's new
+
+optimization:
+  ☐ assign optimization
+  ☐ loop optimization: assign, extract computation
+  ☐ tail recursive
+
+lisp features:
+  ☐ catch/throw
+  ☐ unwind-protect
+  ☐ callcc
+
+logic features:
+  ☐ logic var
+  ☐ unify
+  ☐ logic or
+  ☐ fail, logic negation, findall, call, once, repeat, etc.
+  ☐ callfc
+
+parser features:
+  ☐ parser state
+  ☐ low level primitive
+  ☐ terminals
+  ☐ any, some, times
+  ☐ dummy var
+
