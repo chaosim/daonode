@@ -48,17 +48,23 @@ exports.Test =
     test.equal  solve(iff([[0, 2], [1, 3]], 5)), 3
     test.done()
 
+exports.Test =
   "test block break continue": (test) ->
     a = makeLabel('a')
     b = makeLabel('b')
     x = vari('x')
-    test.equal  solve(begin(assign(x, 1), block(a, print_(x), 1))), 1
-    test.equal  solve(block(a, break_(a, 2), 1)), 2
-    test.equal  solve(block(a, block(b, break_(b, 2), 1), 3)), 3
-    x = vari('x')
-    test.equal  solve(begin(assign(x, 1),  block(a, if_(eq(x, 5), break_(a, x)), inc(x), continue_(a)))), 5 #print_(x),
+#    test.equal  solve(block(a, 1)), 1
+#    test.equal  solve(block(a, 2, 1)), 1
+#    test.equal  solve(block(a, print_(1), 1)), 1
+#    test.equal  solve(block(a, break_(a, 2), 1)), 2
+    test.equal  solve(block(a,  funcall(lamda([x], break_(a, 2)), 1) , 1)), 2
+#    test.equal  solve(block(a, block(b, break_(b, 2), 1), 3)), 3
+#    test.equal  solve(block(a, block(b, break_(a, 2), 1), 3)), 2
+#    x = vari('x')
+#    test.equal  solve(begin(assign(x, 1),  block(a, if_(eq(x, 5), break_(a, x)), inc(x), continue_(a)))), 5 #print_(x),
     test.done()
 
+xexports.Test =
   "test loop while until": (test) ->
     x = vari('x')
     a = makeLabel('x')

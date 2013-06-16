@@ -190,6 +190,7 @@ Clamda::optimizeApply = (args, env, compiler) ->
   else compiler.optimize(body, env.extend(v, value))
 
 JSFun::optimizeApply = (args, env, compiler) -> args[0].call(@fun.apply(args[1...])).optimize(env, compiler)
+JSFun::optimizeApply = (args, env, compiler) -> @apply(args)
 
 VirtualOperation::optimizeApply = (args, env, compiler) ->
   myBoolize = (memo, x) ->
@@ -399,11 +400,12 @@ Array::toCode = (compiler) ->  "[#{(compiler.toCode(exp) for exp in @exps).join(
 Print::toCode = (compiler) ->  "console.log(#{(compiler.toCode(exp) for exp in @exps).join(', ')})"
 Deref::toCode = (compiler) ->  "solver.trail.deref(#{compiler.toCode(@exp)})"
 Code::toCode = (compiler) ->  @string
-JSFun::toCode = (compiler) ->  "function() {\n"+\
-                               " var args, cont;\n "+\
-                               "  cont = arguments[0], args = 2 <= arguments.length ? [].slice.call(arguments, 1) : [];\n"+\
-                               "   return cont(#{@fun}.apply(this, args));"+\
-                               "   }"
+#JSFun::toCode = (compiler) ->  "function() {\n"+
+#" var args, cont;\n "+
+#"  cont = arguments[0], args = 2 <= arguments.length ? [].slice.call(arguments, 1) : [];\n"+
+#"   return cont(#{@fun}.apply(this, args));"+
+#"   }"
+JSFun::toCode = (compiler) ->  @fun.toString()
 BinaryOperationApply::toCode = (compiler) ->  "(#{compiler.toCode(@args[0])})#{@caller.symbol}(#{compiler.toCode(@args[1])})"
 UnaryOperationApply::toCode = (compiler) ->  "#{@caller.symbol}(#{compiler.toCode(@args[0])})"
 

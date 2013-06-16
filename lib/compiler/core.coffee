@@ -32,13 +32,19 @@ exports.Compiler = class Compiler
 
   compile: (exp) ->
     v = il.vari('v')
-    fromCont = @cont(exp, il.clamda(v, v))
+    @globalCont = il.clamda(v, v)
+    fromCont = @cont(exp, @globalCont)
     f = il.clamda(v, fromCont)
     f.refMap = {}
     f.analyze(@, f.refMap)
-    f = f.optimize(new Env(), @)
+#    f = f.optimize(new Env(), @)
     f = f.jsify()
     f.toCode(@)
+
+  clamda: (v, body...) ->
+    cont = il.clamda(v, body...)
+    @globalCont = il.clamda(v, @globalCont.call(il.clamda(v, body...).call(v)))
+    cont
 
   # compile to continuation
   cont: (exp, cont) ->
@@ -54,7 +60,7 @@ exports.Compiler = class Compiler
   leftValueCont: (cont, op, item, exp) ->
     if  _.isString(item)
       v = il.vari('v')
-      if op is 'assign' then return @cont(exp, il.clamda(v, il.assign(il.vari(item), v), cont.call(v)))
+      if op is 'assign' then return @cont(exp, @clamda(v, il.assign(il.vari(item), v), cont.call(v)))
       else return cont.call(il[op].call(il.vari(item)))
     if not _.isArray(item) then throw new Error "Left Value should be an sexpression."
     length = item.length
@@ -66,7 +72,7 @@ exports.Compiler = class Compiler
       obj = il.vari('obj'); i = il.vari('i'); v = il.vari('v')
       if op is 'assign' then cont1 = @cont(exp, il.clamda(v,  il.assign(il.index.call(obj, i), cont.call(v))))
       else cont1 = cont.call(il[op].call(il.index.call(obj, i)))
-      @cont(object, il.clamda(obj, @cont(index, il.clamda(i, cont1))))
+      @cont(object, @clamda(obj, @cont(index, @clamda(i, cont1))))
     else throw new Error "Left Value side should be assignable expression."
 
   specials:
@@ -74,7 +80,7 @@ exports.Compiler = class Compiler
     "eval": (cont, exp, path) ->
       v = il.vari('v')
       p = il.vari('path')
-      @cont(exp, il.clamda(v, @cont(path, il.clamda(p, cont.call(il.evalexpr.call(v, p))))))
+      @cont(exp, @clamda(v, @cont(path, @clamda(p, cont.call(il.evalexpr.call(v, p))))))
     'string': (cont, exp) -> cont.call(exp)
     "begin": (cont, exps...) -> @expsCont(exps, cont)
 
@@ -86,17 +92,13 @@ exports.Compiler = class Compiler
 
     "if": (cont, test, then_, else_) ->
         v = il.vari('v')
-#        if else_ isnt undefined
-#          @cont(test, il.clamda(v, il.if_(v, @cont(then_, cont), @cont(else_, cont))))
-#        else
-#          @cont(test, il.clamda(v, il.if_(v, @cont(then_, cont)))
-        @cont(test, il.clamda(v, il.if_(v, @cont(then_, cont), @cont(else_, cont))))
+        @cont(test, @clamda(v, il.if_(v, @cont(then_, cont), @cont(else_, cont))))
 
     "jsfun": (cont, func) ->
       v = il.vari('v')
       f = il.jsfun(v)
       f._effect = @_effect
-      @cont(func, il.clamda(v, cont.call(f)))
+      @cont(func, @clamda(v, cont.call(f)))
 
     "pure": (cont, exp) ->
       oldEffect = @_effect
@@ -120,15 +122,15 @@ exports.Compiler = class Compiler
       result
 
     "lambda": (cont, params, body...) ->
-      k = il.vari('cont')
+      v = il.vari('v')
       params = (il.vari(p) for p in params)
-      cont.call(il.lamda([k].concat(params), @expsCont(body, k)))
+      cont.call(il.lamda(params, @expsCont(body, il.clamda(v, v))))
 
     "macro": (cont, params, body...) ->
       k = il.vari('cont')
       params1 = (il.vari(p) for p in params)
       body = (@substMacroArgs(e, params) for e in body)
-      cont.call(il.lamda([k].concat(params1), @expsCont(body, k)))
+      cont.call(il.lamda(params1, @expsCont(body, @clamda(v,v))))
 
     "evalarg": (cont, name) -> cont.call(il.vari(name).call(cont))
 
@@ -137,22 +139,22 @@ exports.Compiler = class Compiler
       f = il.vari('f')
       length = args.length
       params = (il.vari('a'+i) for i in [0...length])
-      cont = f.apply([cont].concat(params))
+      cont = cont.call(f.apply(params))
       for i in [length-1..0] by -1
         cont = do (i=i, cont=cont) ->
-          compiler.cont(args[i], il.clamda(params[i], cont))
-      @cont(caller, il.clamda(f, cont))
+          compiler.cont(args[i], compiler.clamda(params[i], cont))
+      @cont(caller, @clamda(f, cont))
 
     "macall": (cont, caller, args...) ->
       compiler = @
       f = il.vari('f'); v = il.vari('v')
       length = args.length
       params = (il.vari('a'+i) for i in [0...length])
-      cont = f.apply([cont].concat(params))
+      cont = cont.call(f.apply(params))
       for i in [length-1..0] by -1
         cont = do (i=i, cont=cont) ->
-          il.clamda(params[i], cont).call(il.lamda([], compiler.cont(args[i], il.clamda(v, v))))
-      @cont(caller, il.clamda(f, cont))
+          compiler.clamda(params[i], cont).call(il.lamda([], compiler.cont(args[i], il.clamda(v, v))))
+      @cont(caller, @clamda(f, cont))
 
     "quasiquote": (cont, exp) -> @quasiquote(exp, cont)
 
@@ -169,12 +171,13 @@ exports.Compiler = class Compiler
       label = label[1]
       if not _.isString(label) then (label = ''; body = [label].concat(body))
       exits = @exits[label] ?= []
-      exits.push(cont)
+#      exits.push(cont)
+      exits.push(@globalCont)
       defaultExits = @exits[''] ?= []  # if no label, go here
       defaultExits.push(cont)
       continues = @continues[label] ?= []
       f = il.vari('block'+label)
-      fun = il.clamda(il.vari('v'), null)
+      fun = @clamda(il.vari('v'), null)
       continues.push(f)
       defaultContinues = @continues[''] ?= []   # if no label, go here
       defaultContinues.push(f)
@@ -241,7 +244,7 @@ exports.Compiler = class Compiler
     else if length is 1 then @cont(exps[0], cont)
     else
       v = il.vari('v')
-      @cont(exps[0], il.clamda(v, @expsCont(exps[1...], cont)))
+      @cont(exps[0], @clamda(v, @expsCont(exps[1...], cont)))
 
   quasiquote: (exp, cont) ->
     if not _.isArray(exp) then return cont.call(exp)
@@ -262,9 +265,9 @@ exports.Compiler = class Compiler
       for i in [exp.length-1..1] by -1
         e = exp[i]
         if  _.isArray(e) and e.length>0 and e[0] is "unquote-slice"
-          cont = @quasiquote(e, il.clamda(v, il.assign(quasilist, il.concat.call(quasilist, v)), cont))
+          cont = @quasiquote(e, @clamda(v, il.assign(quasilist, il.concat.call(quasilist, v)), cont))
         else
-          cont = @quasiquote(e, il.clamda(v, il.push.call(quasilist, v), cont))
+          cont = @quasiquote(e, @clamda(v, il.push.call(quasilist, v), cont))
       il.begin( il.assign(quasilist, il.list.call(head)),
         cont)
 

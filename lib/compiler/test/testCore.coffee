@@ -17,7 +17,7 @@ xexports.Test =
     test.equal  solve(m(sub(5, 1))), null
     test.done()
 
-exports.Test =
+xexports.Test =
   "test 1": (test) ->
     test.equal  solve(1), 1
     test.done()
@@ -30,6 +30,7 @@ exports.Test =
     test.equal  solve(quote(1)), 1
     test.done()
 
+exports.Test =
   "test vari assign": (test) ->
     x = 'x'
     test.equal  solve(begin(assign(x, 1), x)), 1
@@ -37,6 +38,7 @@ exports.Test =
     test.equal  solve(begin(assign(x, 1), suffixinc(x))), 1
     test.done()
 
+xexports.Test =
   "test js vari": (test) ->
     console_log = 'console.log'
     test.equal  solve(console_log), console.log
@@ -59,6 +61,7 @@ exports.Test =
   "test lambda": (test) ->
     x = 'x'; y = 'y'
     test.equal  solve(funcall(lamda([x], 1), 1)), 1
+    test.equal  solve(funcall(lamda([x], funcall(lamda([x], 1), 1)), 1)), 1
     test.equal  solve(funcall(lamda([x, y], add(x, y)), 1, 1)), 2
     test.done()
 
