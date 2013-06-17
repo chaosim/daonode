@@ -6,7 +6,22 @@ exports.vars = (names) -> vari(name) for name in split names,  reElements
 exports.quote = (exp) -> ["quote", exp]
 exports.eval_ = (exp, path) -> ["eval", exp, path]
 exports.begin = (exps...) -> ["begin"].concat(exps)
-exports.assign = (vari, exp) -> ["assign", vari, exp]
+
+exports.assign = (left, exp) -> ["assign", left, exp]
+exports.augassign = (left, exp) -> ["augment-assign", op, left, exp]
+exports.addassign = (left, exp) -> ["augment-assign", 'add', left, exp]
+exports.subassign = (left, exp) -> ["augment-assign", 'sub', left, exp]
+exports.mulassign = (left, exp) -> ["augment-assign", 'mul', left, exp]
+exports.divassign = (left, exp) -> ["augment-assign", 'div', left, exp]
+exports.modassign = (left, exp) -> ["augment-assign", 'mod', left, exp]
+exports.andassign = (left, exp) -> ["augment-assign", 'and', left, exp]
+exports.orassign = (left, exp) -> ["augment-assign", 'or', left, exp]
+exports.bitandassign = (left, exp) -> ["augment-assign", 'bitand', left, exp]
+exports.bitorassign = (left, exp) -> ["augment-assign", 'bitor', left, exp]
+exports.bitxorassign = (left, exp) -> ["augment-assign", 'bitxor', left, exp]
+exports.lshiftassign = (left, exp) -> ["augment-assign", 'lshift', left, exp]
+exports.rshiftassign = (left, exp) -> ["augment-assign", 'rshift', left, exp]
+
 exports.if_ = if_ = (test, then_, else_) -> ["if", test, then_, else_]
 exports.iff = iff = (clauses, else_) ->
   length =  clauses.length
@@ -79,7 +94,8 @@ exports.suffixdec = (item) -> ['suffixdec', item]
 
 il = require("./interlang")
 
-excludes = ['evalexpr', 'failcont', 'run', 'push', 'getvalue', 'fake', 'findCatch', 'popCatch', 'pushCatch', 'protect','suffixdec', 'suffixdec', 'dec', 'inc']
+excludes = ['evalexpr', 'failcont', 'run', 'push', 'getvalue', 'fake', 'findCatch', 'popCatch', 'pushCatch', 'protect',
+ 'suffixdec', 'suffixdec', 'dec', 'inc']
 
 for name, _o of il
   if _o instanceof il.VirtualOperation and name not in excludes

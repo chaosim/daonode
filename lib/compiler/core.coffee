@@ -51,11 +51,13 @@ exports.Compiler = class Compiler
     if not @specials.hasOwnProperty(head) then return cont.call(exp)
     @specials[head].call(this, cont, exp[1...]...)
 
-  leftValueCont: (cont, op, item, exp) ->
+  leftValueCont: (cont, task, item, exp, op) ->
     if  _.isString(item)
       v = il.vari('v')
-      if op is 'assign' then return @cont(exp, il.clamda(v, il.assign(il.vari(item), v), cont.call(v)))
-      else return cont.call(il[op].call(il.vari(item)))
+      if task is 'assign' then return @cont(exp, il.clamda(v, il.assign(il.vari(item), v), cont.call(v)))
+      else if task is 'augment-assign'
+        return @cont(exp, il.clamda(v, new augmentOperators[op](il.vari(item), v), cont.call(v)))
+      else return cont.call(il[task].call(il.vari(item)))
     if not _.isArray(item) then throw new Error "Left Value should be an sexpression."
     length = item.length
     if length is 0 then throw new Error "Left Value side should not be empty list."
@@ -64,8 +66,10 @@ exports.Compiler = class Compiler
     if head is "index"
       object = item[1]; index = item[2]
       obj = il.vari('obj'); i = il.vari('i'); v = il.vari('v')
-      if op is 'assign' then cont1 = @cont(exp, il.clamda(v,  il.assign(il.index.call(obj, i), cont.call(v))))
-      else cont1 = cont.call(il[op].call(il.index.call(obj, i)))
+      if task is 'assign' then cont1 = @cont(exp, il.clamda(v,  il.assign(il.index.call(obj, i), cont.call(v))))
+      else if task is 'augment-assign'
+        cont1 = @cont(exp, il.clamda(v,  new augmentOperators[op](il.index.call(obj, i), cont.call(v))))
+      else cont1 = cont.call(il[task].call(il.index.call(obj, i)))
       @cont(object, il.clamda(obj, @cont(index, il.clamda(i, cont1))))
     else throw new Error "Left Value side should be assignable expression."
 
@@ -79,6 +83,7 @@ exports.Compiler = class Compiler
     "begin": (cont, exps...) -> @expsCont(exps, cont)
 
     "assign": (cont, left, exp) ->  @leftValueCont(cont, "assign", left, exp)
+    "augment-assign": (cont, op, left, exp) ->  @leftValueCont(cont, "augment-assign", left, exp, op)
     'inc': (cont, item) -> @leftValueCont(cont, "inc", item)
     'suffixinc': (cont, item) -> @leftValueCont(cont, "suffixinc", item)
     'dec': (item) ->  @leftValueCont(cont, "dec", item)
@@ -86,10 +91,6 @@ exports.Compiler = class Compiler
 
     "if": (cont, test, then_, else_) ->
         v = il.vari('v')
-#        if else_ isnt undefined
-#          @cont(test, il.clamda(v, il.if_(v, @cont(then_, cont), @cont(else_, cont))))
-#        else
-#          @cont(test, il.clamda(v, il.if_(v, @cont(then_, cont)))
         @cont(test, il.clamda(v, il.if_(v, @cont(then_, cont), @cont(else_, cont))))
 
     "jsfun": (cont, func) ->
@@ -283,6 +284,11 @@ exports.Compiler = class Compiler
     else if head is 'string' then exp
     else if head is 'quasiquote' then exp
     else [exp[0]].concat(@substMacroArgs(e, params) for e in exp[1...])
+
+augmentOperators = {add: il.augadd, sub: il.augsub, mul: il.augmul, div: il.augdiv, mod: il.augmod,
+'and': il.augand, 'or': il.augor, bitand: il.augbitand, bitor:il.augbitor, bitxor: il.augbitxor,
+lshift: il.auglshift, rshift: il.augrshift
+}
 
 exports.Env = class Env
   constructor: (@outer, @data={}) ->

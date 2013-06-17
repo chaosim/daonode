@@ -22,6 +22,8 @@ class Var extends Element
 class Assign extends Element
   constructor: (@left, @exp) -> super
   toString: () -> "#{toString(@left)} = #{toString(@exp)}"
+class AugmentAssign extends Assign
+  toString: () -> "#{toString(@left)} #{@constructor.operator}= #{toString(@exp)}"
 class Return extends Element
   constructor: (@value) -> super
   toString: () -> "return(#{toString(@value)})"
@@ -98,7 +100,7 @@ Assign::optimize = (env, compiler) ->
     caller = left.caller
     args = (compiler.optimize(a, env) for a in left.args)
     left = left.constructor(caller, args)
-  new Assign(left, compiler.optimize(@exp, env))
+  new @constructor(left, compiler.optimize(@exp, env))
 If::optimize = (env, compiler) ->
   test = optimize(@test, env, compiler)
   test_bool = boolize(test)
@@ -321,7 +323,7 @@ jsify = (exp) ->
   if exp_jsify then exp_jsify.call(exp)
   else exp
 
-Assign::jsify = () -> new Assign(@left, jsify(@exp))
+Assign::jsify = () -> new @constructor(@left, jsify(@exp))
 If::jsify = () -> new If(@test, jsify(@then_), jsify(@else_))
 Begin::jsify = () ->
   exps = @exps
@@ -372,6 +374,7 @@ Fun::toCode = (compiler) -> @func.toString()
 Return::toCode = (compiler) -> "return #{compiler.toCode(@value)};"
 Var::toCode = (compiler) -> @name
 Assign::toCode = (compiler) -> "#{compiler.toCode(@left)} = #{compiler.toCode(@exp)}"
+AugmentAssign::toCode = (compiler) -> "#{compiler.toCode(@left)} #{@operator} #{compiler.toCode(@exp)}"
 If::toCode = (compiler) ->
   compiler.parent = @
   else_ = @else_
@@ -457,8 +460,27 @@ il.and_ = binary("&&", (x, y) -> x && y)
 il.or_ = binary("||", (x, y) -> x || y)
 il.bitand = binary("&", (x, y) -> x & y)
 il.bitor = binary("|", (x, y) -> x | y)
+il.bitxor = binary("^", (x, y) -> x ^ y)
 il.lshift = binary("<<", (x, y) -> x << y)
 il.rshift = binary(">>", (x, y) -> x >> y)
+
+augmentAssign = (operator, func) ->
+  class AugAssign extends AugmentAssign
+    _effect: true
+    operator: operator
+    func: func
+il.augadd = augmentAssign("+=", (x, y) -> x + y)
+il.augsub = augmentAssign("-=", (x, y) -> x - y)
+il.augmul = augmentAssign("*=", (x, y) -> x * y)
+il.augdiv = augmentAssign("/=", (x, y) -> x / y)
+il.augmod = augmentAssign("%=", (x, y) -> x % y)
+il.augand = augmentAssign("&&=", (x, y) -> x && y)
+il.augor = augmentAssign("||=", (x, y) -> x || y)
+il.augbitand = augmentAssign("&=", (x, y) -> x & y)
+il.augbitor = augmentAssign("|=", (x, y) -> x | y)
+il.augbitxor = augmentAssign("^=", (x, y) -> x ^ y)
+il.auglshift = augmentAssign("<<=", (x, y) -> x << y)
+il.augrshift = augmentAssign(">>=", (x, y) -> x >> y)
 
 il.not_ = unary("!", (x) -> !x)
 il.neg = unary("-", (x) -> -x)

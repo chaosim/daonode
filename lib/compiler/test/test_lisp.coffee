@@ -55,6 +55,8 @@ exports.Test =
     test.equal  solve(begin(assign(x, 1), block(a, print_(x), 1))), 1
     test.equal  solve(block(a, break_(a, 2), 1)), 2
     test.equal  solve(block(a, block(b, break_(b, 2), 1), 3)), 3
+    test.equal  solve(block(a, block(b, funcall(lamda([x], break_(b, 2)), 1), 1), 3)), 3
+    test.equal  solve(block(a, block(b, funcall(lamda([x], break_(a, 2)), 1), 1), 3)), 2
     x = vari('x')
     test.equal  solve(begin(assign(x, 1),  block(a, if_(eq(x, 5), break_(a, x)), inc(x), continue_(a)))), 5 #print_(x),
     test.done()
@@ -96,15 +98,6 @@ xexports.Test =
     x.binding = 5
     solve(orp(callfc((k) -> a = k), add(x, 2)))
     test.equal a(null), 7
-    test.done()
-
-  "test quasiquote": (test) ->
-    test.equal solve(qq(1)), 1
-    a = add(1, 2)
-    test.deepEqual solve(qq(a)), a
-    test.deepEqual solve(qq(uq(a))), 3
-    test.deepEqual solve(qq(uqs([1,2]))), new UnquoteSliceValue([1,2])
-    test.deepEqual solve(qq(add(uqs([1,2])))), a
     test.done()
 
   "test argsCont": (test) ->

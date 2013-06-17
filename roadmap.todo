@@ -1,6 +1,6 @@
 just javascript:
   ☐ function without cont as parameter
-  ☐ augment assign
+  ✔ augment assign @done (13-06-17 15:32)
   ☐ while
   ☐ javascript's try/catch/throw
   ☐ javascript's new
