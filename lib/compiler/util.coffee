@@ -80,6 +80,10 @@ exports.until_ = (label,body..., test) ->
   body = body.concat([if_(not_(test), continue_(label))])
   block(label, body...)
 
+exports.catch_ =  (tag, forms...) -> ['catch', tag, forms...]
+exports.throw_ = (tag, form) -> ['throw', tag, form]
+exports.protect = (form, cleanup...) -> ['unwind-protect', form, cleanup...]
+
 exports.print_ = (exps...) -> ['funcall', io(jsfun('console.log'))].concat(exps)
 
 exports.vop = vop = (name, args...) -> ["vop_"+name].concat(args)

@@ -12,8 +12,10 @@ exports.solve = (exp, path) ->
 compile = (exp, path) ->
   compiler = new Compiler()
   code = "solve = require('f:/daonode/lib/compiler/core.js').solve;\n"\
-         +"exports.main = #{compiler.compile(exp)}"\
-         +"\n//exports.main();"
+  +"solveModule = require('f:/daonode/lib/compiler/solve.js');\n"\
+  +"solver = new solveModule.Solver()\n"\
+  +"exports.main = #{compiler.compile(exp)}"\
+  +"\n//exports.main();"
   code = beautify(code, { indent_size: 2})
   path = path or "f:/daonode/lib/compiler/test/compiled.js"
   fd = fs.openSync(path, 'w')
@@ -36,7 +38,7 @@ exports.Compiler = class Compiler
     f = il.clamda(v, fromCont)
     f.refMap = {}
     f.analyze(@, f.refMap)
-    f = f.optimize(new Env(), @)
+#    f = f.optimize(new Env(), @)
     f = f.jsify()
     f.toCode(@)
 
@@ -203,6 +205,37 @@ exports.Compiler = class Compiler
       if not continues or continues==[] then throw new  Error(label)
       continueCont = continues[continues.length-1]
       @protect(continueCont).call(null)
+
+    # aka. lisp style catch/throw
+    'catch': (cont, tag, forms...) ->
+      v = il.vari('v'); v2 = il.vari('v2')
+      @cont(tag, il.clamda(v,
+                           il.pushCatch.apply([v, cont]),
+                           @expsCont(forms, il.clamda(v2
+                                                      il.popCatch.apply([v]),
+                                                      cont.call(v2)))))
+
+    # aka lisp style throw
+    "throw": (cont, tag, form) ->
+      v = il.vari('v'); v2 = il.vari('v2')
+      @cont(tag, il.clamda(v,
+                           @cont(form, il.clamda(v2,
+                                                 @protect(il.findCatch.apply([v])).call(v2)))))
+
+
+    # aka. lisp's unwind-protect
+    'unwind-protect': (cont, form, cleanup...) ->
+      oldprotect = @protect
+      v1 = il.vari('v'); v2 = il.vari('v2')
+      compiler = @
+      @protect = (cont) -> il.clamda(v1,
+                                     compiler.expsCont(cleanup, il.clamda(v2,
+                                          oldprotect(cont).call(v1))))
+      result = @cont(form,  il.clamda(v1,
+                              @expsCont(cleanup, il.clamda(v2,
+                                    cont.call(v1)))))
+      @protect = oldprotect
+      result
 
   Compiler = @
   for name, vop of il

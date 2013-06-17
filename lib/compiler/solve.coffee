@@ -332,7 +332,6 @@ exports.BindingError = class Error
 
 exports.TypeError = class TypeError extends Error
 
-
 # solver's status is set to UNKNOWN when start to solve, <br/>
 #  if solver successfully run to solver'last continuation, status is set SUCCESS,<br/>
 #  else if solver run to solver's failcont, status is set to FAIL.

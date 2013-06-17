@@ -150,6 +150,7 @@ Code::optimize = (env, compiler) -> @
 JSFun::optimize = (env, compiler) -> new JSFun(compiler.optimize(@fun, env))
 
 Var::optimizeApply = (args, env, compiler) ->  new Apply(@, args)
+Apply::optimizeApply = (args, env, compiler) ->  new Apply(@, args)
 
 Lamda::optimizeApply = (args, env, compiler) ->
     params = @params
@@ -343,8 +344,7 @@ Clamda::jsify = () ->
   body = insertReturn(body)
   new Clamda(@v, body)
 Apply::jsify = () ->
-  args = @args
-  if args.length>0 then args = [jsify(args[0])].concat(args[1...])
+  args = (jsify(a) for a in @args)
   new @constructor(jsify(@caller), args)
 CApply::jsify = () -> new CApply(@caller.jsify(), jsify(@args[0]))
 

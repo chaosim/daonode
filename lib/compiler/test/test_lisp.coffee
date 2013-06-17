@@ -5,7 +5,8 @@ _ = require "underscore"
 funcall, macall, lamda, macro, jsfun,
 if_, add, eq, le, inc, suffixinc, print_, loop_, until_, while_, not_
 eval_, qq, uq, uqs, iff
-block, break_, continue_, makeLabel} = require('../util')
+block, break_, continue_, makeLabel,
+catch_, throw_, protect} = require('../util')
 
 xexports = {}
 
@@ -72,19 +73,20 @@ exports.Test =
     test.equal  solve(begin(assign(x, 1),  until_(a, print_(x), inc(x), eq(x, 5)))), null
     test.done()
 
-xexports.Test =
   "test catch throw": (test) ->
     a = vari('a')
     test.equal  solve(catch_(1, 2)), 2
     test.equal  solve(catch_(1, throw_(1, 2), 3)), 2
     test.done()
 
+exports.Test =
   "test protect": (test) ->
-    a = vari('a')
-    test.equal(solve(block('foo', protect(break_('foo', 1), print_(2)))), 1)
-    test.equal(solve(block('foo', protect(break_('foo', 1),  print_(2), print_(3)))), 1)
+    foo = makeLabel('foo')
+    test.equal(solve(block(foo, protect(break_(foo, 1), print_(2)))), 1)
+#    test.equal(solve(block(foo, protect(break_(foo, 1),  print_(2), print_(3)))), 1)
     test.done()
 
+xexports.Test =
   "test callcc": (test) ->
     test.equal solve(begin(callcc((k) -> k(null)), add(1, 2))), 3
     test.done()
