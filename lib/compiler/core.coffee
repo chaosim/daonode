@@ -226,7 +226,7 @@ exports.Compiler = class Compiler
     # aka. lisp's unwind-protect
     'unwind-protect': (cont, form, cleanup...) ->
       oldprotect = @protect
-      v1 = il.vari('v'); v2 = il.vari('v2')
+      v1 = il.vari('v3'); v2 = il.vari('v4')
       compiler = @
       @protect = (cont) -> il.clamda(v1,
                                      compiler.expsCont(cleanup, il.clamda(v2,

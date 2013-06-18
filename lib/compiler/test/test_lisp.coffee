@@ -79,11 +79,10 @@ exports.Test =
     test.equal  solve(catch_(1, throw_(1, 2), 3)), 2
     test.done()
 
-exports.Test =
   "test protect": (test) ->
     foo = makeLabel('foo')
     test.equal(solve(block(foo, protect(break_(foo, 1), print_(2)))), 1)
-#    test.equal(solve(block(foo, protect(break_(foo, 1),  print_(2), print_(3)))), 1)
+    test.equal(solve(block(foo, protect(break_(foo, 1),  print_(2), print_(3)))), 1)
     test.done()
 
 xexports.Test =
