@@ -243,6 +243,9 @@ exports.Compiler = class Compiler
       v = il.vari('v')
       @cont(fun, il.clamda(v, cont.call(v.call(cont, cont))))
 
+    'succeed': (cont) -> cont.call(true)
+    'fail': (cont) -> il.failcont.call(false)
+
   Compiler = @
   for name, vop of il
     if vop instanceof il.VirtualOperation

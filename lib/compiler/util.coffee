@@ -107,3 +107,8 @@ for name, _o of il
     do (name=name) -> exports[name] = (args...) -> vop(name, args...)
 
 not_ = exports.not_
+
+# logic
+
+exports.succeed = ['succeed']
+exports.fail = ['fail']

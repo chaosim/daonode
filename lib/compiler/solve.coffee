@@ -14,9 +14,10 @@ class exports.Solver
     @finished = false
     solver =  @
     @faildone = (value) ->
-      solver.finished = true
-      exports.status = exports.FAIL
-      [null, value]
+#      solver.finished = true
+#      exports.status = exports.FAIL
+#      [null, value]
+      false
     @failcont = @faildone
     # @cutCont is used for cut like in prolog.
     @cutCont = @failcont

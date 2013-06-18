@@ -1,19 +1,21 @@
 _ = require "underscore"
 
-{solve, vari, fun, macro, fun2, recursive} = core = require('../core')
-#{ quote, eval_, begin, assign, if_, iff, block, break_, continue_, loop_, while_, until_,
-#catch_, throw_, protect, callcc} = require('../builtins/lisp')
-{ andp, orp, succeed, fail} = require('../builtins/logic')
-{print_, le, eq, add, sub, inc, suffixinc} = require('../builtins/general')
+{solve} = core = require('../core')
+solvebase = require('../solve')
+{begin, assign, print_,
+funcall, lamda, macro,
+if_, add, eq, le, inc, not_
+succeed, fail
+} = require('../util')
 
 xexports = {}
 
 exports.Test =
   "test succeed fail": (test) ->
-#    test.equal solve(succeed), true
-#    test.equal(core.status, core.SUCCESS);
+    test.equal solve(succeed), true
+#    test.equal(solvebase.status, solvebase.SUCCESS);
     test.equal solve(fail), false
-    test.equal(core.status, core.FAIL);
+#    test.equal(solvebase.status, solvebase.FAIL);
     test.done()
 
 xexports.Test =
@@ -86,7 +88,7 @@ xexports.Test =
     r = rule(2, (x, y)->
       [[x,y], 1, null])
     test.equal  solve(r(1,1)), 1
-    test.equal core.status, core.SUCCESS
+    test.equal solvebase.status, solvebase.SUCCESS
     test.done()
 
 
@@ -106,5 +108,5 @@ xexports.Test =
     test.deepEqual  solve(andp(findall(fail, result, x), result)), []
     test.deepEqual  solve(andp(findall(succeed, result, 1), result)), [1]
     test.deepEqual  solve(andp(findall(once(orp(print_(1), print_(2))), result, 1), result)), [1]
-    test.equal(core.status, core.SUCCESS);
+    test.equal(solvebase.status, solvebase.SUCCESS);
     test.done()
