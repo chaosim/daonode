@@ -83,6 +83,7 @@ exports.until_ = (label,body..., test) ->
 exports.catch_ =  (tag, forms...) -> ['catch', tag, forms...]
 exports.throw_ = (tag, form) -> ['throw', tag, form]
 exports.protect = (form, cleanup...) -> ['unwind-protect', form, cleanup...]
+exports.callcc = (fun) -> ['callcc', fun]
 
 exports.print_ = (exps...) -> ['funcall', io(jsfun('console.log'))].concat(exps)
 

@@ -6,7 +6,7 @@ funcall, macall, lamda, macro, jsfun,
 if_, add, eq, le, inc, suffixinc, print_, loop_, until_, while_, not_
 eval_, qq, uq, uqs, iff
 block, break_, continue_, makeLabel,
-catch_, throw_, protect} = require('../util')
+catch_, throw_, protect, callcc} = require('../util')
 
 xexports = {}
 
@@ -85,31 +85,6 @@ exports.Test =
     test.equal(solve(block(foo, protect(break_(foo, 1),  print_(2), print_(3)))), 1)
     test.done()
 
-xexports.Test =
   "test callcc": (test) ->
-    test.equal solve(begin(callcc((k) -> k(null)), add(1, 2))), 3
-    test.done()
-
-xexports.Test =
-  "test callfc": (test) ->
-    a = null
-    solve(orp(callfc((k) -> a = k), add(1, 2)))
-    test.equal a(null), 3
-    x = vari('x')
-    x.binding = 5
-    solve(orp(callfc((k) -> a = k), add(x, 2)))
-    test.equal a(null), 7
-    test.done()
-
-  "test argsCont": (test) ->
-    incall = fun(-1, (args...) ->_.map(args, (x) -> x+1))
-    test.deepEqual  solve(incall(1)), [2]
-    test.deepEqual  solve(incall(1, 2)), [2, 3]
-    test.deepEqual  solve(incall(1, 2, 3)), [2, 3, 4]
-    test.deepEqual  solve(incall(1, 2, 3, 4)), [2, 3, 4, 5]
-    test.deepEqual  solve(incall(1, 2, 3, 4, 5)), [2, 3, 4, 5, 6]
-    test.deepEqual  solve(incall(1, 2, 3, 4, 5, 6)), [2, 3, 4, 5, 6, 7]
-    test.deepEqual  solve(incall(1, 2, 3, 4, 5, 6, 7)), [2, 3, 4, 5, 6, 7, 8]
-    test.deepEqual  solve(incall(1, 2, 3, 4, 5, 6, 7, 8)), [2, 3, 4, 5, 6, 7, 8, 9]
-    test.deepEqual  solve(incall(1, 2, 3, 4, 5, 6, 7, 8, 9)), [2, 3, 4, 5, 6, 7, 8, 9, 10]
+    test.equal solve(begin(callcc(jsfun((k) -> k(null))), add(1, 2))), 3
     test.done()

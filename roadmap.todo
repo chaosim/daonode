@@ -11,8 +11,8 @@ optimization:
   ☐ tail recursive
 
 lisp features:
-  ☐ catch/throw
-  ☐ unwind-protect
+  ✔ catch/throw @done (13-06-18 08:53)
+  ✔ unwind-protect @done (13-06-18 08:53)
   ☐ callcc
 
 logic features:

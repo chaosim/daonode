@@ -138,7 +138,7 @@ Clamda::optimize = (env, compiler) ->
 Apply::optimize = (env, compiler) ->
   caller =  compiler.optimize(@caller, env)
   args = (compiler.optimize(a, env) for a in @args)
-  caller.optimizeApply(args, env, compiler)
+  caller.optimizeApply?(args, env, compiler) or new Apply(caller, args)
 
 Begin::optimize = (env, compiler) ->
   return new @constructor(compiler.optimize(exp, env) for exp in @exps)
@@ -147,7 +147,7 @@ Deref::optimize = (env, compiler) ->
   else if _.isNumber(@exp) then exp
   else @
 Code::optimize = (env, compiler) -> @
-JSFun::optimize = (env, compiler) -> new JSFun(compiler.optimize(@fun, env))
+JSFun::optimize = (env, compiler) ->  new JSFun(compiler.optimize(@fun, env))
 
 Var::optimizeApply = (args, env, compiler) ->  new Apply(@, args)
 Apply::optimizeApply = (args, env, compiler) ->  new Apply(@, args)
@@ -192,7 +192,13 @@ Clamda::optimizeApply = (args, env, compiler) ->
       else il.begin(il.assign(v, value), compiler.optimize(body, env))
   else compiler.optimize(body, env.extend(v, value))
 
-JSFun::optimizeApply = (args, env, compiler) -> args[0].call(@fun.apply(args[1...])).optimize(env, compiler)
+JSFun::optimizeApply = (args, env, compiler) ->
+    cont = args[0]
+    f = @fun
+    t = typeof f
+    if t is 'function' then cont.call(new Apply(f, args[1...]))
+    else if t is 'string' then cont.call(new Apply(il.fun(f), args[1...]))
+    else cont.call(f.apply(args[1...])).optimize(env, compiler)
 
 VirtualOperation::optimizeApply = (args, env, compiler) ->
   myBoolize = (memo, x) ->
@@ -310,6 +316,7 @@ Var::applySideEffect = () -> il.IO
 VirtualOperation::applySideEffect = () -> if @_effect? then  @_effect else il.IO
 BinaryOperation::applySideEffect = () -> if @_effect? then  @_effect else il.PURE
 UnaryOperation::applySideEffect = () ->if @_effect? then  @_effect else il.PURE
+Fun::applySideEffect = () -> if @_effect? then  @_effect else il.IO
 JSFun::applySideEffect = () -> if @_effect? then  @_effect else il.IO
 Lamda::applySideEffect = () -> if @_effect? then  @_effect else sideEffect(@body)
 Clamda::applySideEffect = () -> if @_effect? then  @_effect else sideEffect(@body)

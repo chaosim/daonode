@@ -38,7 +38,7 @@ exports.Compiler = class Compiler
     f = il.clamda(v, fromCont)
     f.refMap = {}
     f.analyze(@, f.refMap)
-#    f = f.optimize(new Env(), @)
+    f = f.optimize(new Env(), @)
     f = f.jsify()
     f.toCode(@)
 
@@ -96,10 +96,9 @@ exports.Compiler = class Compiler
         @cont(test, il.clamda(v, il.if_(v, @cont(then_, cont), @cont(else_, cont))))
 
     "jsfun": (cont, func) ->
-      v = il.vari('v')
-      f = il.jsfun(v)
+      f = il.jsfun(func)
       f._effect = @_effect
-      @cont(func, il.clamda(v, cont.call(f)))
+      cont.call(f)
 
     "pure": (cont, exp) ->
       oldEffect = @_effect
@@ -237,6 +236,13 @@ exports.Compiler = class Compiler
       @protect = oldprotect
       result
 
+    # aka. lisp's call/cc
+    # callcc(someFunction(kont) -> body)
+    #current continuation @cont can be captured in someFunction
+    'callcc': (cont, fun) ->
+      v = il.vari('v')
+      @cont(fun, il.clamda(v, cont.call(v.call(cont, cont))))
+
   Compiler = @
   for name, vop of il
     if vop instanceof il.VirtualOperation
@@ -266,7 +272,9 @@ exports.Compiler = class Compiler
       else if _.isString(exp) then JSON.stringify(exp)
       else if exp is true then "true"
       else if exp is false then "false"
-      else JSON.stringify(exp)
+      else if _.isArray(exp) then JSON.stringify(exp)
+      else if typeof exp is 'function' then exp.toString()
+      else exp.toString()
 
   # used for lisp.begin, logic.andp, etc., to generate the continuation for an expression array
   expsCont: (exps, cont) ->
