@@ -248,22 +248,40 @@ exports.Compiler = class Compiler
     'fail': (cont) -> il.failcont.call(false)
     'orp': (cont, x, y) ->
       v = il.vari('v')
-      oldTrail = il.vari('oldTrail')
       trail = il.vari('trail')
       state = il.vari('state')
       fc = il.vari('fc')
-      il.begin(il.assign(oldTrail, il.trail),
-               il.assign(trail, il.newTrail),
-               il.settrail(trail),
+      il.begin(il.assign(trail, il.trail),
+               il.settrail(il.newTrail),
                il.assign(state, il.state),
                il.assign(fc, il.failcont),
                il.setfailcont(il.clamda(v,
-                   il.undotrail.call(trail),
-                   il.settrail(oldTrail),
+                   il.undotrail.call(il.trail),
+                   il.settrail(trail),
                    il.setstate(state),
                    il.setfailcont(fc),
                    @cont(y, cont))),
                @cont(x, cont))
+
+      #like in prolog, failure as negation.
+    'notp': (cont, goal) ->
+      v = il.vari('v')
+      trail = il.vari('trail')
+      state = il.vari('state')
+      fc = il.vari('fc')
+      il.begin(
+            il.assign(trail, il.trail),
+            il.settrail(il.newTrail),
+            il.assign(fc, il.failcont),
+            il.assign(state, il.state),
+            il.setfailcont(il.clamda(v,
+              il.undotrail.call(il.trail),
+              il.settrail(trail),
+              il.setstate(state),
+              il.setfailcont(fc),
+              cont.call(v))),
+            @cont(goal, fc))
+    'repeat': (cont) -> il.begin(il.setfailcont(cont), cont.call(null))
 
   Compiler = @
   for name, vop of il

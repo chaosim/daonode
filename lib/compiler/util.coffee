@@ -119,4 +119,8 @@ exports.orp = orp = (exps...) ->
   if length is 0 then throw new ArgumentError(exps)
   else if length is 1 then exps[0]
   else if length is 2 then ['orp', exps...]
-  else ['orp', exps[0], orp(exps[1...])]
+  else ['orp', exps[0], orp(exps[1...]...)]
+
+exports.notp = (goal) -> ['notp', goal]
+
+exports.repeat = -> ['repeat']

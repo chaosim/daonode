@@ -65,9 +65,6 @@ class exports.Solver
       [cont, value] = cont(value)
     [cont, value]
 
-  # used by lisp style quasiquote, unquote, unquoteSlice
-  quasiquote: (exp, cont) -> exp?.quasiquote?(@, cont) or ((v) -> cont(exp))
-
   # an utility that is useful for some logic builtins<br/>
   # when backtracking, execute fun at first, and then go to original failcont
   appendFailcont: (fun) ->
@@ -207,10 +204,6 @@ exports.dummy = dummy = (name) ->
   nameToIndexMap[name] = index+1
   new exports.DummyVar(name+index)
 exports.dummies = (names) -> new dummy(name) for name in split names,  reElements
-
-# A flag class is used to process unquoteSlice
-UnquoteSliceValue = class exports.UnquoteSliceValue
-  constructor: (@value) ->
 
 exports.UObject = class UObject
   constructor: (@data) ->
