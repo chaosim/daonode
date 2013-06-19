@@ -407,7 +407,7 @@ Begin::toCode = (compiler) ->
     compiler.parent = @; "{#{(compiler.toCode(exp) for exp in @exps).join('; ')}}"
 Array::toCode = (compiler) ->  "[#{(compiler.toCode(exp) for exp in @exps).join(', ')}]"
 Print::toCode = (compiler) ->  "console.log(#{(compiler.toCode(exp) for exp in @exps).join(', ')})"
-Deref::toCode = (compiler) ->  "solver.trail.deref(#{compiler.toCode(@exp)})"
+Deref::toCode = (compiler) ->  "$trail.deref(#{compiler.toCode(@exp)})"
 Code::toCode = (compiler) ->  @string
 JSFun::toCode = (compiler) ->  "function() {\n"+\
                                " var args, cont;\n "+\
@@ -503,28 +503,30 @@ vop = (name, toCode) ->
 
 il.suffixinc = vop('suffixdec', (compiler, args)->"#{compiler.toCode(args[0])}++")
 il.suffixdec = vop('suffixdec', (compiler, args)->"#{compiler.toCode(args[0])}--")
-il.pushCatch = vop('pushCatch', (compiler, args)->"solver.pushCatch(#{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})")
-il.popCatch = vop('popCatch', (compiler, args)->"solver.popCatch(#{compiler.toCode(args[0])})")
-il.findCatch = il.pure(vop('findCatch', (compiler, args)->"solver.findCatch(#{compiler.toCode(args[0])})"))
-il.fake = vop('fake', (compiler, args)->"solver.fake(#{compiler.toCode(args[0])})").apply([])
-il.restore = vop('restore', (compiler, args)->"solver.restore(#{compiler.toCode(args[0])})")
-il.getvalue = il.pure(vop('getvalue', (compiler, args)->"solver.trail.getvalue(#{compiler.toCode(args[0])})"))
+il.catches = new Var('$catches')
+il.pushCatch = vop('pushCatch', (compiler, args)->"$pushCatch(#{il.catches}, #{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})")
+il.popCatch = vop('popCatch', (compiler, args)->"$popCatch(#{il.catches}, #{compiler.toCode(args[0])})")
+il.findCatch = il.pure(vop('findCatch', (compiler, args)->"$findCatch(#{il.catches}, #{compiler.toCode(args[0])})"))
+il.fake = vop('fake', (compiler, args)->"$fake(#{compiler.toCode(args[0])})").apply([])
+il.restore = vop('restore', (compiler, args)->"$restore(#{compiler.toCode(args[0])})")
+il.getvalue = il.pure(vop('getvalue', (compiler, args)->"$trail.getvalue(#{compiler.toCode(args[0])})"))
 il.list = il.pure(vop('list', (compiler, args)->"[#{(compiler.toCode(a) for a in args).join(', ')}]"))
 il.index = il.pure(vop('index', (compiler, args)->"(#{compiler.toCode(args[0])})[#{compiler.toCode(args[1])}]"))
 il.attr = il.pure(vop('attr', (compiler, args)->"(#{compiler.toCode(args[0])}).#{compiler.toCode(args[1])}"))
 il.push = vop('push', (compiler, args)->"(#{compiler.toCode(args[0])}).push(#{compiler.toCode(args[1])})")
 il.concat = vop('concat', (compiler, args)->"(#{compiler.toCode(args[0])}).concat(#{compiler.toCode(args[1])})")
-il.run = vop('run', (compiler, args)->"solver.run(#{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})")
+il.run = vop('run', (compiler, args)->"$run(#{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})")
 
 il.newLogicVar = vop('newLogicVar', (compiler, args)->"new Var(#{compiler.toCode(args[0])})")
-il.unify = vop('unify', (compiler, args)->"solver.trail.unify(#{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})")
+il.unify = vop('unify', (compiler, args)->"$trail.unify(#{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})")
 
 il.undotrail = vop('undotrail', (compiler, args)->"#{compiler.toCode(args[0])}.undo()")
-il.failcont = new Var('solver.failcont')
+il.failcont = new Var('$failcont')
 il.setfailcont = (cont) -> il.assign(il.failcont, cont)
-il.state = new Var('solver.state')
+il.cutcont = new Var('$cutcont')
+il.state = new Var('$state')
 il.setstate = (state) -> il.assign(il.state, state)
-il.trail = new Var('solver.trail')
+il.trail = new Var('$trail')
 il.newTrail = vop('newTrail', (compiler, args)->"new Trail()").call()
 il.settrail = (trail) -> il.assign(il.trail, trail)
 

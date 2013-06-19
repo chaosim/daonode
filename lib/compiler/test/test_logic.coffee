@@ -33,12 +33,12 @@ exports.Test =
     test.done()
 
   "test not succeed fail": (test) ->
-    test.equal  solve(notp(succeed)), false
+    test.equal  solve(notp(succeed)), true
     test.equal  solve(notp(fail)), false
     test.done()
 
   "test not print": (test) ->
-    test.equal  solve(notp(print_(1))), false
+    test.equal  solve(notp(print_(1))), null
     test.done()
 
   "test unify 1 1, 1 2": (test) ->

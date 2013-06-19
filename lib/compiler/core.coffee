@@ -12,11 +12,13 @@ exports.solve = (exp, path) ->
 compile = (exp, path) ->
   compiler = new Compiler()
   code = "solve = require('f:/daonode/lib/compiler/core.js').solve;\n"\
-  +"solveModule = require('f:/daonode/lib/compiler/solve.js');\n"\
-  +"solver = new solveModule.Solver()\n"\
-  +"Trail = solveModule.Trail\n"\
-  +"Var = solveModule.Var\n"\
-  +"exports.main = #{compiler.compile(exp)}"\
+  +"solvecore = require('f:/daonode/lib/compiler/solve.js');\n"\
+  +"$pushCatch = solvecore.$pushCatch;\n"\
+  +"$popCatch = solvecore.$popCatch;\n"\
+  +"$findCatch = solvecore.$findCatch;\n"\
+  +"Trail = solvecore.Trail;\n"\
+  +"Var = solvecore.Var;\n\n"\
+  +compiler.compile(exp)\
   +"\n//exports.main();"
   code = beautify(code, { indent_size: 2})
   path = path or "f:/daonode/lib/compiler/test/compiled.js"
@@ -37,7 +39,12 @@ exports.Compiler = class Compiler
   compile: (exp) ->
     v = il.vari('v')
     fromCont = @cont(exp, il.clamda(v, v))
-    f = il.clamda(v, fromCont)
+    f = il.begin(il.assign(il.state, null),
+                 il.assign(il.catches, {}),
+                 il.assign(il.trail, il.newTrail),
+                 il.assign(il.failcont, il.clamda(v, v)),
+                 il.assign(il.cutcont, il.failcont),
+                 il.assign(il.vari('exports.main'), il.clamda(v, fromCont)))
     f.refMap = {}
     f.analyze(@, f.refMap)
     f = f.optimize(new Env(), @)
@@ -326,6 +333,7 @@ exports.Compiler = class Compiler
       else if exp is false then "false"
       else if _.isArray(exp) then JSON.stringify(exp)
       else if typeof exp is 'function' then exp.toString()
+      else if _.isObject(exp) then JSON.stringify(exp)
       else exp.toString()
 
   # used for lisp.begin, logic.andp, etc., to generate the continuation for an expression array
