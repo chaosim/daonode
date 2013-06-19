@@ -9,8 +9,6 @@ class exports.Solver
     @trail=new Trail
     #@catches is used for lisp style catch/throw
     @catches = {}
-    @purememo = {}
-    @memo = {}
     @finished = false
     solver =  @
     @faildone = (value) ->
@@ -163,28 +161,11 @@ exports.Var = class Var
       memo[name] = result
       result
 
-  cont: (solver, cont) -> (v) => cont(@deref(solver.trail))
-
-  # nottodo: variable's applyCont:: canceled. lisp1 should be good.
-
   toString:() -> "vari(#{@name})"
-
-reElements = /\s*,\s*|\s+/
-
-# utilities for new variables
-# sometiems, say in macro, we need unique var to avoid name conflict
-nameToIndexMap = {}
-exports.vari = (name) ->
-  index = nameToIndexMap[name] or 1
-  nameToIndexMap[name] = index+1
-  new Var(name+index)
-
-exports.vars = (names) -> vari(name) for name in split names,  reElements
 
 # DummyVar never fail when it unify. see tests on any/some/times in test_parser for examples
 exports.DummyVar = class DummyVar extends Var
   constructor: (name) -> @name = '_$'+name
-  cont:(solver, cont) -> (v) => cont(@binding)
   deref: (trail) -> @
   getvalue: (trail, memo={}) ->
     name = @name
@@ -197,13 +178,6 @@ exports.DummyVar = class DummyVar extends Var
       result = trail.getvalue(result, memo)
       memo[name] = result
       result
-
-# nottodo: variable's applyCont:: canceled. lisp1 should be good.
-exports.dummy = dummy = (name) ->
-  index = nameToIndexMap[name] or 1
-  nameToIndexMap[name] = index+1
-  new exports.DummyVar(name+index)
-exports.dummies = (names) -> new dummy(name) for name in split names,  reElements
 
 exports.UObject = class UObject
   constructor: (@data) ->

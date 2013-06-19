@@ -278,7 +278,7 @@ Apply::boolize = () ->
   if caller instanceof Lamda or caller instanceof Clamda then return boolize(caller.body)
   if caller instanceof Var then return undefined
   for a in @args then if boolize(a) is undefined then return undefined
-  !!(caller.func.apply(null, args))
+  !!(caller.func?.apply(null, @args)) or undefined
 CApply::boolize = () -> boolize(@caller.body)
 
 il.PURE = 0; il.EFFECT = 1; il.IO = 2
@@ -515,8 +515,11 @@ il.attr = il.pure(vop('attr', (compiler, args)->"(#{compiler.toCode(args[0])}).#
 il.push = vop('push', (compiler, args)->"(#{compiler.toCode(args[0])}).push(#{compiler.toCode(args[1])})")
 il.concat = vop('concat', (compiler, args)->"(#{compiler.toCode(args[0])}).concat(#{compiler.toCode(args[1])})")
 il.run = vop('run', (compiler, args)->"solver.run(#{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})")
-il.undotrail = vop('undotrail', (compiler, args)->"#{compiler.toCode(args[0])}.undo()")
 
+il.newLogicVar = vop('newLogicVar', (compiler, args)->"new Var(#{compiler.toCode(args[0])})")
+il.unify = vop('unify', (compiler, args)->"solver.trail.unify(#{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})")
+
+il.undotrail = vop('undotrail', (compiler, args)->"#{compiler.toCode(args[0])}.undo()")
 il.failcont = new Var('solver.failcont')
 il.setfailcont = (cont) -> il.assign(il.failcont, cont)
 il.state = new Var('solver.state')

@@ -110,6 +110,11 @@ not_ = exports.not_
 
 # logic
 
+exports.logicvar = (name) -> ['logicvar', name]
+
+exports.unify = (x, y) -> ['unify', x, y]
+exports.notunify = (x, y) -> ['notunify', x, y]
+
 exports.succeed = ['succeed']
 exports.fail = ['fail']
 
@@ -123,4 +128,5 @@ exports.orp = orp = (exps...) ->
 
 exports.notp = (goal) -> ['notp', goal]
 
-exports.repeat = -> ['repeat']
+exports.repeat = ['repeat']
+

@@ -15,6 +15,7 @@ compile = (exp, path) ->
   +"solveModule = require('f:/daonode/lib/compiler/solve.js');\n"\
   +"solver = new solveModule.Solver()\n"\
   +"Trail = solveModule.Trail\n"\
+  +"Var = solveModule.Var\n"\
   +"exports.main = #{compiler.compile(exp)}"\
   +"\n//exports.main();"
   code = beautify(code, { indent_size: 2})
@@ -244,6 +245,17 @@ exports.Compiler = class Compiler
       v = il.vari('v')
       @cont(fun, il.clamda(v, cont.call(v.call(cont, cont))))
 
+    'logicvar': (cont, name) -> cont.call(il.newLogicVar.call(name))
+    'unify': (cont, x, y) ->
+      x1 = il.vari('x'); y1 = il.vari('y')
+      @cont(x, il.clamda(x1, @cont(y, il.clamda(y1,
+          il.if_(il.unify.call(x1, y1), cont.call(true),
+             il.failcont.call(false))))))
+    'notunify': (cont, x, y) ->
+      x1 = il.vari('x'); y1 = il.vari('y')
+      @cont(x, il.clamda(x1, @cont(y, il.clamda(y1,
+          il.if_(il.unify.call(x, y), il.failcont.call(false),
+             cont.call(true))))))
     'succeed': (cont) -> cont.call(true)
     'fail': (cont) -> il.failcont.call(false)
     'orp': (cont, x, y) ->

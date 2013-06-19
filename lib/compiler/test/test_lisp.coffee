@@ -8,9 +8,9 @@ eval_, qq, uq, uqs, iff
 block, break_, continue_, makeLabel,
 catch_, throw_, protect, callcc} = require('../util')
 
-xexports = {}
-
 vari = (name) -> name
+
+xexports = {}
 
 exports.Test =
   "test assign inc dec": (test) ->

@@ -16,12 +16,14 @@ lisp features:
   ✔ callcc @done (13-06-18 10:58)
 
 logic features:
-  ☐ logic var
-  ☐ unify
+  ✔ logic var @done (13-06-19 17:56)
+  ✔ unify @done (13-06-19 17:18)
   ✔ logic or @done (13-06-19 10:32)
   ✔ fail @done (13-06-19 10:32)
-  ☐ logic negation, findall, call, once, repeat, etc.
+  ✔ logic negation, repeat @done (13-06-19 15:02)
+  ☐ findall, call, once, etc.
   ☐ callfc
+  ☐ Cons, UObject, UArray
 
 parser features:
   ☐ parser state
