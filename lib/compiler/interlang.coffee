@@ -162,7 +162,7 @@ Lamda::optimizeApply = (args, env, compiler) ->
     for p, i in params
       arg = args[i]
       if sideEffect(arg)
-        newParams.push[p]
+        newParams.push(p)
         newArgs.push(arg)
         continue
       else
@@ -498,7 +498,7 @@ il.dec = il.effect(unary("--"))
 vop = (name, toCode) ->
   class Vop extends VirtualOperation
     applyToCode: toCode
-    _effect: true
+    _effect: il.IO
   new Vop(name)
 
 il.suffixinc = vop('suffixdec', (compiler, args)->"#{compiler.toCode(args[0])}++")
@@ -511,11 +511,28 @@ il.restore = vop('restore', (compiler, args)->"solver.restore(#{compiler.toCode(
 il.getvalue = il.pure(vop('getvalue', (compiler, args)->"solver.trail.getvalue(#{compiler.toCode(args[0])})"))
 il.list = il.pure(vop('list', (compiler, args)->"[#{(compiler.toCode(a) for a in args).join(', ')}]"))
 il.index = il.pure(vop('index', (compiler, args)->"(#{compiler.toCode(args[0])})[#{compiler.toCode(args[1])}]"))
+il.attr = il.pure(vop('attr', (compiler, args)->"(#{compiler.toCode(args[0])}).#{compiler.toCode(args[1])}"))
 il.push = vop('push', (compiler, args)->"(#{compiler.toCode(args[0])}).push(#{compiler.toCode(args[1])})")
 il.concat = vop('concat', (compiler, args)->"(#{compiler.toCode(args[0])}).concat(#{compiler.toCode(args[1])})")
 il.run = vop('run', (compiler, args)->"solver.run(#{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})")
-il.failcont = vop('failcont', (compiler, args)->"solver.failcont(#{compiler.toCode(args[0])})")
+il.undotrail = vop('undotrail', (compiler, args)->"#{compiler.toCode(args[0])}.undo()")
+
+il.failcont = new Var('solver.failcont')
+il.setfailcont = (cont) -> il.assign(il.failcont, cont)
+il.state = new Var('solver.state')
+il.setstate = (state) -> il.assign(il.state, state)
+il.trail = new Var('solver.trail')
+il.newTrail = vop('newTrail', (compiler, args)->"new Trail()").call()
+il.settrail = (trail) -> il.assign(il.trail, trail)
 
 il.evalexpr = vop('evalexpr', (compiler, args)->"solve(#{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})")
 
 il.fun = (f) -> new Fun(f)
+
+il.let_ = (bindings, body...) ->
+  params = []
+  values = []
+  for i in [0...bindings.length] by 2
+    params.push(bindings[i])
+    values.push(bindings[i+1])
+  new Apply(il.lamda(params, body...), values)

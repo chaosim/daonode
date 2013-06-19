@@ -21,36 +21,7 @@ exports.prependFailcont = special(1, 'setFailcont', (compiler, cont, fun) -> (v)
     fc(v)
   cont(v))
 
-# same as lisp.begin, aka "," in prolog 
-exports.andp = andp = special(null, 'andp', (compiler, cont, args...) -> compiler.expsCont(args, cont))
 
-orpFun = (compiler, cont, args...) ->
-  length = args.length
-  if length is 0 then throw new ArgumentError(args)
-  else if length is 1 then return compiler.cont(args[0], cont)
-  else if length is 2
-    x = args[0]
-    y = args[1]
-    xcont = compiler.cont(x, cont)
-    ycont = compiler.cont(y, cont)
-  else
-    x = args[0]
-    y = args[1...]
-    xcont = compiler.cont(x, cont)
-    ycont = orpFun(compiler, cont, y...)
-  trail = state = fc = null
-  orcont = il.clamda(v,
-    il.undotrail(trail),
-    il.assign(il.state, state)
-    il.setfailcont(fc)
-    il.return(ycont.call(v)))
-  il.clamda(v,
-    il.assign(trail, il.new(il.symbol(Trail))
-    state = compiler.state
-    fc = compiler.failcont
-    compiler.trail = trail
-    compiler.failcont = orcont
-    [xcont, null]))
 
 # logic choices, aka ";" in prolog 
 exports.orp = orp = special(null, 'orp', orpFun)

@@ -14,6 +14,7 @@ compile = (exp, path) ->
   code = "solve = require('f:/daonode/lib/compiler/core.js').solve;\n"\
   +"solveModule = require('f:/daonode/lib/compiler/solve.js');\n"\
   +"solver = new solveModule.Solver()\n"\
+  +"Trail = solveModule.Trail\n"\
   +"exports.main = #{compiler.compile(exp)}"\
   +"\n//exports.main();"
   code = beautify(code, { indent_size: 2})
@@ -245,6 +246,24 @@ exports.Compiler = class Compiler
 
     'succeed': (cont) -> cont.call(true)
     'fail': (cont) -> il.failcont.call(false)
+    'orp': (cont, x, y) ->
+      v = il.vari('v')
+      oldTrail = il.vari('oldTrail')
+      trail = il.vari('trail')
+      state = il.vari('state')
+      fc = il.vari('fc')
+      il.begin(il.assign(oldTrail, il.trail),
+               il.assign(trail, il.newTrail),
+               il.settrail(trail),
+               il.assign(state, il.state),
+               il.assign(fc, il.failcont),
+               il.setfailcont(il.clamda(v,
+                   il.undotrail.call(trail),
+                   il.settrail(oldTrail),
+                   il.setstate(state),
+                   il.setfailcont(fc),
+                   @cont(y, cont))),
+               @cont(x, cont))
 
   Compiler = @
   for name, vop of il

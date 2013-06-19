@@ -4,8 +4,8 @@ _ = require "underscore"
 solvebase = require('../solve')
 {begin, assign, print_,
 funcall, lamda, macro,
-if_, add, eq, le, inc, not_
-succeed, fail
+if_, add, eq, le, inc, not_,
+succeed, fail, andp, orp
 } = require('../util')
 
 xexports = {}
@@ -18,19 +18,20 @@ exports.Test =
 #    test.equal(solvebase.status, solvebase.FAIL);
     test.done()
 
-xexports.Test =
   "test and print": (test) ->
     test.equal  solve(andp(print_(1), print_(2))), null
     test.done()
 
+exports.Test =
   "test or print": (test) ->
-    test.equal  solve(orp(print_(1))), null
+#    test.equal  solve(orp(print_(1))), null
     test.equal  solve(orp(print_(1), print_(2))), null
-    test.equal  solve(orp(fail, print_(2))), null
-    test.equal  solve(orp(fail, print_(2), print_(3))), null
-    test.equal  solve(orp(fail, fail, print_(3))), null
+#    test.equal  solve(orp(fail, print_(2))), null
+#    test.equal  solve(orp(fail, print_(2), print_(3))), null
+#    test.equal  solve(orp(fail, fail, print_(3))), null
     test.done()
 
+xexports.Test =
   "test not succeed fail": (test) ->
     test.equal  solve(notp(succeed)), null
     test.equal  solve(notp(fail)), null

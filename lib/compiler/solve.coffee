@@ -98,7 +98,7 @@ class exports.Solver
 #  when multiple choices exist, a new Trail for current branch is constructored, <br/>
 #  when backtracking, undo the trail to restore the previous variable binding
 # todo: when variable is new constrctored in current branch, it could not be recorded.
-Trail = class exports.Trail
+exports.Trail = class Trail
   constructor: (@data={}) ->
   copy: () -> new Trail(_.extend({},@data))
   set: (vari, value) ->
@@ -124,7 +124,7 @@ Trail = class exports.Trail
 
 # ####class Var
 # Var for logic bindings, used in unify, lisp.assign, inc/dec, parser operation, etc.
-Var = class exports.Var
+exports.Var = class Var
   constructor: (@name, @binding = @) ->
   deref: (trail) ->
     v = @
@@ -211,25 +211,6 @@ exports.dummies = (names) -> new dummy(name) for name in split names,  reElement
 # A flag class is used to process unquoteSlice
 UnquoteSliceValue = class exports.UnquoteSliceValue
   constructor: (@value) ->
-
-# #### class Command
-# dao command that can be applied <br/>
-#  Special, Fun, Macro, Proc is subclass of Command.
-Command = class exports.Command
-  @directRun = false
-  constructor: (@fun, @name, @arity) ->
-    @callable = (args...) =>
-      applied = new exports.Apply(@, args)
-      if Command.directRun
-        solver = Command.globalSolver
-        result = solver.solve(applied)
-        solver.finished = false
-        result
-      else applied
-    @callable.arity = @arity
-
-  register: (exports) -> exports[@name] = @callable
-  toString: () -> @name
 
 exports.UObject = class UObject
   constructor: (@data) ->

@@ -112,3 +112,11 @@ not_ = exports.not_
 
 exports.succeed = ['succeed']
 exports.fail = ['fail']
+
+exports.andp = exports.begin
+exports.orp = orp = (exps...) ->
+  length = exps.length
+  if length is 0 then throw new ArgumentError(exps)
+  else if length is 1 then exps[0]
+  else if length is 2 then ['orp', exps...]
+  else ['orp', exps[0], orp(exps[1...])]
