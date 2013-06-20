@@ -6,6 +6,7 @@ solvebase = require('../solve')
 funcall, lamda, macro,
 if_, add, eq, le, inc, not_,
 logicvar, unify, succeed, fail, andp, orp, notp
+cutable, cut, findall
 } = require('../util')
 
 vari = (name) -> name
@@ -54,6 +55,26 @@ exports.Test =
     test.equal  solve(begin(assign(a, $a), orp(andp(unify(a, 1), unify(a, 2)), unify(a, 2)))), true
     test.done()
 
+  "test cut": (test) ->
+    test.equal  solve(orp(andp(print_(1), fail), print_(2))), null
+    test.equal  solve(orp(andp(print_(1), cut, fail), print_(2))), false
+    test.equal  solve(orp(cutable(orp(andp(print_(1), cut, fail), print_(2))), print_(3))), null
+    test.done()
+
+exports.Test =
+  "test findall once": (test) ->
+    $x = logicvar('x')
+    x = vari('x')
+    result = logicvar('result')
+    test.equal  solve(findall(orp(print_(1), print_(2)))), null
+    test.equal  solve(findall(orp(print_(1), print_(2), print_(3)))), null
+#    test.deepEqual  solve(andp(findall(orp(unify(x, 1), unify(x, 2)), result, x), result)), [1,2]
+#    test.deepEqual  solve(andp(findall(fail, result, x), result)), []
+#    test.deepEqual  solve(andp(findall(succeed, result, 1), result)), [1]
+#    test.deepEqual  solve(andp(findall(once(orp(print_(1), print_(2))), result, 1), result)), [1]
+#    test.equal(solvebase.status, solvebase.SUCCESS);
+    test.done()
+
 xexports.Test =
   "test macro": (test) ->
     same = macro(1, (x) -> x)
@@ -78,14 +99,3 @@ xexports.Test =
     test.equal  solve(r(1,1)), null
     test.done()
 
-  "test findall once": (test) ->
-    x = logicvar('x')
-    result = logicvar('result')
-    test.equal  solve(findall(orp(print_(1), print_(2)))), null
-    test.equal  solve(findall(orp(print_(1), print_(2), print_(3)))), null
-    test.deepEqual  solve(andp(findall(orp(unify(x, 1), unify(x, 2)), result, x), result)), [1,2]
-    test.deepEqual  solve(andp(findall(fail, result, x), result)), []
-    test.deepEqual  solve(andp(findall(succeed, result, 1), result)), [1]
-    test.deepEqual  solve(andp(findall(once(orp(print_(1), print_(2))), result, 1), result)), [1]
-    test.equal(solvebase.status, solvebase.SUCCESS);
-    test.done()

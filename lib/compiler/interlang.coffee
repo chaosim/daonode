@@ -5,7 +5,7 @@ il = exports
 
 exports.NotImplement = class NotImplement extends Error
   constructor: (@exp, @message='', @stack = @) ->  # @stack: to make webstorm nodeunit happy.
-  toString: () -> "#{@name} >>> #{@message}"
+  toString: () -> "#{@name} >>> #{@exp} #{@message}"
 
 toString = (o) -> o?.toString?() or o
 
@@ -13,25 +13,28 @@ class Element
   constructor: () ->  @name = @toString()
   call: (args...) -> new Apply(@, args)
   apply: (args) -> new Apply(@, args)
-  toCode: (compiler) -> throw new  NotImplement(@)
+  toCode: (compiler) -> throw new  NotImplement(@, "toCode")
   Object.defineProperty @::, '$', get: -> @constructor
 
 class Var extends Element
   constructor: (@name) ->
   toString: () -> @name
+class Symbol extends Var
 class Assign extends Element
   constructor: (@left, @exp) -> super
   toString: () -> "#{toString(@left)} = #{toString(@exp)}"
+class ListAssign extends Assign
+  constructor: (@lefts, @exp) -> @name = @toString()
+  toString: () -> "#{toString(@lefts)} = #{toString(@exp)}"
 class AugmentAssign extends Assign
   toString: () -> "#{toString(@left)} #{@constructor.operator}= #{toString(@exp)}"
 class Return extends Element
   constructor: (@value) -> super
   toString: () -> "return(#{toString(@value)})"
+class Throw extends Return
 class Begin extends Element
   constructor: (@exps) -> super
   toString: () -> "begin(#{(toString(e) for e in @exps).join(',')})"
-class Array extends Begin
-  toString: () -> "[#{(toString(e) for e in @exps).join(',')}]"
 class Print extends Begin
   toString: () -> "print(#{(toString(e) for e in @exps).join(',')})"
 class Lamda extends Element
@@ -48,20 +51,13 @@ class JSFun extends Element
   toString: () -> "jsfun(#{@fun})"
   apply: (args) -> new Apply(@, args)
 exports.VirtualOperation = class VirtualOperation extends Element
-  constructor: (@name) -> super
-  toString: () -> "#{@name}"
-  call: (args...) -> new VirtualOperationApply(@, args)
-  apply: (args) -> new VirtualOperationApply(@, args)
+  constructor: (@args) -> super
+  toString: () -> "vop_#{@_name}(#{(toString(arg) for arg in @args).join(', ')})"
 class BinaryOperation extends VirtualOperation
-  constructor: (@symbol, @func) -> super
-  toString: () -> "binary(#{@symbol})"
-  call: (args...) -> new BinaryOperationApply(@, args)
-  apply: (args) -> new BinaryOperationApply(@, args)
+  toString: () -> "#{toString(@args[0])}#{@symbol}#{toString(@args[1])}"
   _effect: false
 class UnaryOperation extends BinaryOperation
-  toString: () -> "unary(#{@symbol})"
-  call: (args...) -> new UnaryOperationApply(@, args)
-  apply: (args) -> new UnaryOperationApply(@, args)
+  toString: () -> "#{@symbol}#{toString(@args[0])}"
   _effect: false
 class Fun extends Element
   constructor: (@func) -> super
@@ -70,12 +66,6 @@ class Fun extends Element
 class Apply extends Element
   constructor: (@caller, @args) -> super
   toString: () -> "(#{toString(@caller)})(#{(toString(arg) for arg in @args).join(', ')})"
-class VirtualOperationApply extends Apply
-  toString: () -> "vop(#{toString(@caller)})(#{(toString(arg) for arg in @args).join(', ')})"
-class BinaryOperationApply extends VirtualOperationApply
-  toString: () -> "#{toString(@args[0])}#{toString(@caller.symbol)}#{toString(@args[1])}"
-class UnaryOperationApply extends VirtualOperationApply
-  toString: () -> "#{toString(@caller.symbol)}#{toString(@args[0])}"
 class CApply extends Apply
   constructor: (cont, value) -> @caller = cont; @args = [value]; @name = @toString()
 class Deref extends Element
@@ -96,11 +86,16 @@ optimize = (exp, env, compiler) ->
 Var::optimize = (env, compiler) -> env.lookup(@)
 Assign::optimize = (env, compiler) ->
   left = @left
-  if left instanceof VirtualOperationApply
-    caller = left.caller
-    args = (compiler.optimize(a, env) for a in left.args)
-    left = left.constructor(caller, args)
+  if left instanceof VirtualOperation
+    left = new left.constructor(compiler.optimize(a, env) for a in left.args)
   new @constructor(left, compiler.optimize(@exp, env))
+ListAssign::optimize = (env, compiler) ->
+  lefts = []
+  for left in @lefts
+    if left instanceof VirtualOperation
+      lefts.push new left.constructor(compiler.optimize(a, env) for a in left.args)
+    else lefts.push left
+  new @constructor(lefts, compiler.optimize(@exp, env))
 If::optimize = (env, compiler) ->
   test = optimize(@test, env, compiler)
   test_bool = boolize(test)
@@ -124,6 +119,7 @@ If::optimize = (env, compiler) ->
     new If(test, then_, else_)
 
 Return::optimize = (env, compiler) -> new Return(compiler.optimize(@value, env))
+Throw::optimize = (env, compiler) -> new Throw(compiler.optimize(@value, env))
 Lamda::optimize = (env, compiler) ->
   result = new Lamda(@params, compiler.optimize(@body, env))
   result.refMap = {}
@@ -140,12 +136,23 @@ Apply::optimize = (env, compiler) ->
   args = (compiler.optimize(a, env) for a in @args)
   caller.optimizeApply?(args, env, compiler) or new Apply(caller, args)
 
+VirtualOperation::optimize = (env, compiler) ->
+  args = (compiler.optimize(a, env) for a in @args)
+  myBoolize = (memo, x) ->
+    if memo is undefined then undefined
+    else if boolize(x) is undefined then undefined
+    else true
+  bool = _.reduce(args, myBoolize, true)
+  if bool and @func then @func.apply(null, args)
+  else new @constructor(args)
+
 Begin::optimize = (env, compiler) ->
   return new @constructor(compiler.optimize(exp, env) for exp in @exps)
 Deref::optimize = (env, compiler) ->
-  if _.isString(@exp) then exp
-  else if _.isNumber(@exp) then exp
-  else @
+  exp = @exp
+  if _.isString(exp) then exp
+  else if _.isNumber(exp) then exp
+  else new Deref(compiler.optimize(exp, env))
 Code::optimize = (env, compiler) -> @
 JSFun::optimize = (env, compiler) ->  new JSFun(compiler.optimize(@fun, env))
 
@@ -199,15 +206,6 @@ JSFun::optimizeApply = (args, env, compiler) ->
     if t is 'function' then cont.call(new Apply(f, args[1...]))
     else if t is 'string' then cont.call(new Apply(il.fun(f), args[1...]))
     else cont.call(f.apply(args[1...])).optimize(env, compiler)
-
-VirtualOperation::optimizeApply = (args, env, compiler) ->
-  myBoolize = (memo, x) ->
-    if memo is undefined then undefined
-    else if boolize(x) is undefined then undefined
-    else true
-  bool = _.reduce(args, myBoolize, true)
-  if bool and @func then @func.apply(null, args)
-  else @apply(args)
 
 MAX_EXTEND_CODE_SIZE = 10
 
@@ -304,6 +302,7 @@ Return::sideEffect = () -> sideEffect(@value)
 If::sideEffect = () -> expsEffect [@test, @then_, @else_]
 Begin::sideEffect = () -> expsEffect(@exps)
 Apply::sideEffect = () ->  Math.max(applySideEffect(@caller), expsEffect(@args))
+VirtualOperation::sideEffect = () ->  Math.max(@_effect, expsEffect(@args))
 CApply::sideEffect = () -> Math.max(applySideEffect(@caller), sideEffect(@args[0]))
 
 applySideEffect = (exp) ->
@@ -311,11 +310,10 @@ applySideEffect = (exp) ->
   if exp_applySideEffect then exp_applySideEffect.call(exp)
   else  throw new Error(exp)
 
-Element::applySideEffect = () -> throw new NotImplement(@)
+Element::applySideEffect = () -> throw new NotImplement(@, 'applySideEffect')
 Var::applySideEffect = () -> il.IO
-VirtualOperation::applySideEffect = () -> if @_effect? then  @_effect else il.IO
-BinaryOperation::applySideEffect = () -> if @_effect? then  @_effect else il.PURE
-UnaryOperation::applySideEffect = () ->if @_effect? then  @_effect else il.PURE
+Apply::applySideEffect = () -> il.IO
+VirtualOperation::applySideEffect = () -> il.IO
 Fun::applySideEffect = () -> if @_effect? then  @_effect else il.IO
 JSFun::applySideEffect = () -> if @_effect? then  @_effect else il.IO
 Lamda::applySideEffect = () -> if @_effect? then  @_effect else sideEffect(@body)
@@ -332,6 +330,10 @@ jsify = (exp) ->
   else exp
 
 Assign::jsify = () -> new @constructor(@left, jsify(@exp))
+ListAssign::jsify = () ->
+  lefts = @lefts; exp =  @exp
+  il.begin((new Assign(lefts[i], il.index(exp, i)) for i in [0...lefts.length])...)
+
 If::jsify = () -> new If(@test, jsify(@then_), jsify(@else_))
 Begin::jsify = () ->
   exps = @exps
@@ -354,6 +356,9 @@ Apply::jsify = () ->
   args = (jsify(a) for a in @args)
   new @constructor(jsify(@caller), args)
 CApply::jsify = () -> new CApply(@caller.jsify(), jsify(@args[0]))
+VirtualOperation::jsify = () ->
+  args = (jsify(a) for a in @args)
+  new @constructor(args)
 
 insertReturn = (exp) ->
   exp_insertReturn = exp?.insertReturn
@@ -379,6 +384,7 @@ Clamda::toCode = (compiler) ->
   "function(#{@v.name}){#{compiler.toCode(@body)}}"
 Fun::toCode = (compiler) -> @func.toString()
 Return::toCode = (compiler) -> "return #{compiler.toCode(@value)};"
+Throw::toCode = (compiler) -> "throw #{compiler.toCode(@value)};"
 Var::toCode = (compiler) -> @name
 Assign::toCode = (compiler) -> "#{compiler.toCode(@left)} = #{compiler.toCode(@exp)}"
 AugmentAssign::toCode = (compiler) -> "#{compiler.toCode(@left)} #{@operator} #{compiler.toCode(@exp)}"
@@ -386,26 +392,20 @@ If::toCode = (compiler) ->
   compiler.parent = @
   else_ = @else_
   if @isStatement()
-    if else_ is undefined then "if (#{compiler.toCode(@test)}) #{compiler.toCode(@then_)};"
-    else "if (#{compiler.toCode(@test)}) #{compiler.toCode(@then_)} else #{compiler.toCode(@else_)};"
+    if else_ is undefined then "if (#{compiler.toCode(@test)}) #{compiler.toCode(@then_)}"
+    else "if (#{compiler.toCode(@test)}) #{compiler.toCode(@then_)} else #{compiler.toCode(@else_)}"
   else
     "(#{compiler.toCode(@test)}) ? (#{compiler.toCode(@then_)}) : (#{compiler.toCode(@else_)})"
 #    if else_ is undefined then "((#{compiler.toCode(@test)}) && (#{compiler.toCode(@then_)}))"
 #    else "(#{compiler.toCode(@test)}) ? (#{compiler.toCode(@then_)}) : (#{compiler.toCode(@else_)})"
 Apply::toCode = (compiler) ->
   "(#{compiler.toCode(@caller)})(#{(compiler.toCode(arg) for arg in @args).join(', ')})"
-BinaryOperationApply::toCode = (compiler) ->
-  "#{compiler.toCode(@args[0])}#{compiler.toCode(@caller.symbol)}#{compiler.toCode(@args[1])}"
-UnaryOperationApply::toCode = (compiler) ->
-  "#{compiler.toCode(@caller.symbol)}#{compiler.toCode(@args[0])}"
-VirtualOperationApply::toCode = (compiler) -> @caller.applyToCode(compiler, @args)
 CApply::toCode = (compiler) -> "(#{compiler.toCode(@caller)})(#{compiler.toCode(@args[0])})"
 Begin::toCode = (compiler) ->
   if compiler.parent instanceof Lamda
     compiler.parent = @; "#{(compiler.toCode(exp) for exp in @exps).join('; ')}"
   else
     compiler.parent = @; "{#{(compiler.toCode(exp) for exp in @exps).join('; ')}}"
-Array::toCode = (compiler) ->  "[#{(compiler.toCode(exp) for exp in @exps).join(', ')}]"
 Print::toCode = (compiler) ->  "console.log(#{(compiler.toCode(exp) for exp in @exps).join(', ')})"
 Deref::toCode = (compiler) ->  "$trail.deref(#{compiler.toCode(@exp)})"
 Code::toCode = (compiler) ->  @string
@@ -414,8 +414,6 @@ JSFun::toCode = (compiler) ->  "function() {\n"+\
                                "  cont = arguments[0], args = 2 <= arguments.length ? [].slice.call(arguments, 1) : [];\n"+\
                                "   return cont(#{@fun}.apply(this, args));"+\
                                "   }"
-BinaryOperationApply::toCode = (compiler) ->  "(#{compiler.toCode(@args[0])})#{@caller.symbol}(#{compiler.toCode(@args[1])})"
-UnaryOperationApply::toCode = (compiler) ->  "#{@caller.symbol}(#{compiler.toCode(@args[0])})"
 
 isStatement = (exp) ->
   exp_isStatement = exp?.isStatement
@@ -428,6 +426,7 @@ Return::isStatement = () -> true
 Assign::isStatement = () -> true
 
 il.vari = (name) -> new Var(name)
+il.symbol = (name) -> new Symbol(name)
 il.assign = (left, exp) -> new Assign(left, exp)
 il.if_ = (test, then_, else_) -> new If(test, then_, else_)
 il.deref = (exp) -> new Deref(exp)
@@ -440,16 +439,26 @@ il.begin = (exps...) ->
     if e instanceof Begin then result = result.concat(e.exps)
     else result.push e
   new Begin(result)
-il.array = (exps...) -> new Array(exps)
 il.print = (exps...) -> new Print(exps)
 il.return = (value) -> new Return(value)
+il.throw = (value) -> new Throw(value)
 il.lamda = (params, body...) -> new Lamda(params, il.begin(body...))
 il.clamda = (v, body...) -> new Clamda(v, il.begin(body...))
 il.code = (string) -> new Code(string)
 il.jsfun = (fun) -> new JSFun(fun)
 
-binary = (symbol, func) -> new BinaryOperation(symbol, func)
-unary = (symbol, func) -> new UnaryOperation(symbol, func)
+binary = (symbol, func) ->
+  class Binary extends BinaryOperation
+    symbol: symbol
+    toCode: (compiler) -> args = @args; "#{compiler.toCode(args[0])} #{symbol} #{compiler.toCode(args[1])}"
+    func; func
+  (x, y) -> new Binary([x, y])
+unary = (symbol, func) ->
+  class Unary extends UnaryOperation
+    symbol: symbol
+    func; func
+    toCode: (compiler) -> "#{symbol}#{compiler.toCode(@args[0])}"
+  (x) -> new Unary([x])
 
 il.eq = binary("===", (x, y) -> x is y)
 il.ne = binary("!==", (x, y) -> x isnt y)
@@ -473,9 +482,10 @@ il.rshift = binary(">>", (x, y) -> x >> y)
 
 augmentAssign = (operator, func) ->
   class AugAssign extends AugmentAssign
-    _effect: true
     operator: operator
     func: func
+  (vari, exp) -> new AugAssign(vari, exp)
+
 il.augadd = augmentAssign("+=", (x, y) -> x + y)
 il.augsub = augmentAssign("-=", (x, y) -> x - y)
 il.augmul = augmentAssign("*=", (x, y) -> x * y)
@@ -489,48 +499,65 @@ il.augbitxor = augmentAssign("^=", (x, y) -> x ^ y)
 il.auglshift = augmentAssign("<<=", (x, y) -> x << y)
 il.augrshift = augmentAssign(">>=", (x, y) -> x >> y)
 
+
+il.listassign = (lefts..., exp) -> new ListAssign(lefts, exp)
+
 il.not_ = unary("!", (x) -> !x)
 il.neg = unary("-", (x) -> -x)
 il.bitnot = unary("~", (x) -> ~x)
 il.inc = il.effect(unary("++"))
 il.dec = il.effect(unary("--"))
 
-vop = (name, toCode) ->
+vop = (name, toCode, _effect=il.EFFECT) ->
   class Vop extends VirtualOperation
-    applyToCode: toCode
-    _effect: il.IO
-  new Vop(name)
+    toCode: toCode
+    _effect:_effect
+    _name: name
+  (args...) -> new Vop(args)
 
-il.suffixinc = vop('suffixdec', (compiler, args)->"#{compiler.toCode(args[0])}++")
-il.suffixdec = vop('suffixdec', (compiler, args)->"#{compiler.toCode(args[0])}--")
+vop2 = (name, toCode, _effect=il.EFFECT) ->
+  class Vop extends VirtualOperation
+    toCode: toCode
+    _effect:_effect
+    _name: name
+    isStatement: () -> true
+  (args...) -> new Vop(args)
+
+il.array = vop('array', (compiler)->args = @args; "[#{(compiler.toCode(e) for e in args).join(', ')}]")
+il.suffixinc = vop('suffixdec', (compiler)->args = @args; "#{compiler.toCode(args[0])}++")
+il.suffixdec = vop('suffixdec', (compiler)->args = @args; "#{compiler.toCode(args[0])}--")
 il.catches = new Var('$catches')
-il.pushCatch = vop('pushCatch', (compiler, args)->"$pushCatch(#{il.catches}, #{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})")
-il.popCatch = vop('popCatch', (compiler, args)->"$popCatch(#{il.catches}, #{compiler.toCode(args[0])})")
-il.findCatch = il.pure(vop('findCatch', (compiler, args)->"$findCatch(#{il.catches}, #{compiler.toCode(args[0])})"))
-il.fake = vop('fake', (compiler, args)->"$fake(#{compiler.toCode(args[0])})").apply([])
-il.restore = vop('restore', (compiler, args)->"$restore(#{compiler.toCode(args[0])})")
-il.getvalue = il.pure(vop('getvalue', (compiler, args)->"$trail.getvalue(#{compiler.toCode(args[0])})"))
-il.list = il.pure(vop('list', (compiler, args)->"[#{(compiler.toCode(a) for a in args).join(', ')}]"))
-il.index = il.pure(vop('index', (compiler, args)->"(#{compiler.toCode(args[0])})[#{compiler.toCode(args[1])}]"))
-il.attr = il.pure(vop('attr', (compiler, args)->"(#{compiler.toCode(args[0])}).#{compiler.toCode(args[1])}"))
-il.push = vop('push', (compiler, args)->"(#{compiler.toCode(args[0])}).push(#{compiler.toCode(args[1])})")
-il.concat = vop('concat', (compiler, args)->"(#{compiler.toCode(args[0])}).concat(#{compiler.toCode(args[1])})")
-il.run = vop('run', (compiler, args)->"$run(#{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})")
+il.pushCatch = vop('pushCatch', (compiler)->args = @args; "$pushCatch(#{il.catches}, #{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})")
+il.popCatch = vop('popCatch', (compiler)->args = @args; "$popCatch(#{il.catches}, #{compiler.toCode(args[0])})")
+il.findCatch = vop('findCatch', ((compiler)->args = @args; "$findCatch(#{il.catches}, #{compiler.toCode(args[0])})"), il.PURE)
+il.fake = vop('fake', (compiler)->args = @args; "$fake(#{compiler.toCode(args[0])})").apply([])
+il.restore = vop('restore', (compiler)->args = @args; "$restore(#{compiler.toCode(args[0])})")
+il.getvalue = vop('getvalue', ((compiler)->args = @args; "$trail.getvalue(#{compiler.toCode(args[0])})"), il.PURE)
+il.list = vop('list', ((compiler)->args = @args; "[#{(compiler.toCode(a) for a in args).join(', ')}]"), il.PURE)
+il.length = vop('length', ((compiler)->args = @args; "(#{compiler.toCode(args[0])}).length"), il.PURE)
+il.index = vop('index', ((compiler)->args = @args; "(#{compiler.toCode(args[0])})[#{compiler.toCode(args[1])}]"), il.PURE)
+il.attr = vop('attr', ((compiler)->args = @args; "(#{compiler.toCode(args[0])}).#{compiler.toCode(args[1])}"), il.PURE)
+il.push = vop('push', (compiler)->args = @args; "(#{compiler.toCode(args[0])}).push(#{compiler.toCode(args[1])})")
+il.concat = vop('concat', ((compiler)->args = @args; "(#{compiler.toCode(args[0])}).concat(#{compiler.toCode(args[1])})"), il.PURE)
+il.instanceof = vop('instanceof', ((compiler)->args = @args; "(#{compiler.toCode(args[0])}) instanceof (#{compiler.toCode(args[1])})"), il.PURE)
+il.run = vop('run', (compiler)->args = @args; "$run(#{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})")
+il.new = vop('new', (compiler)->args = @args; "new #{compiler.toCode(args[0])}")
 
-il.newLogicVar = vop('newLogicVar', (compiler, args)->"new Var(#{compiler.toCode(args[0])})")
-il.unify = vop('unify', (compiler, args)->"$trail.unify(#{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})")
+il.newLogicVar = vop('newLogicVar', (compiler)->args = @args; "new Var(#{compiler.toCode(args[0])})")
+il.unify = vop('unify', (compiler)->args = @args; "$trail.unify(#{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})")
+il.bind = vop('bind', (compiler)->args = @args; "#{compiler.toCode(args[0])}.bind(#{compiler.toCode(args[1])}, $trail)")
 
-il.undotrail = vop('undotrail', (compiler, args)->"#{compiler.toCode(args[0])}.undo()")
+il.undotrail = vop('undotrail', (compiler)->args = @args; "#{compiler.toCode(args[0])}.undo()")
 il.failcont = new Var('$failcont')
 il.setfailcont = (cont) -> il.assign(il.failcont, cont)
 il.cutcont = new Var('$cutcont')
 il.state = new Var('$state')
 il.setstate = (state) -> il.assign(il.state, state)
 il.trail = new Var('$trail')
-il.newTrail = vop('newTrail', (compiler, args)->"new Trail()").call()
+il.newTrail = vop('newTrail', (compiler)->args = @args; "new Trail()")()
 il.settrail = (trail) -> il.assign(il.trail, trail)
 
-il.evalexpr = vop('evalexpr', (compiler, args)->"solve(#{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})")
+il.evalexpr = vop('evalexpr', (compiler)->args = @args; "solve(#{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})")
 
 il.fun = (f) -> new Fun(f)
 
@@ -541,3 +568,10 @@ il.let_ = (bindings, body...) ->
     params.push(bindings[i])
     values.push(bindings[i+1])
   new Apply(il.lamda(params, body...), values)
+
+il.iff = (clauses..., else_) ->
+  length = clauses.length
+  if length is 2 then il.if_(clauses[0], clauses[1], else_)
+  else il.if_(clauses[0], clauses[1], il.iff(clauses[2...length]..., else_))
+
+il.excludes = ['evalexpr', 'failcont', 'run', 'push', 'getvalue', 'fake', 'findCatch', 'popCatch', 'pushCatch', 'protect', 'suffixinc', 'suffixdec', 'dec', 'inc', 'unify', 'bind', 'undotrail', 'newTrail', 'newLogicVar']

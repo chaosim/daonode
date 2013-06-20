@@ -1,30 +1,27 @@
-I = require "./importer"
+{solve, Error} = core = require('../core')
+{string, begin, quote, assign, print_,
+funcall, macall, lamda, macro, jsfun,
+if_, add, eq, inc, suffixinc,
+parsetext, char, settext} = require('../util')
 
-base = "../lib/"
-I.use base+"core: Trail, solve, fun, macro vari debug dummy, fun2"
-I.use base+"builtins/lisp: begin"
-I.use base+"builtins/logic: andp orp notp succeed fail unify findall once "
-I.use base+"""builtins/parser: char parsetext settext may greedymay
-           any greedyany lazyany some greedysome lazysome eoi nextchar, times seplist
-           purememo"""
-I.use base+"builtins/general: getvalue print_, sub, mul"
-
-core = require base+"core"
+vari = (name) -> name
 
 xexports = {}
 
 exports.Test =
   "test char": (test) ->
-    test.equal  solve(parsetext(char('a'), 'a')), null
-    test.equal core.status, core.SUCCESS
-    test.equal  solve(parsetext(char('a'), 'b')), null
-    test.equal core.status, core.FAIL
-    test.equal  solve(begin(settext('a'), char('a'))), null
-    test.equal core.status, core.SUCCESS
-    test.equal  solve(parsetext(andp(char('a'), char('b')), 'ab')), null
-    test.equal core.status, core.SUCCESS
+#    test.equal  solve(parsetext(1, string('a'))), 1
+    test.equal  solve(parsetext(char(string('a')), string('a'))), 1
+#    test.equal core.status, core.SUCCESS
+#    test.equal  solve(parsetext(char('a'), 'b')), null
+#    test.equal core.status, core.FAIL
+#    test.equal  solve(begin(settext('a'), char('a'))), null
+#    test.equal core.status, core.SUCCESS
+#    test.equal  solve(parsetext(andp(char('a'), char('b')), 'ab')), null
+#    test.equal core.status, core.SUCCESS
     test.done()
 
+xexports.Test =
   "test may char": (test) ->
     test.equal  solve(parsetext(may(char('a')), 'a')), null
     test.equal core.status, core.SUCCESS

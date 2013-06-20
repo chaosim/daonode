@@ -99,11 +99,10 @@ exports.suffixdec = (item) -> ['suffixdec', item]
 
 il = require("./interlang")
 
-excludes = ['evalexpr', 'failcont', 'run', 'push', 'getvalue', 'fake', 'findCatch', 'popCatch', 'pushCatch', 'protect',
- 'suffixdec', 'suffixdec', 'dec', 'inc']
-
 for name, _o of il
-  if _o instanceof il.VirtualOperation and name not in excludes
+  try instance = _o?()
+  catch e then continue
+  if instance instanceof il.VirtualOperation and name not in il.excludes
     do (name=name) -> exports[name] = (args...) -> vop(name, args...)
 
 not_ = exports.not_
@@ -125,8 +124,16 @@ exports.orp = orp = (exps...) ->
   else if length is 1 then exps[0]
   else if length is 2 then ['orp', exps...]
   else ['orp', exps[0], orp(exps[1...]...)]
-
 exports.notp = (goal) -> ['notp', goal]
-
 exports.repeat = ['repeat']
+exports.cutable = (goal) -> ['cutable', goal]
+exports.cut = ['cut']
+exports.findall = (goal) -> ['findall', goal]
+exports.is_ = (vari, exp) -> ['is_', vari, exp]
+exports.bind = (vari, term) -> ['bind', vari, term]
 
+# parser
+exports.parse =  (exp, state) -> ['parse', exp, state]
+exports.parsetext =  (exp, text) -> ['parsetext', exp, text]
+exports.eoi = ['eoi']
+exports.char = (x) -> ['char', x]

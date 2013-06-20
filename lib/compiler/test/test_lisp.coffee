@@ -24,6 +24,7 @@ exports.Test =
     test.equal  solve(eval_(quote(1), string('f:/daonode/lib/compiler/test/compiled2.js'))), 1
     test.done()
 
+#exports.Test =
   "test assign inc dec": (test) ->
     a = vari('a')
     test.equal  solve(begin(assign(a, 1))), 1
@@ -33,6 +34,7 @@ exports.Test =
     test.equal  solve(begin(assign(a, 1), inc(a), inc(a), inc(a))), 4
     test.done()
 
+#xexports.Test =
   "test begin": (test) ->
     test.equal  solve(begin(1)), 1
     test.equal  solve(begin(1, 2)), 2
@@ -73,12 +75,14 @@ exports.Test =
     test.equal  solve(begin(assign(x, 1),  until_(a, print_(x), inc(x), eq(x, 5)))), null
     test.done()
 
+#exports.Test =
   "test catch throw": (test) ->
     a = vari('a')
     test.equal  solve(catch_(1, 2)), 2
     test.equal  solve(catch_(1, throw_(1, 2), 3)), 2
     test.done()
 
+#xexports.Test =
   "test protect": (test) ->
     foo = makeLabel('foo')
     test.equal(solve(block(foo, protect(break_(foo, 1), print_(2)))), 1)

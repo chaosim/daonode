@@ -14,30 +14,37 @@ exports.Test =
     test.equal  solve(begin(assign(x, 1), addassign(x, 2), x)), 3
     test.done()
 
+#exports.Test =
   "test 1": (test) ->
     test.equal  solve(1), 1
     test.done()
 
+#xexports.Test =
   "test begin": (test) ->
     test.equal  solve(begin(1, 2)), 2
     test.done()
 
+#xexports.Test =
   "test quote": (test) ->
     test.equal  solve(quote(1)), 1
     test.done()
 
+#exports.Test =
   "test vari assign": (test) ->
     x = 'x'
     test.equal  solve(begin(assign(x, 1), x)), 1
     test.equal  solve(begin(assign(x, 1), inc(x))), 2
+#    test.equal  solve(begin(inc(x))), 2
     test.equal  solve(begin(assign(x, 1), suffixinc(x))), 1
     test.done()
 
+#xexports.Test =
   "test js vari": (test) ->
     console_log = 'console.log'
     test.equal  solve(console_log), console.log
     test.done()
 
+#xexports.Test =
   "test jsfun": (test) ->
     console_log = 'console.log'
     test.equal  solve(funcall(jsfun(console_log), 1)), null
@@ -46,12 +53,14 @@ exports.Test =
     test.equal  solve(begin(assign(x, 1),print_(x))), null
     test.done()
 
+#exports.Test =
   "test vop: add, eq": (test) ->
     test.equal  solve(add(1, 1)), 2
     test.equal  solve(eq(1, 1)), true
     test.equal  solve(begin(eq(1, 1), add(1, 1))), 2
     test.done()
 
+#xexports.Test =
   "test lambda": (test) ->
     x = 'x'; y = 'y'
     test.equal  solve(funcall(lamda([x], 1), 1)), 1
