@@ -2,6 +2,7 @@
 {string, begin, quote, assign, print_,
 funcall, macall, lamda, macro, jsfun,
 if_, add, eq, inc, suffixinc,
+andp,
 parsetext, char, settext} = require('../util')
 
 vari = (name) -> name
@@ -11,7 +12,8 @@ xexports = {}
 exports.Test =
   "test char": (test) ->
 #    test.equal  solve(parsetext(1, string('a'))), 1
-    test.equal  solve(parsetext(char(string('a')), string('a'))), 1
+#    test.equal  solve(parsetext(char(string('a')), string('a'))), 1
+    test.equal  solve(parsetext(andp(char(string('a')), char(string('b'))), string('ab'))), 2
 #    test.equal core.status, core.SUCCESS
 #    test.equal  solve(parsetext(char('a'), 'b')), null
 #    test.equal core.status, core.FAIL

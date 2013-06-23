@@ -3,12 +3,14 @@ just javascript:
   ✔ augment assign @done (13-06-17 15:32)
   ☐ while
   ☐ javascript's try/catch/throw
-  ☐ javascript's new
+  ✔ javascript's new @done (13-06-22 21:27)
+  ☐ remove unnecessary parenthesis by using precedence of operator
 
 optimization:
   ☐ assign optimization
   ☐ loop optimization: assign, extract computation
   ☐ tail recursive
+  ☐ il.let_, il.clamda, il.equalcont, il.rclamda(can replace parmenter v directly)
 
 lisp features:
   ✔ catch/throw @done (13-06-18 08:53)
@@ -29,8 +31,12 @@ logic features:
 parser features:
   ✔ parser state @done (13-06-21 21:32)
   ✔ low level primitive @done (13-06-21 21:32)
-  ☐ terminals
+    ☐ test
+  ✔ terminals @done (13-06-22 21:26)
+    ☐ test
   ✔ char @done (13-06-21 21:32)
-  ☐ any, some, times
+  ✔ follow, notfollow, may, any @done (13-06-22 21:26)
+    ☐ test
+  ☐ some, times
   ☐ dummy var
 

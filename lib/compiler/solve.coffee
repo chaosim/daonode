@@ -20,6 +20,18 @@ class exports.Solver
     # @cutCont is used for cut like in prolog.
     @cutCont = @failcont
 
+  # pushCatch/popCatch/findCatch: utlities for lisp style catch/throw
+  pushCatch: (value, cont) ->
+    catches = @catches[value] ?= []
+    catches.push(cont)
+
+  popCatch: (value) -> catches = @catches[value]; catches.pop(); if catches.length is 0 then delete catches[value]
+
+  findCatch: (value) ->
+    catches = @catches[value]
+    if not catches? or catches.length is 0 then throw new NotCatched
+    catches[catches.length-1]
+
   # in callcc, callfc, callcs, the solver is needed to be faked and restored(save all of content in an object.
   fake: () ->
     result = {}
@@ -76,18 +88,6 @@ class exports.Solver
       @state = state
       @failcont = fc;
       fun(v)
-
-# pushCatch/popCatch/findCatch: utlities for lisp style catch/throw
-exports.$pushCatch = (catches, value, cont) ->
-  catches = catches[value] ?= []
-  catches.push(cont)
-
-exports.$popCatch = (catches, value) -> catches = catches[value]; catches.pop(); if catches.length is 0 then delete catches[value]
-
-exports.$findCatch = (catches, value) ->
-  catches = catches[value]
-  if not catches? or catches.length is 0 then throw new NotCatched
-  catches[catches.length-1]
 
 # record the trail for variable binding <br/>
 #  when multiple choices exist, a new Trail for current branch is constructored, <br/>

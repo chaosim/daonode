@@ -46,6 +46,10 @@ class Clamda extends Lamda
   constructor: (@v, @body) -> @name = @toString()
   toString: () -> "(#{toString(@v)} -> #{toString(@body)})"
   call: (value) -> new CApply(@, value)
+class ClamdaBody extends Clamda
+  toString: () -> "{#{@v}: #{toString(@body)}}"
+  call: (value) -> new Error("How is it happened to call with ClamdaBody? #{@}")
+class IdCont extends Clamda
 class JSFun extends Element
   constructor: (@fun) -> super
   toString: () -> "jsfun(#{@fun})"
@@ -130,6 +134,8 @@ Clamda::optimize = (env, compiler) ->
   result.refMap = {}
   result.analyze(compiler,  result.refMap)
   return result
+ClamdaBody::optimize = (env, compiler) ->new ClamdaBody(@v, compiler.optimize(@body, env.extend(@v, @v)))
+IdCont::optimize = (env, compiler) -> @
 
 Apply::optimize = (env, compiler) ->
   caller =  compiler.optimize(@caller, env)
@@ -147,7 +153,12 @@ VirtualOperation::optimize = (env, compiler) ->
   else new @constructor(args)
 
 Begin::optimize = (env, compiler) ->
-  return new @constructor(compiler.optimize(exp, env) for exp in @exps)
+  result = []
+  for exp in @exps
+    e = compiler.optimize(exp, env)
+    if e instanceof Begin then result = result.concat(e.exps)
+    else result.push e
+  return new Begin(result)
 Deref::optimize = (env, compiler) ->
   exp = @exp
   if _.isString(exp) then exp
@@ -193,11 +204,11 @@ Clamda::optimizeApply = (args, env, compiler) ->
   count = cont.refMap[v]
   if sideEffect(value)
     switch count
-      when 0 then il.begin(value, compiler.optimize(body, env.extend(v, value)))
-      when undefined then il.begin(value, compiler.optimize(body, env.extend(v, value)))
-      when 1 then compiler.optimize(body, env.extend(v, value))
-      else il.begin(il.assign(v, value), compiler.optimize(body, env))
+      when 0, undefined then il.begin(value, compiler.optimize(body, env))
+      else il.begin(il.assign(v, value), il.clamdabody(v, compiler.optimize(body, env.extend(v, v))))
   else compiler.optimize(body, env.extend(v, value))
+
+IdCont::optimizeApply = (args, env, compiler) -> compiler.optimize(args[0], env)
 
 JSFun::optimizeApply = (args, env, compiler) ->
     cont = args[0]
@@ -238,6 +249,12 @@ Clamda::analyze = (compiler, refMap) ->
   for x, i of childMap
     if x!=@v.name
       if hasOwnProperty.call(refMap, x) then refMap[x] += i else refMap[x] = i
+ClamdaBody::analyze = (compiler, refMap) ->
+  childMap = @refMap = {}
+  analyze(@body, compiler, childMap)
+  for x, i of childMap
+    if x!=@v.name
+      if hasOwnProperty.call(refMap, x) then refMap[x] += i else refMap[x] = i
 
 codeSize = (exp) ->
   exp_codeSize = exp?.codeSize
@@ -251,6 +268,7 @@ Begin::codeSize = () -> _.reduce(@exps, ((memo, e) -> memo + codeSize(e)), 0)
 VirtualOperation::codeSize = () -> 1
 Lamda::codeSize = () -> codeSize(@body) + 2
 Clamda::codeSize = () -> codeSize(@body) + 1
+ClamdaBody::codeSize = () -> codeSize(@body)
 Apply::codeSize = () -> _.reduce(@args, ((memo, e) -> memo + codeSize(e)), codeSize(@caller))
 CApply::codeSize = () -> codeSize(@caller.body) + codeSize(@args[0]) + 2
 
@@ -271,6 +289,7 @@ BinaryOperation::boolize = () -> undefined
 UnaryOperation::boolize = () -> undefined
 Lamda::boolize = () -> true
 Clamda::boolize = () -> true
+ClamdaBody::boolize = () -> boolize(@body)
 Apply::boolize = () ->
   caller = @caller
   if caller instanceof Lamda or caller instanceof Clamda then return boolize(caller.body)
@@ -297,7 +316,7 @@ expsEffect = (exps) ->
     if eff = il.EFFECT then effect = eff
   effect
 
-Var::sideEffect = () -> il.PURE
+Var::sideEffect = () -> il.EFFECT
 Return::sideEffect = () -> sideEffect(@value)
 If::sideEffect = () -> expsEffect [@test, @then_, @else_]
 Begin::sideEffect = () -> expsEffect(@exps)
@@ -352,6 +371,7 @@ Clamda::jsify = () ->
   body = jsify(@body)
   body = insertReturn(body)
   new Clamda(@v, body)
+ClamdaBody::jsify = () -> jsify(@body)
 Apply::jsify = () ->
   args = (jsify(a) for a in @args)
   new @constructor(jsify(@caller), args)
@@ -407,7 +427,7 @@ Begin::toCode = (compiler) ->
   else
     compiler.parent = @; "{#{(compiler.toCode(exp) for exp in @exps).join('; ')}}"
 Print::toCode = (compiler) ->  "console.log(#{(compiler.toCode(exp) for exp in @exps).join(', ')})"
-Deref::toCode = (compiler) ->  "$trail.deref(#{compiler.toCode(@exp)})"
+Deref::toCode = (compiler) ->  "solver.trail.deref(#{compiler.toCode(@exp)})"
 Code::toCode = (compiler) ->  @string
 JSFun::toCode = (compiler) ->  "function() {\n"+\
                                " var args, cont;\n "+\
@@ -444,6 +464,8 @@ il.return = (value) -> new Return(value)
 il.throw = (value) -> new Throw(value)
 il.lamda = (params, body...) -> new Lamda(params, il.begin(body...))
 il.clamda = (v, body...) -> new Clamda(v, il.begin(body...))
+il.clamdabody = (v, body) -> new ClamdaBody(v, body)
+il.idcont = do -> v = il.vari('v'); new IdCont(v, v)
 il.code = (string) -> new Code(string)
 il.jsfun = (fun) -> new JSFun(fun)
 
@@ -523,16 +545,17 @@ vop2 = (name, toCode, _effect=il.EFFECT) ->
     isStatement: () -> true
   (args...) -> new Vop(args)
 
+il.solver = new Var('solver')
 il.array = vop('array', (compiler)->args = @args; "[#{(compiler.toCode(e) for e in args).join(', ')}]")
 il.suffixinc = vop('suffixdec', (compiler)->args = @args; "#{compiler.toCode(args[0])}++")
 il.suffixdec = vop('suffixdec', (compiler)->args = @args; "#{compiler.toCode(args[0])}--")
-il.catches = new Var('$catches')
-il.pushCatch = vop('pushCatch', (compiler)->args = @args; "$pushCatch(#{il.catches}, #{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})")
-il.popCatch = vop('popCatch', (compiler)->args = @args; "$popCatch(#{il.catches}, #{compiler.toCode(args[0])})")
-il.findCatch = vop('findCatch', ((compiler)->args = @args; "$findCatch(#{il.catches}, #{compiler.toCode(args[0])})"), il.PURE)
-il.fake = vop('fake', (compiler)->args = @args; "$fake(#{compiler.toCode(args[0])})").apply([])
-il.restore = vop('restore', (compiler)->args = @args; "$restore(#{compiler.toCode(args[0])})")
-il.getvalue = vop('getvalue', ((compiler)->args = @args; "$trail.getvalue(#{compiler.toCode(args[0])})"), il.PURE)
+il.catches = new Var('solver.catches')
+il.pushCatch = vop('pushCatch', (compiler)->args = @args; "solver.pushCatch(#{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})")
+il.popCatch = vop('popCatch', (compiler)->args = @args; "solver.popCatch(#{compiler.toCode(args[0])})")
+il.findCatch = vop('findCatch', ((compiler)->args = @args; "solver.findCatch(#{compiler.toCode(args[0])})"), il.PURE)
+il.fake = vop('fake', (compiler)->args = @args; "solver.fake(#{compiler.toCode(args[0])})").apply([])
+il.restore = vop('restore', (compiler)->args = @args; "solver.restore(#{compiler.toCode(args[0])})")
+il.getvalue = vop('getvalue', ((compiler)->args = @args; "solver.trail.getvalue(#{compiler.toCode(args[0])})"), il.PURE)
 il.list = vop('list', ((compiler)->args = @args; "[#{(compiler.toCode(a) for a in args).join(', ')}]"), il.PURE)
 il.length = vop('length', ((compiler)->args = @args; "(#{compiler.toCode(args[0])}).length"), il.PURE)
 il.index = vop('index', ((compiler)->args = @args; "(#{compiler.toCode(args[0])})[#{compiler.toCode(args[1])}]"), il.PURE)
@@ -540,24 +563,25 @@ il.attr = vop('attr', ((compiler)->args = @args; "(#{compiler.toCode(args[0])}).
 il.push = vop('push', (compiler)->args = @args; "(#{compiler.toCode(args[0])}).push(#{compiler.toCode(args[1])})")
 il.concat = vop('concat', ((compiler)->args = @args; "(#{compiler.toCode(args[0])}).concat(#{compiler.toCode(args[1])})"), il.PURE)
 il.instanceof = vop('instanceof', ((compiler)->args = @args; "(#{compiler.toCode(args[0])}) instanceof (#{compiler.toCode(args[1])})"), il.PURE)
-il.run = vop('run', (compiler)->args = @args; "$run(#{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})")
+il.run = vop('run', (compiler)->args = @args; "solver.run(#{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})")
 il.new = vop('new', (compiler)->args = @args; "new #{compiler.toCode(args[0])}")
+il.evalexpr = vop('evalexpr', (compiler)->args = @args; "solve(#{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})")
 
 il.newLogicVar = vop('newLogicVar', (compiler)->args = @args; "new Var(#{compiler.toCode(args[0])})")
-il.unify = vop('unify', (compiler)->args = @args; "$trail.unify(#{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})")
-il.bind = vop('bind', (compiler)->args = @args; "#{compiler.toCode(args[0])}.bind(#{compiler.toCode(args[1])}, $trail)")
+il.unify = vop('unify', (compiler)->args = @args; "solver.trail.unify(#{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})")
+il.bind = vop('bind', (compiler)->args = @args; "#{compiler.toCode(args[0])}.bind(#{compiler.toCode(args[1])}, solver.trail)")
 
 il.undotrail = vop('undotrail', (compiler)->args = @args; "#{compiler.toCode(args[0])}.undo()")
-il.failcont = new Var('$failcont')
+il.failcont = new Var('solver.failcont')
 il.setfailcont = (cont) -> il.assign(il.failcont, cont)
-il.cutcont = new Var('$cutcont')
-il.state = new Var('$state')
+il.cutcont = new Var('solver.cutcont')
+il.state = new Var('solver.state')
 il.setstate = (state) -> il.assign(il.state, state)
-il.trail = new Var('$trail')
+il.trail = new Var('solver.trail')
 il.newTrail = vop('newTrail', (compiler)->args = @args; "new Trail()")()
 il.settrail = (trail) -> il.assign(il.trail, trail)
 
-il.evalexpr = vop('evalexpr', (compiler)->args = @args; "solve(#{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})")
+il.char = vop('char', ((compiler)->args = @args; "parser.char(#{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})"), il.EFFECT)
 
 il.fun = (f) -> new Fun(f)
 

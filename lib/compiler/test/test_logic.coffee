@@ -25,14 +25,16 @@ exports.Test =
     test.equal  solve(andp(print_(1), print_(2))), null
     test.done()
 
+#exports.Test =
   "test or print": (test) ->
-    test.equal  solve(orp(print_(1))), null
-    test.equal  solve(orp(print_(1), print_(2))), null
-    test.equal  solve(orp(fail, print_(2))), null
+#    test.equal  solve(orp(print_(1))), null
+#    test.equal  solve(orp(print_(1), print_(2))), null
+#    test.equal  solve(orp(fail, print_(2))), null
     test.equal  solve(orp(fail, print_(2), print_(3))), null
-    test.equal  solve(orp(fail, fail, print_(3))), null
+#    test.equal  solve(orp(fail, fail, print_(3))), null
     test.done()
 
+#xexports.Test =
   "test not succeed fail": (test) ->
     test.equal  solve(notp(succeed)), true
     test.equal  solve(notp(fail)), false
@@ -61,7 +63,7 @@ exports.Test =
     test.equal  solve(orp(cutable(orp(andp(print_(1), cut, fail), print_(2))), print_(3))), null
     test.done()
 
-exports.Test =
+#exports.Test =
   "test findall once": (test) ->
     $x = logicvar('x')
     x = vari('x')
