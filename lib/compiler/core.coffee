@@ -469,7 +469,7 @@ exports.Compiler = class Compiler
                  state, il.state],
           il.settrail(il.newTrail),
           il.setfailcont(il.clamda(v,
-            il.undotrail,
+            il.undotrail(il.trail),
             il.settrail(trail),
             il.setstate(state),
             il.setfailcont(fc),
@@ -483,12 +483,12 @@ exports.Compiler = class Compiler
       anyFcont = il.vari('anyFcont')
       il.begin(
         il.assign(anyCont, il.clamda(v,
-          il.setfailcont, anyFcont),
-          cont.call(v)),
+          il.setfailcont(anyFcont),
+          cont.call(v))),
         il.assign(anyFcont, il.clamda(v,
            il.setfailcont(fc),
            @cont(exp, anyCont))),
-        il.assign(fc, solver.failcont),
+        il.assign(fc, il.failcont),
         anyCont.call(v))
     'greedyany': (cont, exp) ->
       fc = il.vari('fc')

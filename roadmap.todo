@@ -5,19 +5,16 @@ just javascript:
   ☐ javascript's try/catch/throw
   ✔ javascript's new @done (13-06-22 21:27)
   ☐ remove unnecessary parenthesis by using precedence of operator
-
 optimization:
   ☐ assign optimization
   ☐ loop optimization: assign, extract computation
   ☐ tail recursive
   ☐ il.let_, il.clamda, il.rclamda(can replace parmenter v directly)
   ✔ il.equalcont @done (13-06-23 21:03)
-
 lisp features:
   ✔ catch/throw @done (13-06-18 08:53)
   ✔ unwind-protect @done (13-06-18 08:53)
   ✔ callcc @done (13-06-18 10:58)
-
 logic features:
   ✔ logic var @done (13-06-19 17:56)
   ✔ unify @done (13-06-19 17:18)
@@ -28,7 +25,6 @@ logic features:
   ☐ call, once, etc.
   ☐ callfc
   ☐ Cons, UObject, UArray
-
 parser features:
   ✔ parser state @done (13-06-21 21:32)
   ✔ test parsetext, settext @done (13-06-23 20:50)
@@ -37,7 +33,7 @@ parser features:
   ✔ terminals @done (13-06-22 21:26)
     ✔ test char, number, literal @done (13-06-23 18:19)
   ☐ follow, notfollow, may, any, some, times
-    ☐ any 
+    ✔ any @done (13-06-24 22:19)
     ✔ test may(normal, lazy, greedy) @done (13-06-24 18:24)
     ☐ some, times
   ✔ dummy var @done (13-06-24 21:21)
