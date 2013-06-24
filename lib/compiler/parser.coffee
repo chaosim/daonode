@@ -430,7 +430,7 @@ exports.seplist = (exp, options={}) ->
 #  else match with next char, and bound x to it.
 exports.char = (solver, x) ->
   [data, pos] = solver.state
-  if pos>=data.length then return solver.failcont(v)
+  if pos>=data.length then return solver.failcont(pos)
   trail = solver.trail
   x = trail.deref(x)
   c = data[pos]

@@ -1,5 +1,8 @@
 _ = require('underscore')
 
+class exports.SolverFinish
+  constructor: (@value) ->
+
 # ####class Solver
 # the solver for dao expression
 class exports.Solver
@@ -70,10 +73,17 @@ class exports.Solver
     @.trail.getvalue(value)
 
   # run the trampoline from cont until @finished is true.
-  run: (cont, value) ->
+  xxxrun: (cont, value) ->
     while not @finished
       [cont, value] = cont(value)
     [cont, value]
+
+  # run the trampoline from cont until @finished is true.
+  run: (cont) ->
+    try cont()
+    catch e
+      if e instanceof SolverFinish then return e.value
+      else throw e
 
   # an utility that is useful for some logic builtins<br/>
   # when backtracking, execute fun at first, and then go to original failcont

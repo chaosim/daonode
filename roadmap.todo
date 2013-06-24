@@ -36,8 +36,9 @@ parser features:
     ✔ test @done (13-06-24 11:31)
   ✔ terminals @done (13-06-22 21:26)
     ✔ test char, number, literal @done (13-06-23 18:19)
-  ✔ follow, notfollow, may, any @done (13-06-22 21:26)
-    ☐ test
-  ☐ some, times
-  ☐ dummy var
+  ☐ follow, notfollow, may, any, some, times
+    ☐ any 
+    ✔ test may(normal, lazy, greedy) @done (13-06-24 18:24)
+    ☐ some, times
+  ✔ dummy var @done (13-06-24 21:21)
 

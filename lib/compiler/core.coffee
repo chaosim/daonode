@@ -17,9 +17,11 @@ compile = (exp, path) ->
   +"solve = require('f:/daonode/lib/compiler/core.js').solve;\n"\
   +"parser = require('f:/daonode/lib/compiler/parser.js');\n"\
   +"solvecore = require('f:/daonode/lib/compiler/solve.js');\n"\
+  +"SolverFinish = solvecore.SolverFinish;\n"\
   +"Solver = solvecore.Solver;\n"\
   +"Trail = solvecore.Trail;\n"\
-  +"Var = solvecore.Var;\n\n"\
+  +"Var = solvecore.Var;\n"\
+  +"DummyVar = solvecore.DummyVar;\n\n"\
   +compiler.compile(exp)\
   +"\n//exports.main();"
   code = beautify(code, { indent_size: 2})
@@ -40,19 +42,19 @@ exports.Compiler = class Compiler
 
   compile: (exp) ->
     v = il.vari('v')
-    fromCont = @cont(exp, il.idcont)
+    fromCont = @cont(exp, il.clamda(v, il.throw(il.new(il.symbol('SolverFinish').call(v)))))
     f = il.assign(il.vari('exports.main'), il.clamda(v
           il.assign(il.solver, il.new(il.symbol('Solver').call())),
           il.assign(il.state, null),
           il.assign(il.catches, {}),
           il.assign(il.trail, il.newTrail),
-          il.assign(il.failcont, il.idcont),
+          il.assign(il.failcont, il.clamda(v, il.throw(il.new(il.symbol('SolverFinish').call(v))))),
           il.assign(il.cutcont, il.failcont),
-          fromCont))
+          il.run(il.clamda(v, fromCont))))
 #    f = fromCont
     f.refMap = {}
     f.analyze(@, f.refMap)
-#    f = f.optimize(new Env(), @)
+    f = f.optimize(new Env(), @)
     f = f.jsify()
     f.toCode(@)
 
@@ -258,6 +260,7 @@ exports.Compiler = class Compiler
       @cont(fun, il.clamda(v, cont.call(v.call(cont, cont))))
 
     'logicvar': (cont, name) -> cont.call(il.newLogicVar(name))
+    'dummy': (cont, name) -> cont.call(il.newDummyVar(name))
     'unify': (cont, x, y) ->
       x1 = il.vari('x'); y1 = il.vari('y')
       @cont(x, il.clamda(x1, @cont(y, il.clamda(y1,
@@ -435,6 +438,8 @@ exports.Compiler = class Compiler
         @cont(exp, cont))
     # lazymay: lazy optional
     'lazymay': (cont, exp) ->
+      fc = il.vari('fc')
+      v = il.vari('v')
       il.let_([fc, il.failcont],
         il.setfailcont(il.clamda(v,
           il.setfailcont(fc),
@@ -442,6 +447,8 @@ exports.Compiler = class Compiler
         cont.call(v))
      # greedymay: greedy optional
     'greedymay': (cont, exp) ->
+      fc = il.vari('fc')
+      v = il.vari('v')
       il.let_([fc, il.failcont],
          il.setfailcont(il.clamda(v,
            il.setfailcont(fc),
@@ -450,6 +457,11 @@ exports.Compiler = class Compiler
                     il.setfailcont(fc),
                     cont.call(v))))
     'any': (cont, exp) ->
+      fc = il.vari('fc')
+      trail = il.vari('trail')
+      state = il.vari('state')
+      anyCont = il.vari('anyCont')
+      v = il.vari('v')
       il.begin(
         il.assign(anyCont, il.clamda(v,
         il.let_([fc, il.failcont,
@@ -465,6 +477,10 @@ exports.Compiler = class Compiler
           @cont(exp, anyCont))))
         anyCont.call(null))
     'lazyany': (cont, exp) ->
+      fc = il.vari('fc')
+      v = il.vari('v')
+      anyCont = il.vari('anyCont')
+      anyFcont = il.vari('anyFcont')
       il.begin(
         il.assign(anyCont, il.clamda(v,
           il.setfailcont, anyFcont),
@@ -475,11 +491,14 @@ exports.Compiler = class Compiler
         il.assign(fc, solver.failcont),
         anyCont.call(v))
     'greedyany': (cont, exp) ->
-        il.begin(
-          il.assign(anyCont, il.clamda(v, @cont(exp, anyCont)))
-          il.assign(fc, il.failcont;
-          il.setfailcont(il.clamda(v, il.setfailcont(fc), cont.call(v)))
-          anyCont.call(v)))
+      fc = il.vari('fc')
+      anyCont = il.vari('anyCont')
+      v = il.vari('v')
+      il.begin(
+          il.assign(anyCont, il.clamda(v, @cont(exp, anyCont))),
+          il.assign(fc, il.failcont),
+          il.setfailcont(il.clamda(v, il.setfailcont(fc), cont.call(v))),
+          anyCont.call(null))
     # char: match one char  <br/>
     #  if x is char or bound to char, then match that given char with next<br/>
     #  else match with next char, and bound x to it.

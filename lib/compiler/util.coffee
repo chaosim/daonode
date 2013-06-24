@@ -110,6 +110,7 @@ not_ = exports.not_
 # logic
 
 exports.logicvar = (name) -> ['logicvar', name]
+exports.dummy = (name) -> ['dummy', name]
 
 exports.unify = (x, y) -> ['unify', x, y]
 exports.notunify = (x, y) -> ['notunify', x, y]
@@ -154,6 +155,22 @@ exports.lefttext =  ['lefttext']
 exports.subtext =  (length, start) -> ['subtext', length, start]
 # nextchar: text[pos]
 exports.nextchar =  ['nextchar']
+
+# ##### may, lazymay, greedymay
+# may: aka optional
+exports.may = (exp) -> ['may', exp]
+# lazymay: lazy optional
+exports.lazymay = (exp) -> ['lazymay', exp]
+# greedymay: greedy optional
+exports.greedymay = (exp) -> ['greedymay', exp]
+
+# ##### any, lazyany, greedyany
+# normal any
+exports.any = (exp) -> ['any', exp]
+# lazyany: lazy any
+exports.lazyany = (exp) -> ['lazyany', exp]
+# greedyany: greedy any
+exports.greedyany = (exp) -> ['greedyany', exp]
 
 # char: match one char  <br/>
 #  if x is char or bound to char, then match that given char with next<br/>

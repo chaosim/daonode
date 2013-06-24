@@ -32,6 +32,7 @@ class Return extends Element
   constructor: (@value) -> super
   toString: () -> "return(#{toString(@value)})"
 class Throw extends Return
+  toString: () -> "throw(#{toString(@value)})"
 class Begin extends Element
   constructor: (@exps) -> super
   toString: () -> "begin(#{(toString(e) for e in @exps).join(',')})"
@@ -234,8 +235,10 @@ Assign::analyze = (compiler, refMap) -> analyze(@exp, compiler, refMap)
 If::analyze = (compiler, refMap) ->
   analyze(@test, compiler, refMap) + analyze(@then_, compiler, refMap) + analyze(@else_, compiler, refMap)
 Begin::analyze = (compiler, refMap) -> analyze(e, compiler, refMap) for e in @exps
+Return::analyze = (compiler, refMap) -> analyze(@value, compiler, refMap)
 Apply::analyze = (compiler, refMap) ->
   analyze(@caller, compiler, refMap); analyze(e, compiler, refMap) for e in @args
+VirtualOperation::analyze = (compiler, refMap) -> analyze(e, compiler, refMap) for e in @args
 CApply::analyze = (compiler, refMap) ->  analyze(@cont, compiler, refMap); analyze(@value, compiler, refMap)
 Lamda::analyze = (compiler, refMap) ->
   childMap = @refMap = {}
@@ -284,9 +287,9 @@ If::boolize = () ->
   if b is undefined then undefined
   if b is true then boolize(@then_) else boolize(@else_)
 Begin::boolize = () -> exps = @exps; boolize(exps[exps.length-1])
-VirtualOperation::boolize = () -> undefined
-BinaryOperation::boolize = () -> undefined
-UnaryOperation::boolize = () -> undefined
+VirtualOperation::boolize = () ->
+  for a in @args then if boolize(a) is undefined then return undefined
+  !!(@func?.apply(null, @args)) or undefined
 Lamda::boolize = () -> true
 Clamda::boolize = () -> true
 ClamdaBody::boolize = () -> boolize(@body)
@@ -564,17 +567,19 @@ il.attr = vop('attr', ((compiler)->args = @args; "(#{compiler.toCode(args[0])}).
 il.push = vop('push', (compiler)->args = @args; "(#{compiler.toCode(args[0])}).push(#{compiler.toCode(args[1])})")
 il.concat = vop('concat', ((compiler)->args = @args; "(#{compiler.toCode(args[0])}).concat(#{compiler.toCode(args[1])})"), il.PURE)
 il.instanceof = vop('instanceof', ((compiler)->args = @args; "(#{compiler.toCode(args[0])}) instanceof (#{compiler.toCode(args[1])})"), il.PURE)
-il.run = vop('run', (compiler)->args = @args; "solver.run(#{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})")
+il.run = vop('run', (compiler)->args = @args; "solver.run(#{compiler.toCode(args[0])})")
 il.new = vop('new', (compiler)->args = @args; "new #{compiler.toCode(args[0])}")
 il.evalexpr = vop('evalexpr', (compiler)->args = @args; "solve(#{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})")
 
 il.newLogicVar = vop('newLogicVar', ((compiler)->args = @args; "new Var(#{compiler.toCode(args[0])})"), il.PURE)
+il.newDummyVar = vop('newDummyVar', ((compiler)->args = @args; "new DummyVar(#{compiler.toCode(args[0])})"), il.PURE)
 il.unify = vop('unify', (compiler)->args = @args; "solver.trail.unify(#{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})")
 il.bind = vop('bind', (compiler)->args = @args; "#{compiler.toCode(args[0])}.bind(#{compiler.toCode(args[1])}, solver.trail)")
 
 il.undotrail = vop('undotrail', (compiler)->args = @args; "#{compiler.toCode(args[0])}.undo()")
 il.failcont = new Var('solver.failcont')
 il.setfailcont = (cont) -> il.assign(il.failcont, cont)
+il.appendFailcont = vop('appendFailcont', (compiler)->args = @args; "solver.appendFailcont(#{compiler.toCode(args[0])})")
 il.cutcont = new Var('solver.cutcont')
 il.state = new Var('solver.state')
 il.setstate = (state) -> il.assign(il.state, state)

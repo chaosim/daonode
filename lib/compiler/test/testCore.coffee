@@ -14,7 +14,7 @@ exports.Test =
     test.equal  solve(begin(assign(x, 1), addassign(x, 2), x)), 3
     test.done()
 
-#exports.Test =
+#xexports.Test =
   "test 1": (test) ->
     test.equal  solve(1), 1
     test.done()
