@@ -312,8 +312,8 @@ expsEffect = (exps) ->
   effect = il.PURE
   for e in exps
     eff = sideEffect(e)
-    if eff = il.IO then return il.IO
-    if eff = il.EFFECT then effect = eff
+    if eff == il.IO then return il.IO
+    if eff == il.EFFECT then effect = eff
   effect
 
 Var::sideEffect = () -> il.EFFECT
@@ -508,18 +508,18 @@ augmentAssign = (operator, func) ->
     func: func
   (vari, exp) -> new AugAssign(vari, exp)
 
-il.augadd = augmentAssign("+=", (x, y) -> x + y)
-il.augsub = augmentAssign("-=", (x, y) -> x - y)
-il.augmul = augmentAssign("*=", (x, y) -> x * y)
-il.augdiv = augmentAssign("/=", (x, y) -> x / y)
-il.augmod = augmentAssign("%=", (x, y) -> x % y)
-il.augand = augmentAssign("&&=", (x, y) -> x && y)
-il.augor = augmentAssign("||=", (x, y) -> x || y)
-il.augbitand = augmentAssign("&=", (x, y) -> x & y)
-il.augbitor = augmentAssign("|=", (x, y) -> x | y)
-il.augbitxor = augmentAssign("^=", (x, y) -> x ^ y)
-il.auglshift = augmentAssign("<<=", (x, y) -> x << y)
-il.augrshift = augmentAssign(">>=", (x, y) -> x >> y)
+il.addassign = augmentAssign("+=", (x, y) -> x + y)
+il.subassign = augmentAssign("-=", (x, y) -> x - y)
+il.mulassign = augmentAssign("*=", (x, y) -> x * y)
+il.divassign = augmentAssign("/=", (x, y) -> x / y)
+il.modassign = augmentAssign("%=", (x, y) -> x % y)
+il.andassign = augmentAssign("&&=", (x, y) -> x && y)
+il.orassign = augmentAssign("||=", (x, y) -> x || y)
+il.bitandassign = augmentAssign("&=", (x, y) -> x & y)
+il.bitorassign = augmentAssign("|=", (x, y) -> x | y)
+il.bitxorassign = augmentAssign("^=", (x, y) -> x ^ y)
+il.lshiftassign = augmentAssign("<<=", (x, y) -> x << y)
+il.rshiftassign = augmentAssign(">>=", (x, y) -> x >> y)
 
 
 il.listassign = (lefts..., exp) -> new ListAssign(lefts, exp)
@@ -559,6 +559,7 @@ il.getvalue = vop('getvalue', ((compiler)->args = @args; "solver.trail.getvalue(
 il.list = vop('list', ((compiler)->args = @args; "[#{(compiler.toCode(a) for a in args).join(', ')}]"), il.PURE)
 il.length = vop('length', ((compiler)->args = @args; "(#{compiler.toCode(args[0])}).length"), il.PURE)
 il.index = vop('index', ((compiler)->args = @args; "(#{compiler.toCode(args[0])})[#{compiler.toCode(args[1])}]"), il.PURE)
+il.slice = vop('slice', ((compiler)->args = @args; "#{compiler.toCode(args[0])}.slice(#{compiler.toCode(args[1])}, #{compiler.toCode(args[2])})"), il.PURE)
 il.attr = vop('attr', ((compiler)->args = @args; "(#{compiler.toCode(args[0])}).#{compiler.toCode(args[1])}"), il.PURE)
 il.push = vop('push', (compiler)->args = @args; "(#{compiler.toCode(args[0])}).push(#{compiler.toCode(args[1])})")
 il.concat = vop('concat', ((compiler)->args = @args; "(#{compiler.toCode(args[0])}).concat(#{compiler.toCode(args[1])})"), il.PURE)
@@ -567,7 +568,7 @@ il.run = vop('run', (compiler)->args = @args; "solver.run(#{compiler.toCode(args
 il.new = vop('new', (compiler)->args = @args; "new #{compiler.toCode(args[0])}")
 il.evalexpr = vop('evalexpr', (compiler)->args = @args; "solve(#{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})")
 
-il.newLogicVar = vop('newLogicVar', (compiler)->args = @args; "new Var(#{compiler.toCode(args[0])})")
+il.newLogicVar = vop('newLogicVar', ((compiler)->args = @args; "new Var(#{compiler.toCode(args[0])})"), il.PURE)
 il.unify = vop('unify', (compiler)->args = @args; "solver.trail.unify(#{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})")
 il.bind = vop('bind', (compiler)->args = @args; "#{compiler.toCode(args[0])}.bind(#{compiler.toCode(args[1])}, solver.trail)")
 
@@ -582,6 +583,18 @@ il.newTrail = vop('newTrail', (compiler)->args = @args; "new Trail()")()
 il.settrail = (trail) -> il.assign(il.trail, trail)
 
 il.char = vop('char', ((compiler)->args = @args; "parser.char(#{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})"), il.EFFECT)
+il.followChars =  vop('followChars', ((compiler)->args = @args; "parser.followChars(#{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})"), il.EFFECT)
+il.notFollowChars = vop('notFollowChars', ((compiler)->args = @args; "parser.notFollowChars(#{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})"), il.EFFECT)
+il.charWhen = vop('charWhen', ((compiler)->args = @args; "parser.charWhen(#{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})"), il.EFFECT)
+il.spaces = vop('spaces', ((compiler)->args = @args; "parser.spaces(#{compiler.toCode(args[0])})"), il.EFFECT)
+il.spaces0 = vop('spaces0', ((compiler)->args = @args; "parser.spaces0(#{compiler.toCode(args[0])})"), il.EFFECT)
+il.stringWhile = vop('stringWhile', ((compiler)->args = @args; "parser.stringWhile(#{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})"), il.EFFECT)
+il.stringWhile0 = vop('stringWhile0', ((compiler)->args = @args; "parser.stringWhile0(#{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})"), il.EFFECT)
+il.number = vop('number', ((compiler)->args = @args; "parser.number(#{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})"), il.EFFECT)
+il.literal = vop('literal', ((compiler)->args = @args; "parser.literal(#{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})"), il.EFFECT)
+il.followLiteral = vop('followLiteral', ((compiler)->args = @args; "parser.followLiteral(#{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})"), il.EFFECT)
+il.notFollowLiteral = vop('notFollowLiteral', ((compiler)->args = @args; "parser.notFollowLiteral(#{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})"), il.EFFECT)
+il.quoteString = vop('quoteString', ((compiler)->args = @args; "parser.quoteString(#{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})"), il.EFFECT)
 
 il.fun = (f) -> new Fun(f)
 
@@ -598,4 +611,5 @@ il.iff = (clauses..., else_) ->
   if length is 2 then il.if_(clauses[0], clauses[1], else_)
   else il.if_(clauses[0], clauses[1], il.iff(clauses[2...length]..., else_))
 
-il.excludes = ['evalexpr', 'failcont', 'run', 'push', 'getvalue', 'fake', 'findCatch', 'popCatch', 'pushCatch', 'protect', 'suffixinc', 'suffixdec', 'dec', 'inc', 'unify', 'bind', 'undotrail', 'newTrail', 'newLogicVar']
+il.excludes = ['evalexpr', 'failcont', 'run', 'push', 'getvalue', 'fake', 'findCatch', 'popCatch', 'pushCatch', 'protect', 'suffixinc', 'suffixdec', 'dec', 'inc', 'unify', 'bind', 'undotrail', 'newTrail', 'newLogicVar',
+ 'char', 'followChars', 'notFollowChars', 'charWhen', 'stringWhile', 'stringWhile0', 'number', 'literal', 'followLiteral', 'quoteString']

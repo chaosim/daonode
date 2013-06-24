@@ -2,25 +2,59 @@
 {string, begin, quote, assign, print_,
 funcall, macall, lamda, macro, jsfun,
 if_, add, eq, inc, suffixinc,
-andp,
-parsetext, char, settext} = require('../util')
+logicvar, andp,
+getstate, gettext, getpos, eoi, boi, eol, bol, step, lefttext, subtext
+parsetext, char, settext, number, literal} = require('../util')
 
 vari = (name) -> name
 
 xexports = {}
 
 exports.Test =
+  "test low level primitives": (test) ->
+    x = logicvar('x')
+    test.deepEqual  solve(parsetext(getstate, string(''))), ['', 0]
+    test.equal  solve(parsetext(gettext, string(''))), ''
+    test.equal  solve(parsetext(getpos, string(''))), 0
+    test.equal  solve(parsetext(eoi, string(''))), true
+    test.equal  solve(parsetext(andp(step(2), eoi), string('we'))), true
+    test.equal  solve(parsetext(andp(step(2), boi), string(''))), false
+    test.equal  solve(parsetext(boi, string(''))), true
+    test.equal  solve(parsetext(eol, string(''))), true
+    test.equal  solve(parsetext(bol, string(''))), true
+    test.equal  solve(parsetext(bol, string('\r'))), true
+    test.equal  solve(parsetext(andp(step(1), bol), string('\r'))), true
+    test.equal  solve(parsetext(andp(step(1), eol), string('\rasdf'))), false
+    test.equal  solve(parsetext(andp(step(3), eol), string('\ras\ndf'))), true
+    test.deepEqual  solve(parsetext(lefttext, string('\ras\ndf'))), '\ras\ndf'
+    test.deepEqual  solve(parsetext(subtext(1, 3), string('\ras\ndf'))), '\n'
+    test.done()
+
+xexports.Test =
   "test char": (test) ->
-#    test.equal  solve(parsetext(1, string('a'))), 1
-#    test.equal  solve(parsetext(char(string('a')), string('a'))), 1
+    x = logicvar('x')
+    test.equal  solve(parsetext(1, string('a'))), 1
+    test.equal  solve(parsetext(char(string('a')), string('a'))), 1
     test.equal  solve(parsetext(andp(char(string('a')), char(string('b'))), string('ab'))), 2
-#    test.equal core.status, core.SUCCESS
-#    test.equal  solve(parsetext(char('a'), 'b')), null
-#    test.equal core.status, core.FAIL
-#    test.equal  solve(begin(settext('a'), char('a'))), null
-#    test.equal core.status, core.SUCCESS
-#    test.equal  solve(parsetext(andp(char('a'), char('b')), 'ab')), null
-#    test.equal core.status, core.SUCCESS
+    test.equal  solve(parsetext(char(string('a')), string('b'))), 0
+    test.equal  solve(begin(settext(string('a')), char(string('a')))), 1
+    test.equal  solve(begin(settext(string('ab')), char(string('a'), char(string('b'))))), 1
+    test.done()
+
+#exports.Test =
+  "test number": (test) ->
+    x = logicvar('x')
+    test.equal  solve(parsetext(number(x), string('123'))), 3
+    test.equal  solve(parsetext(number(x), string('123.4'))), 5
+    test.equal  solve(parsetext(number(x), string('-123.4'))), 6
+    test.equal  solve(parsetext(number(x), string('.123'))), 4
+    test.equal  solve(parsetext(number(x), string('123.e-2'))), 7
+    test.equal  solve(parsetext(number(x), string('123.e'))), 4
+    test.equal  solve(parsetext(number(x), string('123.e+'))), 4
+    test.done()
+
+  "test literal": (test) ->
+    test.equal  solve(parsetext(literal(string('daf')), string('daf'))), 3
     test.done()
 
 xexports.Test =

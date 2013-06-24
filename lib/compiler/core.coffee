@@ -7,11 +7,13 @@ il = require("./interlang")
 exports.solve = (exp, path) ->
   path = compile(exp, path)
   delete require.cache[require.resolve(path)]
-  require(path).main()
+  compiled = require(path)
+  compiled.main()
 
 compile = (exp, path) ->
   compiler = new Compiler()
   code = "_ = require('underscore');\n"\
+  +'__slice = [].slice\n'\
   +"solve = require('f:/daonode/lib/compiler/core.js').solve;\n"\
   +"parser = require('f:/daonode/lib/compiler/parser.js');\n"\
   +"solvecore = require('f:/daonode/lib/compiler/solve.js');\n"\
@@ -47,9 +49,10 @@ exports.Compiler = class Compiler
           il.assign(il.failcont, il.idcont),
           il.assign(il.cutcont, il.failcont),
           fromCont))
+#    f = fromCont
     f.refMap = {}
     f.analyze(@, f.refMap)
-    f = f.optimize(new Env(), @)
+#    f = f.optimize(new Env(), @)
     f = f.jsify()
     f.toCode(@)
 
@@ -254,7 +257,7 @@ exports.Compiler = class Compiler
       v = il.vari('v')
       @cont(fun, il.clamda(v, cont.call(v.call(cont, cont))))
 
-    'logicvar': (cont, name) -> cont.call(il.newLogicVar.call(name))
+    'logicvar': (cont, name) -> cont.call(il.newLogicVar(name))
     'unify': (cont, x, y) ->
       x1 = il.vari('x'); y1 = il.vari('y')
       @cont(x, il.clamda(x1, @cont(y, il.clamda(y1,
@@ -345,43 +348,57 @@ exports.Compiler = class Compiler
     'settext': (cont, text) ->
       v = il.vari('v')
       @cont(text, il.clamda(v, il.setstate(il.array(v, 0)), cont.call(v)))
+    'setpos': (cont, pos) ->
+      v = il.vari('v')
+      @cont(pos, il.clamda(v, il.assign(il.index(il.state, 1), v), cont.call(v)))
     'getstate': (cont) -> cont.call(il.state)
     'gettext': (cont) -> cont.call(il.index(il.state, 0))
     'getpos': (cont) -> cont.call(il.index(il.state, 1))
     'eoi': (cont) ->
+      data = il.vari('data'); pos = il.vari('pos')
       il.begin(il.listassign(data, pos, il.state)
-               il.if_(il.ge(pos,il.length(data)), cont.call(true), il.failcont.call(v)))
-    'boi': (cont) -> il.if_(il.eq(il.index(il.state, 1), 0), cont.call(true), il.failcont.call(v))
+               il.if_(il.ge(pos, il.length(data)), cont.call(true), il.failcont.call(false)))
+    'boi': (cont) -> il.if_(il.eq(il.index(il.state, 1), 0), cont.call(true), il.failcont.call(false))
     # eol: end of line text[pos] in "\r\n"
     'eol': (cont) ->
+      text = il.vari('text'); pos = il.vari('pos');  c = il.vari('c')
       il.begin(
-                il.listassign(data, pos, il.state),
-                il.if_(il.ge(pos, il.length(data.length), cont.call(true),
-                             il.if_(il.in(text[pos], il.string("\r\n")), cont.call(true),
-                                    il.failcont.call(v)))))
-    # eol: end of line text[pos] in "\r\n"
-    'eol': (cont) ->
+                il.listassign(text, pos, il.state),
+                il.if_(il.ge(pos, il.length(text)), cont.call(true),
+                       il.begin(
+                         il.assign(c, il.index(text, pos, 1)),
+                         il.if_(il.or_(il.eq(c, "\r"), il.eq(c, "\n")),
+                              cont.call(true),
+                              il.failcont.call(false)))))
+    'bol': (cont) ->
+      text = il.vari('text'); pos = il.vari('pos');  c = il.vari('c')
       il.begin(
-                il.if_(il.eq(il.index(il.state, 1), 0), cont.call(true),
-                             il.if_(il.in(il.index(il.index(il.state, 0), il.sub(il.index(il.state, 1), 1)), il.string("\r\n")),
+                il.listassign(text, pos, il.state),
+                il.if_(il.eq(pos, 0), cont.call(true),
+                         il.begin(
+                             il.assign(c, il.index(text, il.sub(pos, 1))),
+                             il.if_(il.or_(il.eq(c, "\r"), il.eq(c, "\n")),
                                     cont.call(true),
-                                    il.failcont.call(v))))
+                                    il.failcont.call(false)))))
 
     'step': (cont, n) ->
+      v = il.vari('v'); text = il.vari('text'); pos = il.vari('pos');
       @cont(n, il.clamda(v,
         il.listassign(text, pos, il.state),
-        il.augassign(pos, v),
+        il.addassign(pos, v),
         il.setstate(il.array(text, pos)),
         cont.call(pos)))
     # lefttext: return left text
-    'lefttext': (cont) -> cont(il.slice(il.index(il.state, 0), il.index(il.state, 1)))
+    'lefttext': (cont) -> cont.call(il.slice(il.index(il.state, 0), il.index(il.state, 1)))
     # subtext: return text[start...start+length]
-    'subtext': (solver, cont, length, start) ->
+    'subtext': (cont, length, start) ->
+       text = il.vari('text'); pos = il.vari('pos')
+       start1 = il.vari('start'); length1 = il.vari('length')
        il.begin(
-        il.listassign(text, pos,il.state),
-        il.assign(start, il.or_(il.ne(start, null), pos)),
-        il.assign(length, il.or_(il.ne(length, null), il.length(pos))),
-        cont.call(il.slice(start, il.add(start, length))))
+        il.listassign(text, pos, il.state),
+        il.assign(start1, il.if_(il.ne(start, null), start, pos)),
+        il.assign(length1, il.if_(il.ne(length, null), length, il.length(text))),
+        cont.call(il.slice(text, start1, il.add(start1, length1))))
 
     # nextchar: text[pos]
     'nextchar': (cont) ->
@@ -491,13 +508,8 @@ exports.Compiler = class Compiler
                         il.throw(il.new(il.symbol('ExpressionError').call(x)))),
                  il.throw(il.new(il.symbol('TypeError').call(x))))))
 
-    # char: match one char  <br/>
-    #  if x is char or bound to char, then match that given char with next<br/>
-    #  else match with next char, and bound x to it.
-    'char': (cont, item) ->
-      v = il.vari('v')
-      @cont(item, il.clamda(v, cont.call(il.char(il.solver, v))))
-
+    'spaces': (cont, item) -> cont.call(il.spaces(il.solver))
+    'spaces0': (cont, item) -> cont.call(il.spaces0(il.solver))
 
   Compiler = @
   for name, vop of il
@@ -513,6 +525,13 @@ exports.Compiler = class Compiler
           cont = do (i=i, cont=cont) ->
             compiler.cont(args[i], il.clamda(params[i], cont))
         cont
+
+  for name in ['char', 'followChars', 'notFollowChars', 'charWhen', 'stringWhile', 'stringWhile0',
+               'number', 'literal', 'followLiteral', 'quoteString']
+    do (name=name, vop=vop) -> Compiler::specials[name] = (cont, item) ->
+      compiler = @
+      v = il.vari('v')
+      compiler.cont(item, il.clamda(v, cont.call(il[name](il.solver, v))))
 
   optimize: (exp, env) ->
     expOptimize = exp?.optimize
@@ -584,9 +603,9 @@ exports.Compiler = class Compiler
     else if head is 'quasiquote' then exp
     else [exp[0]].concat(@substMacroArgs(e, params) for e in exp[1...])
 
-augmentOperators = {add: il.augadd, sub: il.augsub, mul: il.augmul, div: il.augdiv, mod: il.augmod,
-'and': il.augand, 'or': il.augor, bitand: il.augbitand, bitor:il.augbitor, bitxor: il.augbitxor,
-lshift: il.auglshift, rshift: il.augrshift
+augmentOperators = {add: il.addassign, sub: il.subassign, mul: il.mulassign, div: il.divassign, mod: il.modassign,
+'and': il.andassign, 'or': il.orassign, bitand: il.bitandassign, bitor:il.bitorassign, bitxor: il.bitxorassign,
+lshift: il.lshiftassign, rshift: il.rshiftassign
 }
 
 exports.Env = class Env

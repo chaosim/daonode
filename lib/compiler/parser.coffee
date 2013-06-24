@@ -440,266 +440,227 @@ exports.char = (solver, x) ->
     pos+1
   else if x is c then (solver.state = [data, pos+1]; pos+1)
   else if _.isString(x)
-    if x.length==1 then solver.failcont(v)
+    if x.length==1 then solver.failcont(pos)
     else throw new ExpressionError(x)
   else throw new TypeError(x)
 
 # followChar: follow given char? <br/>
 #  x should be char or be bound to char, then match that given char
-  
-exports.followChar = special(1, 'followChar', (solver, cont, x) -> (v) ->
+exports.followChar = (solver, x) ->
   [data, pos] = solver.state
-  if pos>=data.length then return solver.failcont(v)
+  if pos>=data.length then return solver.failcont(pos)
   trail = solver.trail
   x = trail.deref(x)
   c = data[pos]
   if x instanceof Var then throw new TypeError(x)
-  else if x is c then (cont(pos))
+  else if x is c then pos
   else if _.isString(x)
-    if x.length==1 then solver.failcont(v)
+    if x.length==1 then solver.failcont(pos)
     else throw new ValueError(x)
-  else throw new TypeError(x))
+  else throw new TypeError(x)
 
 # notFollowChar: not follow given char? <br/>
 #  x should be char or be bound to char, then match that given char
-  
-exports.notFollowChar = special(1, 'notfollowChar', (solver, cont, x) -> (v) ->
+exports.notFollowChar =(solver, x) ->
   [data, pos] = solver.state
-  if pos>=data.length then return solver.failcont(v)
+  if pos>=data.length then return solver.failcont(pos)
   trail = solver.trail
   x = trail.deref(x)
   c = data[pos]
   if x instanceof Var then throw new TypeError(x)
   else if x is c then solver.failcont(pos)
   else if _.isString(x)
-    if x.length==1 then cont(v)
+    if x.length==1 then pos
     else throw new ValueError(x)
-  else throw new TypeError(x))
+  else throw new TypeError(x)
 
 # followChars: follow one of given chars?  <br/>
 #  chars should be string or be bound to char, then match that given char
-  
-exports.followChars = special(1, 'followChars', (solver, cont, chars) -> (v) ->
+exports.followChars = (solver, chars) ->
   # follow one of char in chars
   chars = trail.deref(chars)
   if chars instanceof Var then throw new TypeError(chars)
   [data, pos] = solver.state
-  if pos>=data.length then return solver.failcont(v)
+  if pos>=data.length then return solver.failcont(pos)
   trail = solver.trail
   c = data[pos]
-  if c in chars then cont(pos)
+  if c in chars then pos
   else if not _.isString(chars)
     throw new TypeError(chars)
-  else solver.failcont(pos))
+  else solver.failcont(pos)
 
 # notFollowChars: not follow one of given chars? <br/>
 #  chars should be string or be bound to char, then match that given char
-  
-exports.notFollowChars = special(1, 'notFollowChars', (solver, cont, chars) -> (v) ->
+exports.notFollowChars = (solver, chars) ->
   # not follow one of char in chars
   chars = trail.deref(chars)
   if chars instanceof Var then throw new TypeError(chars)
   [data, pos] = solver.state
-  if pos>=data.length then return solver.failcont(v)
+  if pos>=data.length then return solver.failcont(pos)
   trail = solver.trail
   c = data[pos]
   if c in chars then solver.failcont(pos)
   else if not _.isString(chars)
     throw new TypeError(chars)
-  else cont(pos))
+  else cont(pos)
 
 # charWhen: next char pass @test? <br/>
 #  @test should be an function with single argument
-  
-exports.charWhen = special(1, 'charWhen', (solver, cont, test) -> (v) ->
+exports.charWhen = (solver, test) ->
   [data, pos] = solver.state
-  if pos>=data.length then return solver.failcont(false)
+  if pos>=data.length then return solver.failcont(pos)
   c = data[pos]
-  if test(c) then solver.state = [data, pos+1]; cont(c)
-  else solver.failcont(c))
-
-exports.charBetween = (start, end) -> exports.charWhen((c) -> start<c<end)
-exports.charIn = (set) -> exports.charWhen((c) ->  c in set)
-# theses terminal should be used directly, NO suffix with ()
-exports.digit = exports.charWhen((c)->'0'<=c<='9')
-exports.digit1_9 = exports.charWhen((c)->'1'<=c<='9')
-exports.lower = exports.charWhen((c)->'a'<=c<='z')
-exports.upper = exports.charWhen((c)->'A'<=c<='Z')
-exports.letter = exports.charWhen((c)-> ('a'<=c<='z') or ('A'<=c<='Z'))
-exports.underlineLetter = exports.charWhen((c)-> (c is '_') or ('a'<=c<='z') or ('A'<=c<='Z'))
-exports.underlineLetterDight = exports.charWhen((c)-> (c is '_') or ('a'<=c<='z') or ('A'<=c<='Z') or ('0'<=c<='9'))
-exports.tabspace = exports.charIn(' \t')
-exports.whitespace = exports.charIn(' \t\r\n')
-exports.newline = exports.charIn('\r\n')
+  if test(c) then solver.state = [data, pos+1]; pos
+  else solver.failcont(pos)
 
 # spaces: one or more spaces(' ') <br/>
 #usage: spaces # !!! NOT spaces()
-exports.spaces = special(0, 'spaces', (solver, cont) -> (v) ->
+exports.spaces = (solver) ->
   [data, pos] = solver.state
   length = data.length
-  if pos>=length then return solver.failcont(false)
+  if pos>=length then return solver.failcont(pos)
   c = data[pos]
-  if c isnt ' ' then return solver.failcont(c)
+  if c isnt ' ' then return solver.failcont(pos)
   p = pos+1
   while p< length and data[p] is ' ' then p++
   solver.state = [data, p]
-  cont(p-pos))()
+  p
 
 # spaces0: zero or more spaces(' ') <br/>
 #usage: spaces0 # !!! NOT spaces0()
-exports.spaces0 = special(0, 'spaces', (solver, cont) -> (v) ->
+exports.spaces0 = (solver) ->
   [data, pos] = solver.state
   length = data.length
-  if pos>=length then return cont(0)
+  if pos>=length then return pos
   c = data[pos]
-  if c isnt ' ' then return cont(c)
+  if c isnt ' ' then return pos
   p = pos+1
   while p< length and data[p] is ' ' then p++
   solver.state = [data, p]
-  cont(p-pos))()
+  pos
 
 # stringWhile: match a string, every char in the string should pass test <br/>
 # test: a function with single argument <br/>
 #  the string should contain on char at least.
-exports.stringWhile = special(1, 'stringWhile', (solver, cont, test) -> (v) ->
+exports.stringWhile = (solver, test) ->
   [data, pos] = solver.state
   length = data.length
-  if pos is length then return solver.failcont(false)
+  if pos is length then return solver.failcont(pos)
   c = data[pos]
-  unless test(c) then return solver.failcont(c)
+  unless test(c) then return solver.failcont(pos)
   p = pos+1
   while p<length and test(data[p]) then p++
   solver.state = [data, p]
-  cont(data[pos...p]))
-
-exports.stringBetween = (start, end) -> exports.stringWhile((c) -> start<c<end)
-exports.stringIn = (set) -> exports.stringWhile((c) ->  c in set)
-# theses terminal should be used directly, NO suffix with ()
-exports.digits = exports.stringWhile((c)->'0'<=c<='9')
-exports.digits1_9 = exports.stringWhile((c)->'1'<=c<='9')
-exports.lowers = exports.stringWhile((c)->'a'<=c<='z')
-exports.uppers = exports.stringWhile((c)->'A'<=c<='Z')
-exports.letters = exports.stringWhile((c)-> ('a'<=c<='z') or ('A'<=c<='Z'))
-exports.underlineLetters = exports.stringWhile((c)-> (c is '_') or ('a'<=c<='z') or ('A'<=c<='Z'))
-exports.underlineLetterDights = exports.stringWhile((c)-> (c is '_') or ('a'<=c<='z') or ('A'<=c<='Z') or ('0'<=c<='9'))
-exports.tabspaces = exports.stringIn(' \t')
-exports.whitespaces = exports.stringIn(' \t\r\n')
-exports.newlinespaces = exports.stringIn('\r\n')
+  data[pos...p]
 
 #stringWhile0: match a string, every char in it passes test <br/>
 # test: a function with single argument <br/>
 #  the string can be empty string.
-exports.stringWhile0 = special(1, 'stringWhile0', (solver, cont, test) -> (v) ->
+exports.stringWhile0 = (solver, test) ->
   [data, pos] = solver.state
   length = data.length
-  if pos is length then return cont('')
+  if pos is length then return ''
   c = data[pos]
-  unless test(c) then return cont('')
+  unless test(c) then return ''
   p = pos+1
   while p<length and test(data[p]) then p++
   solver.state = [data, p]
-  cont(data[pos...p]))
-
-exports.stringBetween0 = (start, end) -> exports.stringWhile0((c) -> start<c<end)
-exports.stringIn0 = (set) -> exports.stringWhile0((c) ->  c in set)
-# theses terminal should be used directly, NO suffix with ()
-exports.digits0 = exports.stringWhile0((c)->'0'<=c<='9')
-exports.digits1_90 = exports.stringWhile0((c)->'1'<=c<='9')
-exports.lowers0 = exports.stringWhile0((c)->'a'<=c<='z')
-exports.uppers0 = exports.stringWhile0((c)->'A'<=c<='Z')
-exports.letters0 = exports.stringWhile0((c)-> ('a'<=c<='z') or ('A'<=c<='Z'))
-exports.underlineLetters0 = exports.stringWhile0((c)-> (c is '_') or ('a'<=c<='z') or ('A'<=c<='Z'))
-exports.underlineLetterDights0 = exports.stringWhile0((c)-> (c is '_') or ('a'<=c<='z') or ('A'<=c<='Z') or ('0'<=c<='9'))
-exports.tabspaces0 = exports.stringIn0(' \t')
-exports.whitespaces0 = exports.stringIn0(' \t\r\n')
-exports.newlines0 = exports.stringIn0('\r\n')
+  data[pos...p]
 
 # float: match a number, which can be float format..<br/>
 #  if arg is free core.Var, arg would be bound to the number <br/>
 #  else arg should equal to the number.
-exports.number = exports.float = special(1, 'float', (solver, cont, arg) -> (v) ->
+exports.number = exports.float = (solver, arg) ->
   [text, pos] = solver.state
   length = text.length
-  if pos>=length then return solver.failcont(v)
-  if not '0'<=text[pos]<='9' and text[pos]!='.'
-    return solver.failcont(v)
+  if pos>=length then return solver.failcont(pos)
   p = pos
+  if text[p]=='+' or text[p]=='-' then p++
+  if p>=length then return solver.failcont(p)
+  dot = false
+  if text[p]=='.' then (dot = true; p++)
+  if p>=length or text[p]<'0' or '9'<text[p] then return solver.failcont(p)
+  p++
   while p<length and '0'<=text[p]<='9' then p++
-  if p<length and text[p]=='.' then p++
-  while p<length and '0'<=text[p]<='9' then p++
-  if p<length-1 and text[p] in 'eE' then (p++; p++)
-  while p<length and '0'<=text[p]<='9' then p++
-  if text[pos:p]=='.' then return solver.failcont(v)
+  if not dot
+    if p<length and text[p]=='.' then p++
+    while p<length and '0'<=text[p]<='9' then p++
+  if p<length-1 and text[p] == 'e' or text[p] == 'E'
+    p++
+    pE = p
+    if p<length and (text[p]=='+' or text[p]=='-') then p++
+    if p>=length or text[p]<'0' or '9'<text[p] then p = pE-1
+    else while p<length and '0'<=text[p]<='9' then p++
   arg = solver.trail.deref(arg)
-  value =  eval(text[pos:p])
+  value =  eval(text[pos...p])
   if (arg instanceof Var)
     arg.bind(value, solver.trail)
-    solver.state = [data, p]
-    cont(value)
+    solver.state = [text, p]
+    p
   else
     if _.isNumber(arg)
-      if arg is value then solver.state = [data, p]; cont(arg)
-      else solver.failcont(v)          s
-    else throw new exports.TypeError(arg))
+      if arg is value then solver.state = [text, p]; p
+      else solver.failcont(pos)
+    else throw new TypeError(arg)
 
 #literal: match given literal arg,  <br/>
 # arg is a string or a var bound to a string.
-exports.literal = special(1, 'literal', (solver, cont, arg) -> (v) ->
+exports.literal = (solver, arg) ->
   arg = solver.trail.deref(arg)
   if (arg instanceof Var) then throw new exports.TypeError(arg)
   [text, pos] = solver.state
   length = text.length
-  if pos>=length then return solver.failcont(v)
+  if pos>=length then return solver.failcont(pos)
   i = 0
   p = pos
   length2 = arg.length
   while i<length2 and p<length and arg[i] is text[p] then i++; p++
   if i is length2
     solver.state = [text, p]
-    cont(p)
-  else solver.failcont(p))
+    p
+  else solver.failcont(p)
 
 #followLiteral: follow  given literal arg<br/>
 # arg is a string or a var bound to a string. <br/>
 #solver.state is restored after match.
-exports.followLiteral = special(1, 'followLiteral', (solver, cont, arg) -> (v) ->
+exports.followLiteral = (solver, arg) ->
   arg = solver.trail.deref(arg)
   if (arg instanceof Var) then throw new exports.TypeError(arg)
   [text, pos] = solver.state
   length = text.length
-  if pos>=length then return solver.failcont(v)
+  if pos>=length then return solver.failcont(pos)
   i = 0
   p = pos
   length2 = arg.length
   while i<length2 and p<length and arg[i] is text[p] then i++; p++
-  if i is length2 then cont(p)
-  else solver.failcont(p))
+  if i is length2 then p
+  else solver.failcont(p)
 
 #notFollowLiteral: not follow  given literal arg,  <br/>
 # arg is a string or a var bound to a string. <br/>
 #solver.state is restored after match.
-exports.notFollowLiteral = special(1, 'followLiteral', (solver, cont, arg) -> (v) ->
+exports.notFollowLiteral = (solver, arg) ->
   arg = solver.trail.deref(arg)
   if (arg instanceof Var) then throw new exports.TypeError(arg)
   [text, pos] = solver.state
   length = text.length
-  if pos>=length then return solver.failcont(v)
+  if pos>=length then return solver.failcont(pos)
   i = 0
   p = pos
   length2 = arg.length
   while i<length2 and p<length and arg[i] is text[p] then i++; p++
   if i is length2 then solver.failcont(p)
-  else cont(p))
+  else p
 
 #quoteString: match a quote string quoted by quote, quote can be escapedby \
-exports.quoteString = special(1, 'quoteString', (solver, cont, quote) -> (v) ->
+exports.quoteString = (solver, quote) ->
   string = ''
   [text, pos] = solver.state
   length = text.length
-  if pos>=length then return solver.failcont(v)
+  if pos>=length then return solver.failcont(pos)
   quote = solver.trail.deref(quote)
   if (arg instanceof Var) then throw new exports.TypeError(arg)
-  if text[pos]!=quote then return solver.failcont(v)
+  if text[pos]!=quote then return solver.failcont(pos)
   p = pos+1
   while p<length
     char = text[p]
@@ -708,16 +669,9 @@ exports.quoteString = special(1, 'quoteString', (solver, cont, quote) -> (v) ->
     else if char==quote
       string = text[pos+1...p]
       break
-  if p is length then return solver.failcont(v)
-  solver.state = [data, p]
-  cont(string))
-
-#dqstring： double quoted string "..." <br/>
-#usage: dqstring  #!!! not dqstring()
-dqstring = exports.quoteString('"')
-#sqstring： single quoted string '...' <br/>
-#usage: sqstring  #!!! not sqstring()
-sqstring = exports.quoteString("'")
+  if p is length then return solver.failcont(p)
+  solver.state = [text, p]
+  string
 
 # fsm, for keywords
 

@@ -10,7 +10,8 @@ optimization:
   ☐ assign optimization
   ☐ loop optimization: assign, extract computation
   ☐ tail recursive
-  ☐ il.let_, il.clamda, il.equalcont, il.rclamda(can replace parmenter v directly)
+  ☐ il.let_, il.clamda, il.rclamda(can replace parmenter v directly)
+  ✔ il.equalcont @done (13-06-23 21:03)
 
 lisp features:
   ✔ catch/throw @done (13-06-18 08:53)
@@ -30,11 +31,11 @@ logic features:
 
 parser features:
   ✔ parser state @done (13-06-21 21:32)
+  ✔ test parsetext, settext @done (13-06-23 20:50)
   ✔ low level primitive @done (13-06-21 21:32)
-    ☐ test
+    ✔ test @done (13-06-24 11:31)
   ✔ terminals @done (13-06-22 21:26)
-    ☐ test
-  ✔ char @done (13-06-21 21:32)
+    ✔ test char, number, literal @done (13-06-23 18:19)
   ✔ follow, notfollow, may, any @done (13-06-22 21:26)
     ☐ test
   ☐ some, times

@@ -135,5 +135,118 @@ exports.bind = (vari, term) -> ['bind', vari, term]
 # parser
 exports.parse =  (exp, state) -> ['parse', exp, state]
 exports.parsetext =  (exp, text) -> ['parsetext', exp, text]
+exports.settext =  (text) -> ['settext', text]
+exports.setpos =  (pos) -> ['setpos', pos]
+exports.setstate =  (state) -> ['setstate', state]
+exports.getstate =  ['getstate']
+exports.gettext =  ['gettext']
+exports.getpos =  ['getpos']
 exports.eoi = ['eoi']
+exports.boi =  ['boi']
+# eol: end of line text[pos] in "\r\n"
+exports.eol =  ['eol']
+# bol: bein of line text[pos-1] in "\r\n"
+exports.bol =  ['bol']
+exports.step = (n) -> ['step', n]
+# lefttext: return left text
+exports.lefttext =  ['lefttext']
+# subtext: return text[start...start+length]
+exports.subtext =  (length, start) -> ['subtext', length, start]
+# nextchar: text[pos]
+exports.nextchar =  ['nextchar']
+
+# char: match one char  <br/>
+#  if x is char or bound to char, then match that given char with next<br/>
+#  else match with next char, and bound x to it.
 exports.char = (x) -> ['char', x]
+exports.followChars = (chars) ->  ['followChars', chars]
+exports.notFollowChars = (chars) ->  ['notFollowChars', chars]
+exports.charWhen = charWhen = (test) ->  ['charWhen', test]
+
+exports.charBetween = (start, end) -> charWhen((c) -> start<c<end)
+charIn = charIn = (set) -> charWhen((c) ->  c in set)
+# theses terminal should be used directly, NO suffix with ()
+exports.digit = charWhen((c)->'0'<=c<='9')
+exports.digit1_9 = charWhen((c)->'1'<=c<='9')
+exports.lower = charWhen((c)->'a'<=c<='z')
+exports.upper = charWhen((c)->'A'<=c<='Z')
+exports.letter = charWhen((c)-> ('a'<=c<='z') or ('A'<=c<='Z'))
+exports.underlineLetter = charWhen((c)-> (c is '_') or ('a'<=c<='z') or ('A'<=c<='Z'))
+exports.underlineLetterDight = charWhen((c)-> (c is '_') or ('a'<=c<='z') or ('A'<=c<='Z') or ('0'<=c<='9'))
+exports.tabspace = charIn(' \t')
+exports.whitespace = charIn(' \t\r\n')
+exports.newline = charIn('\r\n')
+
+# spaces: one or more spaces(' ') <br/>
+#usage: spaces # !!! NOT spaces()
+exports.spaces = ['spaces']
+# spaces0: zero or more spaces(' ') <br/>
+#usage: spaces0 # !!! NOT spaces0()
+exports.spaces0 = ['spaces0']
+
+# stringWhile: match a string, every char in the string should pass test <br/>
+# test: a function with single argument <br/>
+#  the string should contain on char at least.
+exports.stringWhile = stringWhile = (test) ->  ['stringWhile', test]
+
+exports.stringBetween = (start, end) -> stringWhile((c) -> start<c<end)
+exports.stringIn = stringIn = (set) -> stringWhile((c) ->  c in set)
+# theses terminal should be used directly, NO suffix with ()
+exports.digits = stringWhile((c)->'0'<=c<='9')
+exports.digits1_9 = stringWhile((c)->'1'<=c<='9')
+exports.lowers = stringWhile((c)->'a'<=c<='z')
+exports.uppers = stringWhile((c)->'A'<=c<='Z')
+exports.letters = stringWhile((c)-> ('a'<=c<='z') or ('A'<=c<='Z'))
+exports.underlineLetters = stringWhile((c)-> (c is '_') or ('a'<=c<='z') or ('A'<=c<='Z'))
+exports.underlineLetterDights = stringWhile((c)-> (c is '_') or ('a'<=c<='z') or ('A'<=c<='Z') or ('0'<=c<='9'))
+exports.tabspaces = stringIn(' \t')
+exports.whitespaces = stringIn(' \t\r\n')
+exports.newlinespaces = stringIn('\r\n')
+
+#stringWhile0: match a string, every char in it passes test <br/>
+# test: a function with single argument <br/>
+#  the string can be empty string.
+exports.stringWhile0 = stringWhile0 = (test) ->  ['stringWhile0', test]
+
+exports.stringBetween0 = (start, end) -> stringWhile0((c) -> start<c<end)
+exports.stringIn0 = stringIn0 = (set) -> stringWhile0((c) ->  c in set)
+# theses terminal should be used directly, NO suffix with ()
+exports.digits0 = stringWhile0((c)->'0'<=c<='9')
+exports.digits1_90 = stringWhile0((c)->'1'<=c<='9')
+exports.lowers0 = stringWhile0((c)->'a'<=c<='z')
+exports.uppers0 = stringWhile0((c)->'A'<=c<='Z')
+exports.letters0 = stringWhile0((c)-> ('a'<=c<='z') or ('A'<=c<='Z'))
+exports.underlineLetters0 = stringWhile0((c)-> (c is '_') or ('a'<=c<='z') or ('A'<=c<='Z'))
+exports.underlineLetterDights0 = stringWhile0((c)-> (c is '_') or ('a'<=c<='z') or ('A'<=c<='Z') or ('0'<=c<='9'))
+exports.tabspaces0 = stringIn0(' \t')
+exports.whitespaces0 = stringIn0(' \t\r\n')
+exports.newlines0 = stringIn0('\r\n')
+
+# float: match a number, which can be float format..<br/>
+#  if arg is free core.Var, arg would be bound to the number <br/>
+#  else arg should equal to the number.
+exports.number = exports.float = (arg) ->  ['number', arg]
+
+#literal: match given literal arg,  <br/>
+# arg is a string or a var bound to a string.
+exports.literal = (arg) ->  ['literal', arg]
+
+#followLiteral: follow  given literal arg<br/>
+# arg is a string or a var bound to a string. <br/>
+#solver.state is restored after match.
+exports.followLiteral = (arg) ->  ['followLiteral', arg]
+
+#notFollowLiteral: not follow  given literal arg,  <br/>
+# arg is a string or a var bound to a string. <br/>
+#solver.state is restored after match.
+exports.notFollowLiteral = (arg) ->  ['notFollowLiteral', arg]
+
+#quoteString: match a quote string quoted by quote, quote can be escapedby \
+exports.quoteString = (arg) ->  ['quoteString', arg]
+
+#dqstring： double quoted string "..." <br/>
+#usage: dqstring  #!!! not dqstring()
+exports.dqstring = exports.quoteString('"')
+#sqstring： single quoted string '...' <br/>
+#usage: sqstring  #!!! not sqstring()
+exports.sqstring = exports.quoteString("'")
