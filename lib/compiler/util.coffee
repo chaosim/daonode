@@ -118,7 +118,7 @@ exports.notunify = (x, y) -> ['notunify', x, y]
 exports.succeed = ['succeed']
 exports.fail = ['fail']
 
-exports.andp = exports.begin
+exports.andp = andp = exports.begin
 exports.orp = orp = (exps...) ->
   length = exps.length
   if length is 0 then throw new ArgumentError(exps)
@@ -132,6 +132,7 @@ exports.cut = ['cut']
 exports.findall = (goal) -> ['findall', goal]
 exports.is_ = (vari, exp) -> ['is_', vari, exp]
 exports.bind = (vari, term) -> ['bind', vari, term]
+exports.getvalue = (term) -> ['getvalue', term]
 
 # parser
 exports.parse =  (exp, state) -> ['parse', exp, state]
@@ -171,6 +172,14 @@ exports.any = (exp) -> ['any', exp]
 exports.lazyany = (exp) -> ['lazyany', exp]
 # greedyany: greedy any
 exports.greedyany = (exp) -> ['greedyany', exp]
+
+# ##### some, lazysome, greedysome
+# normal some
+exports.some = (exp) -> andp(exp, ['any', exp])
+# lazysome: lazy some
+exports.lazysome = (exp) -> andp(exp, ['lazyany', exp])
+# greedysome: greedy some
+exports.greedysome = (exp) -> andp(exp, ['greedyany', exp])
 
 # char: match one char  <br/>
 #  if x is char or bound to char, then match that given char with next<br/>

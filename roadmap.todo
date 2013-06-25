@@ -35,6 +35,7 @@ parser features:
   ☐ follow, notfollow, may, any, some, times
     ✔ any @done (13-06-24 22:19)
     ✔ test may(normal, lazy, greedy) @done (13-06-24 18:24)
-    ☐ some, times
+    ✔ some @done (13-06-25 10:41)
+    ☐ times
   ✔ dummy var @done (13-06-24 21:21)
 

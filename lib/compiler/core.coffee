@@ -276,6 +276,7 @@ exports.Compiler = class Compiler
       v = il.vari('v')
       @cont(exp, il.clamda(v, il.bind(vari, v), cont.call(true)))
     'bind': (cont, vari, term) -> il.begin(il.bind(vari, il.deref(term)), cont.call(true))
+    'getvalue': (cont, term) -> cont.call(il.getvalue(@interlang(term)))
     'succeed': (cont) -> cont.call(true)
     'fail': (cont) -> il.failcont.call(false)
     'orp': (cont, x, y) ->
@@ -621,6 +622,20 @@ exports.Compiler = class Compiler
     else if head is 'string' then exp
     else if head is 'quasiquote' then exp
     else [exp[0]].concat(@substMacroArgs(e, params) for e in exp[1...])
+
+  interlang: (term) ->
+    if _.isString(term) then return il.vari(term)
+    else return term
+    if not _.isArray(term) then return term
+    length = term.length
+    if length is 0 then return term
+    head = term[0]
+    if not _.isString(head) then return term
+    if head is 'string' then return term[1]
+    return term
+    # should add stuffs such as 'cons', 'uarray', 'uobject', etc.
+#    @specials.hasOwnProperty(head) then return term
+    #    @specials[head].call(this, cont, exp[1...]...)
 
 augmentOperators = {add: il.addassign, sub: il.subassign, mul: il.mulassign, div: il.divassign, mod: il.modassign,
 'and': il.andassign, 'or': il.orassign, bitand: il.bitandassign, bitor:il.bitorassign, bitxor: il.bitxorassign,
