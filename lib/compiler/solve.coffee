@@ -43,8 +43,6 @@ class exports.Solver
     result.state = state
     result.trail = @trail.copy()
     result.catches = _.extend({}, @catches)
-    result.exits = _.extend({}, @exits)
-    result.continues = _.extend({}, @continues)
     result.purememo = _.extend({}, @purememo)
     result.memo = _.extend({}, @memo)
     result.done = @done
@@ -57,8 +55,6 @@ class exports.Solver
     @state = faked.state
     @trail = faked.trail
     @catches = faked.catches
-    @exits = faked.exits
-    @continues = faked.continues
     @purememo = faked.purememo
     @memo = faked.memo
     @done = faked.done

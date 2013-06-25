@@ -2,7 +2,7 @@
 {string, begin, quote, assign, print_,
 funcall, macall, lamda, macro, jsfun,
 if_, add, eq, inc, suffixinc,
-logicvar, dummy, andp, findall, getvalue
+logicvar, dummy, andp, orp, findall, getvalue
 getstate, gettext, getpos, eoi, boi, eol, bol, step, lefttext, subtext, nextchar
 parsetext, char, settext, number, literal
 may, greedymay, lazymay,
@@ -74,18 +74,15 @@ exports.Test =
 #exports.Test =
   "test greedyany": (test) ->
     _ = vari('__')
-#    result = vari('result')
+    result = vari('result')
     test.equal  solve(begin(assign(_, dummy('__')), parsetext(greedyany(char(_)), string('abc')))), 3
     test.equal  solve(parsetext(begin(assign(_, dummy('__')), greedyany(char(_)), eoi), string('a'))), true
     test.equal  solve(parsetext(begin(assign(_, dummy('__')), greedyany(char(_)), char(string('c')), eoi), string('ac'))), 2
     test.equal  solve(parsetext(findall(begin(assign(_, dummy('__')), greedyany(char(_)), char(string('c')), eoi)), string('abc'))), 3
-#    test.equal core.status, core.SUCCESS
-#    test.deepEqual  solve(begin(parsetext(greedyany(char(_), result, _), string('a')), result)), ['a']
-#    test.equal core.status, core.SUCCESS
-#    test.deepEqual  solve(begin(settext('ab'), greedyany(char(_), result, _), eoi, result)), ['a', 'b']
-#    test.equal core.status, core.SUCCESS
-#    test.equal  solve(parsetext(orp(begin(greedyany(char(_)), char('c'), eoi), 1), string('abc'))), 1
-#    test.equal core.status, core.SUCCESS
+    test.deepEqual  solve(begin(assign(_, dummy('__')), assign(result, logicvar('result')),
+                                parsetext(greedyany(char(_), result, _), string('a')), getvalue(result))), ['a']
+    test.deepEqual  solve(begin(assign(_, dummy('__')), assign(result, logicvar('result')),
+                                settext(string('ab')), greedyany(char(_), result, _), eoi, getvalue(result))), ['a', 'b']
     test.done()
 
 #exports.Test =
@@ -95,11 +92,10 @@ exports.Test =
     test.equal  solve(begin(assign(_, dummy('__')), parsetext(any(char(_)), string('a')))), 1
     test.equal  solve(begin(assign(_, dummy('__')), parsetext(any(char(_)), string('ab')))), 2
     test.equal  solve(parsetext(begin(assign(_, dummy('__')), any(char(_)), eoi), string('abc'))), true
-#    test.equal core.status, core.SUCCESS
-#    test.deepEqual  solve(begin(parsetext(any(char(_), result, _), string('a')), result)), ['a']
-#    test.equal core.status, core.SUCCESS
-#    test.deepEqual  solve(begin(settext('ab'), any(char(_), result, _), eoi, result)), ['a', 'b']
-#    test.equal core.status, core.SUCCESS
+    test.deepEqual  solve(begin(assign(_, dummy('__')), assign(result, logicvar('result')),
+                                parsetext(any(char(_), result, _), string('a')), getvalue(result))), ['a']
+    test.deepEqual  solve(begin(assign(_, dummy('__')), assign(result, logicvar('result')),
+                                settext(string('ab')), any(char(_), result, _), eoi, getvalue(result))), ['a', 'b']
     test.equal  solve(parsetext(begin(assign(_, dummy('__')), any(char(_)), char(string('c')), eoi), string('abc'))), true
     test.equal  solve(parsetext(begin(assign(_, dummy('__')), any(char(string('a')))), string('b'))), 0
     test.equal  solve(parsetext(begin(assign(_, dummy('__')), any(char(string('a'))), eoi), string('b'))), false
@@ -110,8 +106,10 @@ exports.Test =
     _ = vari('__')
     result = vari('result')
     test.equal  solve(begin(assign(_, dummy('__')), parsetext(lazyany(char(_)), string('a')))), 'a'
-#    test.deepEqual  solve(begin(parsetext(lazyany(char(_), result, _), string('a')), result)), []
-#    test.deepEqual  solve(begin(settext('ab'), lazyany(char(_), result, _), eoi, result)), ['a', 'b']
+    test.deepEqual  solve(begin(assign(_, dummy('__')), assign(result, logicvar('result')),
+                                parsetext(lazyany(char(_), result, _), string('a')), getvalue(result))), []
+    test.deepEqual  solve(begin(assign(_, dummy('__')), assign(result, logicvar('result')),
+                                settext(string('ab')), lazyany(char(_), result, _), eoi, getvalue(result))), ['a', 'b']
     test.equal  solve(parsetext(begin(assign(_, dummy('__')), lazyany(char(_)), char(string('c')), eoi), string('abc'))), true
     test.equal  solve(parsetext(begin(lazyany(char(string('a'))), nextchar), string('b'))), 'b'
     test.equal  solve(parsetext(begin(lazyany(char(string('a'))), eoi), string('b'))), 0
@@ -122,18 +120,16 @@ exports.Test =
 #exports.Test =
   "test greedysome": (test) ->
     _ = vari('__')
-    #    result = vari('result')
+    result = vari('result')
     test.equal  solve(begin(assign(_, dummy('__')), parsetext(greedysome(char(_)), string('abc')))), 3
     test.equal  solve(parsetext(begin(assign(_, dummy('__')), greedysome(char(_)), eoi), string('a'))), true
     test.equal  solve(parsetext(begin(assign(_, dummy('__')), greedysome(char(_)), char(string('c')), eoi), string('ac'))), 2
     test.equal  solve(parsetext(findall(begin(assign(_, dummy('__')), greedysome(char(_)), char(string('c')), eoi)), string('abc'))), 3
-    #    test.equal core.status, core.SUCCESS
-    #    test.deepEqual  solve(begin(parsetext(greedysome(char(_), result, _), string('a')), result)), ['a']
-    #    test.equal core.status, core.SUCCESS
-    #    test.deepEqual  solve(begin(settext('ab'), greedysome(char(_), result, _), eoi, result)), ['a', 'b']
-    #    test.equal core.status, core.SUCCESS
-    #    test.equal  solve(parsetext(orp(begin(greedysome(char(_)), char('c'), eoi), 1), string('abc'))), 1
-    #    test.equal core.status, core.SUCCESS
+    test.deepEqual  solve(begin(assign(_, dummy('__')), assign(result, logicvar('result')),
+                                parsetext(greedysome(char(_), result, _), string('a')), getvalue(result))), ['a']
+    test.deepEqual  solve(begin(assign(_, dummy('__')), assign(result, logicvar('result')),
+                                settext(string('ab')), greedysome(char(_), result, _), eoi, getvalue(result))), ['a', 'b']
+    test.equal  solve(parsetext(orp(begin(greedysome(char(_)), char('c'), eoi), 1), string('abc'))), 1
     test.done()
 
 #exports.Test =
@@ -143,11 +139,13 @@ exports.Test =
     test.equal  solve(begin(assign(_, dummy('__')), parsetext(some(char(_)), string('a')))), 1
     test.equal  solve(begin(assign(_, dummy('__')), parsetext(some(char(_)), string('ab')))), 2
     test.equal  solve(parsetext(begin(assign(_, dummy('__')), some(char(_)), eoi), string('abc'))), true
-    #    test.equal core.status, core.SUCCESS
-    #    test.deepEqual  solve(begin(parsetext(some(char(_), result, _), string('a')), result)), ['a']
-    #    test.equal core.status, core.SUCCESS
-    #    test.deepEqual  solve(begin(settext('ab'), some(char(_), result, _), eoi, result)), ['a', 'b']
-    #    test.equal core.status, core.SUCCESS
+    test.equal core.status, core.SUCCESS
+    test.deepEqual  solve(begin(assign(_, dummy('__')), assign(result, logicvar('result')),
+                                parsetext(some(char(_), result, _), string('a')), getvalue(result))), ['a']
+    test.equal core.status, core.SUCCESS
+    test.deepEqual  solve(begin(assign(_, dummy('__')), assign(result, logicvar('result')),
+                                settext(string('ab')), some(char(_), result, _), eoi, getvalue(result))), ['a', 'b']
+    test.equal core.status, core.SUCCESS
     test.equal  solve(parsetext(begin(assign(_, dummy('__')), some(char(_)), char(string('c')), eoi), string('abc'))), true
     test.equal  solve(parsetext(begin(assign(_, dummy('__')), some(char(string('a')))), string('b'))), 0
     test.equal  solve(parsetext(begin(assign(_, dummy('__')), some(char(string('a'))), eoi), string('b'))), false
@@ -158,8 +156,10 @@ exports.Test =
     _ = vari('__')
     result = vari('result')
     test.equal  solve(begin(assign(_, dummy('__')), parsetext(lazysome(char(_)), string('a')))), 1
-#    #    test.deepEqual  solve(begin(parsetext(lazysome(char(_), result, _), string('a')), result)), []
-#    #    test.deepEqual  solve(begin(settext('ab'), lazysome(char(_), result, _), eoi, result)), ['a', 'b']
+    test.deepEqual  solve(begin(assign(_, dummy('__')), assign(result, logicvar('result')),
+                                parsetext(lazysome(char(_), result, _), string('a')), getvalue(result))), ['a']
+    test.deepEqual  solve(begin(assign(_, dummy('__')), assign(result, logicvar('result')),
+                                settext(string('ab')), lazysome(char(_), result, _), eoi, getvalue(result))), ['a', 'b']
     test.equal  solve(parsetext(begin(assign(_, dummy('__')), lazysome(char(_)), char(string('c')), eoi), string('abc'))), true
     test.equal  solve(parsetext(begin(lazysome(char(string('a'))), nextchar), string('b'))), false
     test.equal  solve(parsetext(begin(lazysome(char(string('a'))), eoi), string('b'))), false
@@ -178,15 +178,15 @@ xexports.Test =
     test.equal core.status, core.SUCCESS
     test.equal  solve(parsetext(times(char(_), 3), string('abc'))), 3
     test.equal core.status, core.SUCCESS
-    test.deepEqual  solve(begin(settext('ab'), times(char(_), n), eoi)), true
+    test.deepEqual  solve(begin(settext(string('ab')), times(char(_), n), eoi)), true
     test.equal core.status, core.SUCCESS
     test.deepEqual  solve(begin(parsetext(times(char(_), 2, result, _), 'ab'), result)), ['a', 'b']
     test.equal core.status, core.SUCCESS
     test.deepEqual  solve(begin(parsetext(times(char(_), 3, result, _), string('abc')), result)), ['a', 'b', 'c']
     test.equal core.status, core.SUCCESS
-    test.deepEqual  solve(begin(settext('ab'), times(char(_), n, result, _), eoi, n)), 2
+    test.deepEqual  solve(begin(settext(string('ab')), times(char(_), n, result, _), eoi, n)), 2
     test.equal core.status, core.SUCCESS
-    test.deepEqual  solve(begin(settext('ab'), times(char(_), n, result, _), eoi, result)), ['a', 'b']
+    test.deepEqual  solve(begin(settext(string('ab')), times(char(_), n, result, _), eoi, result)), ['a', 'b']
     test.equal core.status, core.SUCCESS
     test.deepEqual  solve(begin(settext('aabb'), times(char(string('a')), n), times(char(string('b')), n), eoi, n)), 2
     test.equal core.status, core.SUCCESS

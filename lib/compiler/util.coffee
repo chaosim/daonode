@@ -5,9 +5,9 @@ exports.vars = (names) -> vari(name) for name in split names,  reElements
 
 exports.quote = (exp) -> ["quote", exp]
 exports.eval_ = (exp, path) -> ["eval", exp, path]
-exports.begin = (exps...) -> ["begin"].concat(exps)
+exports.begin = begin = (exps...) -> ["begin"].concat(exps)
 
-exports.assign = (left, exp) -> ["assign", left, exp]
+exports.assign = assign = (left, exp) -> ["assign", left, exp]
 exports.augassign = (left, exp) -> ["augment-assign", op, left, exp]
 exports.addassign = (left, exp) -> ["augment-assign", 'add', left, exp]
 exports.subassign = (left, exp) -> ["augment-assign", 'sub', left, exp]
@@ -105,6 +105,8 @@ for name, _o of il
   if instance instanceof il.VirtualOperation and name not in il.excludes
     do (name=name) -> exports[name] = (args...) -> vop(name, args...)
 
+list = exports.list
+push = exports.push
 not_ = exports.not_
 
 # logic
@@ -112,7 +114,7 @@ not_ = exports.not_
 exports.logicvar = (name) -> ['logicvar', name]
 exports.dummy = (name) -> ['dummy', name]
 
-exports.unify = (x, y) -> ['unify', x, y]
+exports.unify = unify = (x, y) -> ['unify', x, y]
 exports.notunify = (x, y) -> ['notunify', x, y]
 
 exports.succeed = ['succeed']
@@ -132,7 +134,7 @@ exports.cut = ['cut']
 exports.findall = (goal) -> ['findall', goal]
 exports.is_ = (vari, exp) -> ['is_', vari, exp]
 exports.bind = (vari, term) -> ['bind', vari, term]
-exports.getvalue = (term) -> ['getvalue', term]
+exports.getvalue = getvalue = (term) -> ['getvalue', term]
 
 # parser
 exports.parse =  (exp, state) -> ['parse', exp, state]
@@ -165,21 +167,55 @@ exports.lazymay = (exp) -> ['lazymay', exp]
 # greedymay: greedy optional
 exports.greedymay = (exp) -> ['greedymay', exp]
 
+index = 1
+exports.internalvar = internalvar = (name) -> name+'_$$'+index++
+
 # ##### any, lazyany, greedyany
 # normal any
-exports.any = (exp) -> ['any', exp]
+exports.any = any = (exp, result, template) ->
+  result1 = internalvar('result')
+  if not result?  then ['any', exp]
+  else begin(assign(result1, list()), any(andp(exp, push(result1, getvalue(template)))), unify(result, result1))
+
 # lazyany: lazy any
-exports.lazyany = (exp) -> ['lazyany', exp]
+exports.lazyany = lazyany = (exp, result, template) ->
+  result1 = internalvar('result')
+  if not result?  then ['lazyany', exp]
+  else begin(assign(result1, list()),
+                lazyany(andp(exp, push(result1, getvalue(template)))), unify(result, result1))
+
 # greedyany: greedy any
-exports.greedyany = (exp) -> ['greedyany', exp]
+exports.greedyany = greedyany = (exp, result, template) ->
+  result1 = internalvar('result')
+  if not result?  then ['greedyany', exp]
+  else begin(assign(result1, list()),
+                greedyany(andp(exp, push(result1, getvalue(template)))), unify(result, result1))
 
 # ##### some, lazysome, greedysome
 # normal some
-exports.some = (exp) -> andp(exp, ['any', exp])
+exports.some = (exp, result, template) ->
+  result1 = internalvar('result')
+  if not result?  then andp(exp, ['any', exp])
+  else begin(['result'],
+                assign(result1, list()),
+                exp, push(result1, getvalue(template)),
+                any(andp(exp, push(result1, getvalue(template)))), unify(result, result1))
+
 # lazysome: lazy some
-exports.lazysome = (exp) -> andp(exp, ['lazyany', exp])
+exports.lazysome = (exp, result, template) ->
+  result1 = internalvar('result')
+  if not result?  then andp(exp, ['lazyany', exp])
+  else begin(assign(result1, list()),
+                exp, push(result1, getvalue(template)),
+                any(andp(exp, push(result1, getvalue(template)))), unify(result, result1))
+
 # greedysome: greedy some
-exports.greedysome = (exp) -> andp(exp, ['greedyany', exp])
+exports.greedysome = (exp, result, template) ->
+  result1 = internalvar('result')
+  if not result?  then andp(exp, ['greedyany', exp])
+  else begin(assign(result1, list()),
+                exp, push(result1, getvalue(template)),
+                any(andp(exp, push(result1, getvalue(template)))), unify(result, result1))
 
 # char: match one char  <br/>
 #  if x is char or bound to char, then match that given char with next<br/>

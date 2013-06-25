@@ -616,5 +616,5 @@ il.iff = (clauses..., else_) ->
   if length is 2 then il.if_(clauses[0], clauses[1], else_)
   else il.if_(clauses[0], clauses[1], il.iff(clauses[2...length]..., else_))
 
-il.excludes = ['evalexpr', 'failcont', 'run', 'push', 'getvalue', 'fake', 'findCatch', 'popCatch', 'pushCatch', 'protect', 'suffixinc', 'suffixdec', 'dec', 'inc', 'unify', 'bind', 'undotrail', 'newTrail', 'newLogicVar',
+il.excludes = ['evalexpr', 'failcont', 'run', 'getvalue', 'fake', 'findCatch', 'popCatch', 'pushCatch', 'protect', 'suffixinc', 'suffixdec', 'dec', 'inc', 'unify', 'bind', 'undotrail', 'newTrail', 'newLogicVar',
  'char', 'followChars', 'notFollowChars', 'charWhen', 'stringWhile', 'stringWhile0', 'number', 'literal', 'followLiteral', 'quoteString']

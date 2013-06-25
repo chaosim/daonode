@@ -177,22 +177,6 @@ greedyany2 = special(3, 'greedyany', (solver, cont, exp, result, template) ->
 #  template: the item in reuslt array is getvalue(template)
 exports.some = (exp, result, template) -> if not result then some1(exp) else some2(exp, result, template)
 
-some1 = special(1, 'some', (solver, cont, exp) ->
-  someCont = (v) ->
-    fc = solver.failcont
-    trail = solver.trail
-    solver.trail = new core.Trail
-    state = solver.state
-    solver.failcont = (v) ->
-      solver.trail.undo()
-      solver.trail = trail
-      solver.state = state
-      solver.failcont = fc
-      cont(v)
-    [expCont, v]
-  expCont = solver.cont(exp, someCont)
-  expCont)
-
 some2 = special(3, 'some', (solver, cont, exp, result, template) ->
   result1 = null
   someCont = (v) ->
@@ -217,17 +201,6 @@ some2 = special(3, 'some', (solver, cont, exp, result, template) ->
 #  template: the item in reuslt array is getvalue(template)
 exports.lazysome = (exp, result, template) -> if not result then lazysome1(exp) else lazysome2(exp, result, template)
 
-lazysome1 = special(1, 'lazysome', (solver, cont, exp) ->
-  fc = null
-  someFcont = (v) ->
-    solver.failcont = fc
-    [expcont, v]
-  someCont = (v) ->
-    solver.failcont = someFcont
-    cont(v)
-  expcont = solver.cont(exp, someCont)
-  (v) ->  fc = solver.failcont; expcont(v))
-
 lazysome2 = special(3, 'lazysome', (solver, cont, exp, result, template) ->
   result1 = fc = null
   someFcont = (v) ->
@@ -248,14 +221,6 @@ lazysome2 = special(3, 'lazysome', (solver, cont, exp, result, template) ->
 #  result should be an core.Var, and always be bound to the result array. <br/>
 #  template: the item in reuslt array is getvalue(template)
 exports.greedysome = (exp, result, template) -> if not result then greedysome1(exp) else greedysome2(exp, result, template)
-
-greedysome1 = special(1, 'greedysome', (solver, cont, exp) ->
-  someCont = (v) -> [expCont, v]
-  expCont =  solver.cont(exp, someCont)
-  (v) ->
-    fc = solver.failcont;
-    solver.failcont = (v) -> (solver.failcont = fc; cont(v))
-    expCont(v))
 
 greedysome2 = special(3, 'greedysome', (solver, cont, exp, result, template) ->
   result1 = null

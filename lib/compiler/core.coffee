@@ -58,6 +58,29 @@ exports.Compiler = class Compiler
     f = f.jsify()
     f.toCode(@)
 
+  xxxanalyse: (exp) ->
+    if _.isString(exp) then return [exp]
+    if not _.isArray(exp) then return []
+    length = exp.length
+    if length is 0 then return []
+    head = exp[0]
+    if not _.isString(head) then return []
+    if not @specials.hasOwnProperty(head) then return []
+    switch head
+      when 'string' then []
+      when 'logicvar' then []
+      when 'quote' then []
+      when 'quasiquote' then []
+      when 'lambda', 'macro'
+        bodyVars = analyseExps(exp[2...])
+        exp.bodyVars = bodyVars
+        exp.vars = result = _.difference(bodyVars, exp[1])
+        result
+      when 'with-vars'
+        body = exp[2...]
+        bodyVars = analyseExps(exp[2...])
+      else analyseExps(exp[1...])
+
   # compile to continuation
   cont: (exp, cont) ->
     if _.isString(exp) then return cont.call(il.vari(exp))
@@ -145,8 +168,17 @@ exports.Compiler = class Compiler
     "macro": (cont, params, body...) ->
       k = il.vari('cont')
       params1 = (il.vari(p) for p in params)
-      body = (@substMacroArgs(e, params) for e in body)
+      body = (@substMacroArgs(body[i], params) for i in [0...body.length])
       cont.call(il.lamda([k].concat(params1), @expsCont(body, k)))
+
+    'with-vars': (cont, names, body) ->
+      bindings = {}
+      bindings[name] = @newvar(name)
+      env = @withEnv
+      @withEnv = env.extendBindings(bindings)
+      cont = @cont(['begin', body...])
+      @withEnv = env
+      cont
 
     "evalarg": (cont, name) -> cont.call(il.vari(name).call(cont))
 
