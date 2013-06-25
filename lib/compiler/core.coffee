@@ -511,14 +511,19 @@ exports.Compiler = class Compiler
         anyCont.call(null))
     'lazyany': (cont, exp) ->
       fc = il.vari('fc')
+      trail = il.vari('trail')
       v = il.vari('v')
       anyCont = il.vari('anyCont')
       anyFcont = il.vari('anyFcont')
       il.begin(
         il.assign(anyCont, il.clamda(v,
+          il.assign(trail, il.trail),
+          il.settrail(il.newTrail),
           il.setfailcont(anyFcont),
           cont.call(v))),
         il.assign(anyFcont, il.clamda(v,
+           il.undotrail(il.trail),
+           il.settrail(trail),
            il.setfailcont(fc),
            @cont(exp, anyCont))),
         il.assign(fc, il.failcont),

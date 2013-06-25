@@ -170,52 +170,94 @@ exports.greedymay = (exp) -> ['greedymay', exp]
 index = 1
 exports.internalvar = internalvar = (name) -> name+'_$$'+index++
 
+# ##### normal mode, lazy mode, greedy mode
+#normal mode: try the goal at first, <br/>
+# after succeed, if need, backtracking happens to try the goal again.  <br/>
+#greedy mode: goes forward at first,<br/>
+#after succeed, no backtracking happens on the goal.<br/>
+#lazy mode: goes foward without trying the goal, <br/>
+# if failed, backtrack to goal and try again.<br/>
+#see test_parser for more informations.
+
 # ##### any, lazyany, greedyany
-# normal any
+# any: zero or more exp, normal mode <br/>
+#  result should be an core.Var, and always be bound to the result array. <br/>
+#  template: the item in result array is getvalue(template)
 exports.any = any = (exp, result, template) ->
-  result1 = internalvar('result')
   if not result?  then ['any', exp]
-  else begin(assign(result1, list()), any(andp(exp, push(result1, getvalue(template)))), unify(result, result1))
+  else
+    result1 = internalvar('result')
+    begin(assign(result1, list()), any(andp(exp, push(result1, getvalue(template)))),
+             unify(result, result1))
 
-# lazyany: lazy any
+# lazyany: zero or more exp, lazy mode <br/>
+#  result should be an core.Var, and always be bound to the result array. <br/>
+#  template: the item in reuslt array is getvalue(template)
 exports.lazyany = lazyany = (exp, result, template) ->
-  result1 = internalvar('result')
   if not result?  then ['lazyany', exp]
-  else begin(assign(result1, list()),
-                lazyany(andp(exp, push(result1, getvalue(template)))), unify(result, result1))
+  else
+    result1 = internalvar('result')
+    begin(assign(result1, list()),
+                lazyany(andp(exp, push(result1, getvalue(template)))),
+                unify(result, result1))
 
-# greedyany: greedy any
+# greedyany: zero or more exp, greedy mode
+#  result should be an core.Var, and always be bound to the result array.
+#  template: the item in reuslt array is getvalue(template)
 exports.greedyany = greedyany = (exp, result, template) ->
-  result1 = internalvar('result')
   if not result?  then ['greedyany', exp]
-  else begin(assign(result1, list()),
-                greedyany(andp(exp, push(result1, getvalue(template)))), unify(result, result1))
+  else
+    result1 = internalvar('result')
+    begin(assign(result1, list()),
+                greedyany(andp(exp, push(result1, getvalue(template)))),
+                unify(result, result1))
 
 # ##### some, lazysome, greedysome
-# normal some
+# some: one or more exp, normal mode <br/>
+#  result should be an core.Var, and always be bound to the result array. <br/>
+#  template: the item in reuslt array is getvalue(template)
 exports.some = (exp, result, template) ->
-  result1 = internalvar('result')
   if not result?  then andp(exp, ['any', exp])
-  else begin(['result'],
+  else
+    result1 = internalvar('result')
+    begin(['result'],
                 assign(result1, list()),
                 exp, push(result1, getvalue(template)),
-                any(andp(exp, push(result1, getvalue(template)))), unify(result, result1))
+                any(andp(exp, push(result1, getvalue(template)))),
+                unify(result, result1))
 
-# lazysome: lazy some
+# lazysome: one or more exp, lazy mode <br/>
+#  result should be an core.Var, and always be bound to the result array. <br/>
+#  template: the item in reuslt array is getvalue(template)
 exports.lazysome = (exp, result, template) ->
-  result1 = internalvar('result')
   if not result?  then andp(exp, ['lazyany', exp])
-  else begin(assign(result1, list()),
+  else
+    result1 = internalvar('result')
+    begin(assign(result1, list()),
                 exp, push(result1, getvalue(template)),
-                any(andp(exp, push(result1, getvalue(template)))), unify(result, result1))
+                lazyany(andp(exp, push(result1, getvalue(template)))),
+                unify(result, result1))
 
-# greedysome: greedy some
+# greedysome: one or more exp, greedy mode<br/>
+#  result should be an core.Var, and always be bound to the result array. <br/>
+#  template: the item in reuslt array is getvalue(template)
 exports.greedysome = (exp, result, template) ->
-  result1 = internalvar('result')
   if not result?  then andp(exp, ['greedyany', exp])
-  else begin(assign(result1, list()),
-                exp, push(result1, getvalue(template)),
-                any(andp(exp, push(result1, getvalue(template)))), unify(result, result1))
+  else
+    result1 = internalvar('result')
+    begin(assign(result1, list()),
+              exp, push(result1, getvalue(template)),
+              greedyany(andp(exp, push(result1, getvalue(template)))),
+              unify(result, result1))
+
+exports.times = (exp, expectTimes, result, template) ->
+  n = internalvar('n')
+  if not result? then begin(assign(n, 0), lazyany(andp(exp, inc(n))), unify(expectTimes, n))
+  else
+   result1 = internalvar('result')
+   begin(assign(n, 0), assign(result1, list()),
+             lazyany(andp(exp, inc(n), push(result1, getvalue(template)))),
+             unify(expectTimes, n), unify(result, result1))
 
 # char: match one char  <br/>
 #  if x is char or bound to char, then match that given char with next<br/>
