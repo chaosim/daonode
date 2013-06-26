@@ -7,6 +7,7 @@ just javascript:
   ☐ remove unnecessary parenthesis by using precedence of operator
 optimization:
   ☐ assign optimization
+  ☐ v = v, unnessary pure expression statement
   ☐ loop optimization: assign, extract computation
   ☐ tail recursive
   ☐ il.let_, il.clamda, il.rclamda(can replace parmenter v directly)
@@ -32,10 +33,12 @@ parser features:
     ✔ test @done (13-06-24 11:31)
   ✔ terminals @done (13-06-22 21:26)
     ✔ test char, number, literal @done (13-06-23 18:19)
-  ☐ follow, notfollow, may, any, some, times
+  ☐ follow, notfollow, parallel, may, any, some, times, seplist
+    ✔ follow, notfollow, parallel @done (13-06-26 09:50)
     ✔ any @done (13-06-24 22:19)
     ✔ test may(normal, lazy, greedy) @done (13-06-24 18:24)
     ✔ some @done (13-06-25 10:41)
-    ☐ times
+    ✔ times @done (13-06-25 20:58)
+    ☐ seplist
   ✔ dummy var @done (13-06-24 21:21)
 

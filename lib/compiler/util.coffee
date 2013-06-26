@@ -1,5 +1,6 @@
 _ = require('underscore')
 
+vari = (name) -> name
 exports.string = string = (s) -> ["string", s]
 exports.vars = (names) -> vari(name) for name in split names,  reElements
 
@@ -89,13 +90,21 @@ exports.print_ = (exps...) -> ['funcall', io(jsfun('console.log'))].concat(exps)
 
 exports.vop = vop = (name, args...) -> ["vop_"+name].concat(args)
 
-exports.inc = (item) -> ['inc', item]
+exports.inc = inc = (item) -> ['inc', item]
 
 exports.suffixinc = (item) -> ['suffixinc', item]
 
 exports.dec = (item) -> ['dec', item]
 
 exports.suffixdec = (item) -> ['suffixdec', item]
+
+exports.incp = incp = (item) -> ['incp', item]
+
+exports.suffixincp = (item) -> ['suffixincp', item]
+
+exports.decp = (item) -> ['decp', item]
+
+exports.suffixdecp = (item) -> ['suffixdecp', item]
 
 il = require("./interlang")
 
@@ -107,6 +116,7 @@ for name, _o of il
 
 list = exports.list
 push = exports.push
+exports.pushp = pushp = (list, value) -> ['pushp', list, value]
 not_ = exports.not_
 
 # logic
@@ -133,7 +143,7 @@ exports.cutable = (goal) -> ['cutable', goal]
 exports.cut = ['cut']
 exports.findall = (goal) -> ['findall', goal]
 exports.is_ = (vari, exp) -> ['is_', vari, exp]
-exports.bind = (vari, term) -> ['bind', vari, term]
+exports.bind = bind = (vari, term) -> ['bind', vari, term]
 exports.getvalue = getvalue = (term) -> ['getvalue', term]
 
 # parser
@@ -187,82 +197,128 @@ exports.any = any = (exp, result, template) ->
   if not result?  then ['any', exp]
   else
     result1 = internalvar('result')
-    begin(assign(result1, list()), any(andp(exp, push(result1, getvalue(template)))),
+    begin(assign(result1, []), any(andp(exp, push(result1, getvalue(template)))),
              unify(result, result1))
 
 # lazyany: zero or more exp, lazy mode <br/>
 #  result should be an core.Var, and always be bound to the result array. <br/>
-#  template: the item in reuslt array is getvalue(template)
+#  template: the item in result array is getvalue(template)
 exports.lazyany = lazyany = (exp, result, template) ->
   if not result?  then ['lazyany', exp]
   else
     result1 = internalvar('result')
-    begin(assign(result1, list()),
+    begin(assign(result1, []),
                 lazyany(andp(exp, push(result1, getvalue(template)))),
                 unify(result, result1))
 
 # greedyany: zero or more exp, greedy mode
 #  result should be an core.Var, and always be bound to the result array.
-#  template: the item in reuslt array is getvalue(template)
+#  template: the item in result array is getvalue(template)
 exports.greedyany = greedyany = (exp, result, template) ->
   if not result?  then ['greedyany', exp]
   else
     result1 = internalvar('result')
-    begin(assign(result1, list()),
+    begin(assign(result1, []),
                 greedyany(andp(exp, push(result1, getvalue(template)))),
                 unify(result, result1))
 
 # ##### some, lazysome, greedysome
 # some: one or more exp, normal mode <br/>
 #  result should be an core.Var, and always be bound to the result array. <br/>
-#  template: the item in reuslt array is getvalue(template)
+#  template: the item in result array is getvalue(template)
 exports.some = (exp, result, template) ->
   if not result?  then andp(exp, ['any', exp])
   else
     result1 = internalvar('result')
     begin(['result'],
-                assign(result1, list()),
+                assign(result1, []),
                 exp, push(result1, getvalue(template)),
                 any(andp(exp, push(result1, getvalue(template)))),
                 unify(result, result1))
 
 # lazysome: one or more exp, lazy mode <br/>
 #  result should be an core.Var, and always be bound to the result array. <br/>
-#  template: the item in reuslt array is getvalue(template)
+#  template: the item in result array is getvalue(template)
 exports.lazysome = (exp, result, template) ->
   if not result?  then andp(exp, ['lazyany', exp])
   else
     result1 = internalvar('result')
-    begin(assign(result1, list()),
+    begin(assign(result1, []),
                 exp, push(result1, getvalue(template)),
                 lazyany(andp(exp, push(result1, getvalue(template)))),
                 unify(result, result1))
 
 # greedysome: one or more exp, greedy mode<br/>
 #  result should be an core.Var, and always be bound to the result array. <br/>
-#  template: the item in reuslt array is getvalue(template)
+#  template: the item in result array is getvalue(template)
 exports.greedysome = (exp, result, template) ->
   if not result?  then andp(exp, ['greedyany', exp])
   else
     result1 = internalvar('result')
-    begin(assign(result1, list()),
+    begin(assign(result1, []),
               exp, push(result1, getvalue(template)),
               greedyany(andp(exp, push(result1, getvalue(template)))),
               unify(result, result1))
 
-exports.times = (exp, expectTimes, result, template) ->
+exports.times = times = (exp, expectTimes, result, template) ->
   n = internalvar('n')
-  if not result? then begin(assign(n, 0), lazyany(andp(exp, inc(n))), unify(expectTimes, n))
+  if not result? then begin(assign(n, 0), any(andp(exp, incp(n))), unify(expectTimes, n))
   else
    result1 = internalvar('result')
-   begin(assign(n, 0), assign(result1, list()),
-             lazyany(andp(exp, inc(n), push(result1, getvalue(template)))),
+   begin(assign(n, 0), assign(result1, []),
+             any(andp(exp, incp(n), pushp(result1, getvalue(template)))),
              unify(expectTimes, n), unify(result, result1))
+
+# seplist: sep separated exp, expectTimes should be integer or core.Var <br/>
+#  at least one exp is matched.<br/>
+#  if expectTimes is free core.Var, then seplist behaviour like some(normal node).<br/>
+#  result should be an core.Var, and always be bound to the result array.<br/>
+#  template: the item in result array is getvalue(template)
+exports.seplist = (exp, options={}) ->
+  # one or more exp separated by sep
+  sep = options.sep or char(string(' '));
+  expectTimes = options.times or null
+  result = options.result or null;
+  template = options.template or null
+  if result isnt null then result1 = internalvar('result')
+  if expectTimes is null
+    if result is null
+      andp(exp, any(andp(sep, exp)))
+    else
+      andp(assign(result1, []), exp, pushp(result1, getvalue(template)),
+           any(andp(sep, exp, pushp(result1, getvalue(template)))), unify(result, result1))
+  else if _.isNumber(expectTimes)
+    expectTimes = Math.floor Math.max 0, expectTimes
+    if result is null
+      switch expectTimes
+        when 0 then succeed
+        when 1 then exp
+        else andp(exp, times(andp(sep, exp), expectTimes-1))
+    else
+      switch expectTimes
+        when 0 then unify(result, [])
+        when 1 then andp(exp, unify(result, list(getvalue(template))))
+        else andp(assign(result1, []), exp, pushp(result1, getvalue(template)),
+                  times(andp(sep, exp, pushp(result1, getvalue(template))), expectTimes-1), unify(result, result1))
+  else
+    n = internalvar('n')
+    if result is null
+     orp(andp(exp, assign(n, 1), any(andp(sep, exp, incp(n))), unify(expectTimes, n)),
+         unify(expectTimes, 0))
+    else
+      orp(andp(exp, assign(n, 1), assign(result1, list(getvalue(template))),
+                    any(andp(sep, exp, pushp(result1, getvalue(template)), incp(n))),
+              unify(expectTimes, n), unify(result, result1)),
+         andp(unify(expectTimes, 0), unify(result, [])))
+
+exports.parallel = (x, y) -> ['parallel', x, y]
+exports.follow = (x) -> ['follow', x]
+exports.notfollow = (x) -> ['notfollow', x]
 
 # char: match one char  <br/>
 #  if x is char or bound to char, then match that given char with next<br/>
 #  else match with next char, and bound x to it.
-exports.char = (x) -> ['char', x]
+exports.char = char = (x) -> ['char', x]
 exports.followChars = (chars) ->  ['followChars', chars]
 exports.notFollowChars = (chars) ->  ['notFollowChars', chars]
 exports.charWhen = charWhen = (test) ->  ['charWhen', test]

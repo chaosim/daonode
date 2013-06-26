@@ -94,23 +94,53 @@ exports.Compiler = class Compiler
 
   leftValueCont: (cont, task, item, exp, op) ->
     if  _.isString(item)
+      item = il.vari(item)
       v = il.vari('v')
-      if task is 'assign' then return @cont(exp, il.clamda(v, il.assign(il.vari(item), v), cont.call(v)))
-      else if task is 'augment-assign'
-        return @cont(exp, il.clamda(v, new augmentOperators[op](il.vari(item), v), cont.call(v)))
-      else return cont.call(il[task](il.vari(item)))
-    if not _.isArray(item) then throw new Error "Left Value should be an sexpression."
+      switch task
+        when 'assign' then return @cont(exp, il.clamda(v, il.assign(item, v), cont.call(v)))
+        when 'augment-assign'
+          return @cont(exp, il.clamda(v, new augmentOperators[op](item, v), cont.call(v)))
+        when 'incp'
+          fc = il.vari('fc')
+          return il.let_([fc, il.failcont], il.setfailcont(il.clamda(v, il['dec'](item), fc.call(v))), cont.call(il['inc'](item)))
+        when 'decp'
+          fc = il.vari('fc')
+          return il.let_([fc, il.failcont], il.setfailcont(il.clamda(v, il['inc'](item), fc)), cont.call(il['dec'](item)))
+        when 'suffixincp'
+          fc = il.vari('fc')
+          return il.let_([fc, il.failcont], il.setfailcont(il.clamda(v, il['suffixdec'](item), fc.call(v))), cont.call(il['suffixinc'](item)))
+        when 'suffixdecp'
+          fc = il.vari('fc')
+          return il.let_([fc, il.failcont], il.setfailcont(il.clamda(v, il['suffixinc'](item), fc)), cont.call(il['suffixdec'](item)))
+        else # when 'inc', 'dec', 'suffixinc', 'suffixdec'
+          return cont.call(il[task](item))
+
+    if not _.isArray(item) then throw new Error "Left value should be an sexpression."
     length = item.length
-    if length is 0 then throw new Error "Left Value side should not be empty list."
+    if length is 0 then throw new Error "Left value side should not be empty list."
     head = item[0]
     if not _.isString(head) then throw new Error "Keyword should be a string."
     if head is "index"
       object = item[1]; index = item[2]
       obj = il.vari('obj'); i = il.vari('i'); v = il.vari('v')
-      if task is 'assign' then cont1 = @cont(exp, il.clamda(v,  il.assign(il.index(obj, i), cont.call(v))))
-      else if task is 'augment-assign'
-        cont1 = @cont(exp, il.clamda(v,  new augmentOperators[op](il.index(obj, i), cont.call(v))))
-      else cont1 = cont.call(il[task](il.index(obj, i)))
+      item = il.index(obj, i)
+      switch task
+        when 'assign' then cont1 = @cont(exp, il.clamda(v,  il.assign(item, v), cont.call(v)))
+        when 'augment-assign'
+          cont1 = @cont(exp, il.clamda(v,  new augmentOperators[op](item, v), cont.call(v)))
+        when 'incp'
+          fc = il.vari('fc')
+          il.let_([fc, il.failcont], il.setfailcont(il.clamda(v, il['dec'](item), fc.call(v))), cont.call(il['inc'](item)))
+        when 'decp'
+          fc = il.vari('fc')
+          il.let_([fc, il.failcont], il.setfailcont(il.clamda(v, il['inc'](item), fc)), cont.call(il['dec'](item)))
+        when 'suffixincp'
+          fc = il.vari('fc')
+          il.let_([fc, il.failcont], il.setfailcont(il.clamda(v, il['suffixdec'](item), fc.call(v))), cont.call(il['suffixinc'](item)))
+        when 'suffixdecp'
+          fc = il.vari('fc')
+          il.let_([fc, il.failcont], il.setfailcont(il.clamda(v, il['suffixinc'](item), fc)), cont.call(il['suffixdec'](item)))
+        else cont1 = cont.call(il[task](item))
       @cont(object, il.clamda(obj, @cont(index, il.clamda(i, cont1))))
     else throw new Error "Left Value side should be assignable expression."
 
@@ -129,6 +159,11 @@ exports.Compiler = class Compiler
     'suffixinc': (cont, item) -> @leftValueCont(cont, "suffixinc", item)
     'dec': (item) ->  @leftValueCont(cont, "dec", item)
     'suffixdec': (item) ->  @leftValueCont(cont, "suffixdec", item)
+
+    'incp': (cont, item) -> @leftValueCont(cont, "incp", item)
+    'suffixincp': (cont, item) -> @leftValueCont(cont, "suffixincp", item)
+    'decp': (item) ->  @leftValueCont(cont, "decp", item)
+    'suffixdecp': (item) ->  @leftValueCont(cont, "suffixdecp", item)
 
     "if": (cont, test, then_, else_) ->
         v = il.vari('v')
@@ -311,6 +346,20 @@ exports.Compiler = class Compiler
     'getvalue': (cont, term) -> cont.call(il.getvalue(@interlang(term)))
     'succeed': (cont) -> cont.call(true)
     'fail': (cont) -> il.failcont.call(false)
+
+    # x.push(y), when backtracking here, x.pop()
+    'pushp': (cont, list, value) ->
+      list1 = il.vari('list')
+      value1 = il.vari('value')
+      fc = il.vari('fc')
+      v = il.vari('v')
+      @cont(list, il.clamda(list1,
+        @cont(value, il.clamda(value1,
+          il.let_([fc, il.failcont],
+            il.setfailcont(il.clamda(v, il.pop(list1), fc.call(v)))
+            il.push(list1, value1),
+            cont.call(value1))))))
+
     'orp': (cont, x, y) ->
       v = il.vari('v')
       trail = il.vari('trail')
@@ -443,26 +492,6 @@ exports.Compiler = class Compiler
       il.begin(
           il.listassign(text, pos, il.state),
           cont.call(il.index(text, pos)))
-    # follow: if item is followed, succeed, else fail. after eval, state is restored
-    'follow': (cont, item) ->
-      state = il.vari('state')
-      il.let_(
-         [state, il.state],
-         @cont(item, il.clamda(v,
-           il.setstate(state),
-           cont.call(v))))
-
-    # follow: if item is followed, succeed, else fail. after eval, state is restored
-    'notfollow': (cont, item) ->
-      state = il.vari('state')
-      fc = il.vari('fc')
-      il.let_(
-         [fc, il.failcont,
-          state, il.state],
-         il.setfailcont(cont),
-         @cont(item, il.clamda(v,
-           il.setstate(state),
-           fc.call(v))))
     # ##### may, lazymay, greedymay
     # may: aka optional
     'may': (cont, exp) ->
@@ -537,6 +566,41 @@ exports.Compiler = class Compiler
           il.assign(fc, il.failcont),
           il.setfailcont(il.clamda(v, il.setfailcont(fc), cont.call(v))),
           anyCont.call(null))
+    'parallel': (cont, x, y, checkFunction = (state, baseState) -> state[1] is baseState[1]) ->
+      state = il.vari('state')
+      right = il.vari('right')
+      v = il.vari('v')
+      il.let_([state, il.state],
+        @cont(x,  il.clamda(v,
+        il.assign(right, il.state),
+        il.setstate(state),
+        @cont(y, il.clamda(v,
+          il.if_(il.fun(checkFunction).call(il.state, right), cont.call(v),
+                il.failcont.call(false)))))))
+    # follow: if item is followed, succeed, else fail. after eval, state is restored
+    'follow': (cont, item) ->
+      state = il.vari('state')
+      v = il.vari('v')
+      state = il.vari('state')
+      il.let_(
+               [state, il.state],
+               @cont(item, il.clamda(v,
+                                     il.setstate(state),
+                                     cont.call(v))))
+
+    # follow: if item is followed, succeed, else fail. after eval, state is restored
+    'notfollow': (cont, item) ->
+      state = il.vari('state')
+      fc = il.vari('fc')
+      v = il.vari('v')
+      il.let_(
+               [fc, il.failcont,
+                state, il.state],
+               il.setfailcont(cont),
+               @cont(item, il.clamda(v,
+                                     il.setstate(state),
+                                     fc.call(v))))
+
     # char: match one char  <br/>
     #  if x is char or bound to char, then match that given char with next<br/>
     #  else match with next char, and bound x to it.
@@ -662,7 +726,6 @@ exports.Compiler = class Compiler
 
   interlang: (term) ->
     if _.isString(term) then return il.vari(term)
-    else return term
     if not _.isArray(term) then return term
     length = term.length
     if length is 0 then return term

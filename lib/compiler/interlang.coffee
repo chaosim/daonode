@@ -565,6 +565,7 @@ il.index = vop('index', ((compiler)->args = @args; "(#{compiler.toCode(args[0])}
 il.slice = vop('slice', ((compiler)->args = @args; "#{compiler.toCode(args[0])}.slice(#{compiler.toCode(args[1])}, #{compiler.toCode(args[2])})"), il.PURE)
 il.attr = vop('attr', ((compiler)->args = @args; "(#{compiler.toCode(args[0])}).#{compiler.toCode(args[1])}"), il.PURE)
 il.push = vop('push', (compiler)->args = @args; "(#{compiler.toCode(args[0])}).push(#{compiler.toCode(args[1])})")
+il.pop = vop('pop', (compiler)->args = @args; "(#{compiler.toCode(args[0])}).pop()")
 il.concat = vop('concat', ((compiler)->args = @args; "(#{compiler.toCode(args[0])}).concat(#{compiler.toCode(args[1])})"), il.PURE)
 il.instanceof = vop('instanceof', ((compiler)->args = @args; "(#{compiler.toCode(args[0])}) instanceof (#{compiler.toCode(args[1])})"), il.PURE)
 il.run = vop('run', (compiler)->args = @args; "solver.run(#{compiler.toCode(args[0])})")
