@@ -326,6 +326,13 @@ exports.Compiler = class Compiler
       v = il.vari('v')
       @cont(fun, il.clamda(v, cont.call(v.call(cont, cont))))
 
+    # aka. lisp's call/fc
+    # callfc(someFunction(kont) -> body)
+    #current continuation @cont can be captured in someFunction
+    'callfc': (cont, fun) ->
+      v = il.vari('v')
+      @cont(fun, il.clamda(v, cont.call(v.call(il.failcont, cont))))
+
     'logicvar': (cont, name) -> cont.call(il.newLogicVar(name))
     'dummy': (cont, name) -> cont.call(il.newDummyVar(name))
     'unify': (cont, x, y) ->
@@ -365,19 +372,30 @@ exports.Compiler = class Compiler
       trail = il.vari('trail')
       state = il.vari('state')
       fc = il.vari('fc')
-      il.begin(il.assign(trail, il.trail),
-               il.settrail(il.newTrail),
-               il.assign(state, il.state),
-               il.assign(fc, il.failcont),
-               il.setfailcont(il.clamda(v,
+      il.let_([trail, il.trail,
+               state, il.state,
+               fc, il.failcont],
+           il.settrail(il.newTrail),
+           il.setfailcont(il.clamda(v,
                    il.undotrail(il.trail),
                    il.settrail(trail),
                    il.setstate(state),
                    il.setfailcont(fc),
                    @cont(y, cont))),
-               @cont(x, cont))
+           @cont(x, cont))
 
-      #like in prolog, failure as negation.
+    'ifp': (cont, test, action) ->
+      #if -> Then; _Else :- If, !, Then.<br/>
+      #If -> _Then; Else :- !, Else.<br/>
+      #If -> Then :- If, !, Then
+      v = il.vari('v')
+      fc = il.vari('fc')
+      il.let_([fc, il.failcont],
+        @cont(test, il.clamda(v,
+          il.setfailcont(fc),
+          @cont(action, cont))))
+
+    #like in prolog, failure as negation.
     'notp': (cont, goal) ->
       v = il.vari('v')
       trail = il.vari('trail')
@@ -406,12 +424,30 @@ exports.Compiler = class Compiler
     # prolog's cut, aka "!"
     'cut': (cont) -> il.begin(il.setfailcont(il.cutcont), cont.call(null))
     # find all solution to the goal @exp in prolog
-    'findall': (cont, goal) ->
+    'findall': (cont, goal, result, template) ->
+      fc = il.vari('fc')
+      v = il.vari('v')
+      if not result?
+        il.let_([fc, il.failcont],
+                il.setfailcont(il.clamda(v, il.setfailcont(fc), cont.call(v))),
+                @cont(goal, il.failcont))
+      else
+        result1 = il.vari('result')
+        il.let_([result1, [],
+                fc, il.failcont],
+          il.setfailcont(il.clamda(v,
+            il.if_(il.unify(result, result1), fc.call(v),
+                   il.begin(il.setfailcont(fc), cont.call(v))))),
+          @cont(exp, il.clamda(v,
+            il.push(result1, il.getvalue(template)),
+            il.failcont.call(v))))
+
+    # find only one solution to the @goal
+    'once': (cont, goal) ->
       fc = il.vari('fc')
       v = il.vari('v')
       il.let_([fc, il.failcont],
-               il.setfailcont(il.clamda(v, il.setfailcont(fc), cont.call(v))),
-               @cont(goal, il.failcont))
+        @cont(goal, il.clamda(v, il.setfailcont(fc), cont.call(v))))
 
     'parse': (cont, exp, state) ->
       v = il.vari('v')

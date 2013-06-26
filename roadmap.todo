@@ -4,7 +4,7 @@ just javascript:
   ☐ while
   ☐ javascript's try/catch/throw
   ✔ javascript's new @done (13-06-22 21:27)
-  ☐ remove unnecessary parenthesis by using precedence of operator
+  ☐ toCode: remove unnecessary parenthesis by using precedence of operator
 optimization:
   ☐ assign optimization
   ☐ v = v, unnessary pure expression statement
@@ -23,8 +23,10 @@ logic features:
   ✔ fail @done (13-06-19 10:32)
   ✔ logic negation, repeat @done (13-06-19 15:02)
   ✔ findall @done (13-06-20 14:04)
-  ☐ call, once, etc.
-  ☐ callfc
+  ✔ once, ifp, etc. @done (13-06-26 21:54)
+    ☐ test
+  ✔ callfc @done (13-06-26 21:54)
+    ☐ test
   ☐ Cons, UObject, UArray
 parser features:
   ✔ parser state @done (13-06-21 21:32)
@@ -33,12 +35,12 @@ parser features:
     ✔ test @done (13-06-24 11:31)
   ✔ terminals @done (13-06-22 21:26)
     ✔ test char, number, literal @done (13-06-23 18:19)
-  ☐ follow, notfollow, parallel, may, any, some, times, seplist
+  ✔ follow, notfollow, parallel, may, any, some, times, seplist @done (13-06-26 18:38)
     ✔ follow, notfollow, parallel @done (13-06-26 09:50)
     ✔ any @done (13-06-24 22:19)
     ✔ test may(normal, lazy, greedy) @done (13-06-24 18:24)
     ✔ some @done (13-06-25 10:41)
     ✔ times @done (13-06-25 20:58)
-    ☐ seplist
+    ✔ seplist @done (13-06-26 18:38)
   ✔ dummy var @done (13-06-24 21:21)
 
