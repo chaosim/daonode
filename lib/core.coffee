@@ -495,6 +495,19 @@ class exports.Fun2 extends exports.Command
 #  add = fun(function(x,y){ return x+y; } # javascript <br/>
 exports.fun2 = commandMaker(exports.Fun2)
 
+# Lamda evaluate its arguments, and evaluate the result of fun(params...) again
+class exports.Lamda extends exports.Command
+  applyCont: (solver, cont, args) ->
+    fun = @fun
+    f = (k, args...) -> solver.cont(fun(args...), k)
+    solver.argsCont(args, (params) -> f(cont, params...))
+
+# generate an instance of Fun from a function <br/>
+#  example:  <br/>
+#  add = fun((x, y) -> x+y ) # coffeescript <br/>
+#  add = fun(function(x,y){ return x+y; } # javascript <br/>
+exports.lamda = commandMaker(exports.Lamda)
+
 # similar to lisp'macro, Macro does NOT evaluate its arguments, but evaluate the result to fun(args).
 exports.Macro = class Macro extends exports.Command
   @idMap: {}

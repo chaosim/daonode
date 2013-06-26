@@ -64,11 +64,11 @@
   };
 
   string = function(x) {
-    return orp(is_(x, dqstring), is_(sqstring));
+    return orp(is_(x, dqstring), is_(x, sqstring));
   };
 
   exports.atom = rule(1, 'atom', function(x) {
-    return [[x], number(x), [x], string(x), [x], literal('(') + spaces + expression(x) + literal(')')];
+    return [[x], number(x), [x], string(x), [x], andp(literal('('), spaces, expression(x), literal(')'))];
   });
 
 }).call(this);

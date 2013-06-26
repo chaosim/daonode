@@ -36,9 +36,10 @@ exports.operator = special('operator', (solver, cont, x) -> (v) ->
 # use terminal in parser.coffee
 operator = (x) -> is_(charIn("+-*/"))
 
-string = (x) -> orp(is_(x, dqstring), is_(sqstring))
+string = (x) -> orp(is_(x, dqstring), is_(x, sqstring))
+
 exports.atom = rule(1, 'atom', (x) ->
   [ [x], number(x),
     [x], string(x),
-    [x], literal('(') + spaces + expression(x) + literal(')')
+    [x], andp(literal('('), spaces, expression(x),literal(')'))
   ])
