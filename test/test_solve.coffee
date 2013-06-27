@@ -3,7 +3,7 @@ I = require "./importer"
 base  =  "../lib/"
 
 core = require('../lib/core')
-I.use base+"core: solve vari Trail fun, fun2, macro proc rule, tofun, dummy"
+I.use base+"core: solve vari Trail fun, fun2, macro proc lamda rule, tofun, dummy"
 I.use base+"builtins/general: add print_, sub, eq, inc"
 I.use base+"builtins/lisp: quote eval_, if_, begin"
 I.use base+"builtins/logic: andp orp notp succeed fail unify findall once"
@@ -81,7 +81,14 @@ exports.Test =
     test.equal  solve(m(5)), null
     test.done()
 
+exports.Test =
+  "test lamda": (test) ->
+#    m = lamda(1, (x) -> if_(eq(x,0),print_(x), m(sub(x,1))))
+    m = lamda((x) -> x)
+    test.equal  solve(m(1)), 1
+    test.done()
 
+xexports.Test =
   "test macro 2": (test) ->
     _ = dummy('_')
     m = macro(0, () ->  print_(1))

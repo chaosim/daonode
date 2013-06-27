@@ -8,7 +8,7 @@
 
   core = require('../lib/core');
 
-  I.use(base + "core: solve vari Trail fun, fun2, macro proc rule, tofun, dummy");
+  I.use(base + "core: solve vari Trail fun, fun2, macro proc lamda rule, tofun, dummy");
 
   I.use(base + "builtins/general: add print_, sub, eq, inc");
 
@@ -128,7 +128,22 @@
       });
       test.equal(solve(m(5)), null);
       return test.done();
-    },
+    }
+  };
+
+  exports.Test = {
+    "test lamda": function(test) {
+      var m;
+
+      m = lamda(function(x) {
+        return x;
+      });
+      test.equal(solve(m(1)), 1);
+      return test.done();
+    }
+  };
+
+  xexports.Test = {
     "test macro 2": function(test) {
       var m, x, _;
 

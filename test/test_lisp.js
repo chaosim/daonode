@@ -9,7 +9,7 @@
 
   base = "../lib/";
 
-  I.use(base + "core: Trail, solve, solver, fun, macro proc vari debug done faildone UnquoteSliceValue");
+  I.use(base + "core: Trail, solve, solver, fun, macro lamda proc call, vari debug done faildone UnquoteSliceValue");
 
   I.use(base + "builtins/general: add print_ inc dec eq le");
 
@@ -93,7 +93,22 @@
       a = vari('a');
       test.equal(solve(begin(assign(a, 1), block('a', if_(eq(a, 5), break_('a', a)), inc(a), continue_('a')))), 5);
       return test.done();
-    },
+    }
+  };
+
+  exports.Test = {
+    "test block break lamda": function(test) {
+      var m;
+
+      m = vari('m');
+      test.equal(solve(block('a', assign(m, lamda(function() {
+        return break_('a', 2);
+      })), call(m), 1)), 2);
+      return test.done();
+    }
+  };
+
+  xexports.Test = {
     "test assign inc dec": function(test) {
       var a;
 
@@ -132,17 +147,6 @@
       test.equal(a(null), 7);
       return test.done();
     },
-    "test quasiquote": function(test) {
-      var a;
-
-      test.equal(solve(qq(1)), 1);
-      a = add(1, 2);
-      test.deepEqual(solve(qq(a)), a);
-      test.deepEqual(solve(qq(uq(a))), 3);
-      test.deepEqual(solve(qq(uqs([1, 2]))), new UnquoteSliceValue([1, 2]));
-      test.deepEqual(solve(qq(add(uqs([1, 2])))), a);
-      return test.done();
-    },
     "test argsCont": function(test) {
       var incall;
 
@@ -163,6 +167,20 @@
       test.deepEqual(solve(incall(1, 2, 3, 4, 5, 6, 7)), [2, 3, 4, 5, 6, 7, 8]);
       test.deepEqual(solve(incall(1, 2, 3, 4, 5, 6, 7, 8)), [2, 3, 4, 5, 6, 7, 8, 9]);
       test.deepEqual(solve(incall(1, 2, 3, 4, 5, 6, 7, 8, 9)), [2, 3, 4, 5, 6, 7, 8, 9, 10]);
+      return test.done();
+    }
+  };
+
+  xexports.Test = {
+    "test quasiquote": function(test) {
+      var a;
+
+      test.equal(solve(qq(1)), 1);
+      a = add(1, 2);
+      test.deepEqual(solve(qq(a)), a);
+      test.deepEqual(solve(qq(uq(a))), 3);
+      test.deepEqual(solve(qq(uqs([1, 2]))), new UnquoteSliceValue([1, 2]));
+      test.deepEqual(solve(qq(add(uqs([1, 2])))), a);
       return test.done();
     }
   };

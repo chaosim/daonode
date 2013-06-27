@@ -475,16 +475,16 @@ exports.special = special = commandMaker(exports.Special)
 # call goal with args...
 exports.call = special(-1, 'call', (solver, cont, goal, args...) ->
   goal1 = null
-  argsCont =  solver.argsCont(args, (params,  solver) ->
+  argsCont =  solver.argsCont(args, (params) ->
     solver.cont(goal1(params...), cont)(null))
-  solver.cont(goal, (v) -> goal1 = goal; argsCont(null)))
+  solver.cont(goal, (v) -> goal1 = v; argsCont(null)))
 
 # apply goal with args
 exports.apply  = special(2, 'apply', (solver, cont, goal, args) ->
   goal1 = null
-  argsCont =  solver.argsCont(args, (params,  solver) ->
+  argsCont =  solver.argsCont(args, (params) ->
     solver.cont(goal1(params...), cont)(null))
-  solver.cont(goal, (v) -> goal1 = goal; argsCont(null)))
+  solver.cont(goal, (v) -> goal1 = v; argsCont(null)))
 
 # Fun evaluate its arguments, and return the result to fun(params...) to cont directly.
 class exports.Fun extends exports.Command
@@ -510,11 +510,18 @@ class exports.Fun2 extends exports.Command
 exports.fun2 = commandMaker(exports.Fun2)
 
 # Lamda evaluate its arguments, and evaluate the result of fun(params...) again
-class exports.Lamda extends exports.Command
+class exports.xxxLamda extends exports.Command
   applyCont: (solver, cont, args) ->
     fun = @fun
     f = (k, args...) -> solver.cont(fun(args...), k)
-    solver.argsCont(args, (params) -> f(cont, params...))
+    solver.argsCont(args, (params) -> f(cont, params...)(null))
+
+# Lamda evaluate its arguments, and evaluate the result of fun(params...) again
+class exports.Lamda extends exports.Command
+  applyCont: (solver, cont, args) ->
+    fun = @fun
+    f = (args...) -> solver.cont(fun(args...), (v) -> v)
+    solver.argsCont(args, (params) -> cont(f(params...)(null)))
 
 # generate an instance of Fun from a function <br/>
 #  example:  <br/>

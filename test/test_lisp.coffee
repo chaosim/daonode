@@ -3,7 +3,7 @@ _ = require "underscore"
 I = require("./importer")
 
 base = "../lib/"
-I.use base+"core: Trail, solve, solver, fun, macro proc vari debug done faildone UnquoteSliceValue"
+I.use base+"core: Trail, solve, solver, fun, macro lamda proc call, vari debug done faildone UnquoteSliceValue"
 I.use base+"builtins/general: add print_ inc dec eq le"
 I.use base+"builtins/logic: orp"
 I.use base+"""builtins/lisp: quote begin if_ iff eval_ block break_ continue_ assign loop_ while_ until_
@@ -70,7 +70,17 @@ exports.Test =
     test.equal  solve(begin(assign(a, 1),  block('a', if_(eq(a, 5), break_('a', a)), inc(a), continue_('a')))), 5
     test.done()
 
+exports.Test =
+  "test block break lamda": (test) ->
+    m = vari('m')
+#    test.equal  solve(block('a', 1)), 1
+    test.equal  solve(block('a', assign(m, lamda(() -> break_('a', 2))), call(m), 1)), 2
+#    test.equal  solve(block('a', block('b', break_('b', 2), 1), 3)), 3
+#    a = vari('a')
+#    test.equal  solve(begin(assign(a, 1),  block('a', if_(eq(a, 5), break_('a', a)), inc(a), continue_('a')))), 5
+    test.done()
 
+xexports.Test =
   "test assign inc dec": (test) ->
     a = vari('a')
     test.equal  solve(begin(assign(a, 1),  block('a', if_(eq(a, 5), break_('a', a)), print_(a), inc(a), continue_('a')))), 5
@@ -97,15 +107,7 @@ exports.Test =
     test.equal a(null), 7
     test.done()
 
-  "test quasiquote": (test) ->
-    test.equal solve(qq(1)), 1
-    a = add(1, 2)
-    test.deepEqual solve(qq(a)), a
-    test.deepEqual solve(qq(uq(a))), 3
-    test.deepEqual solve(qq(uqs([1,2]))), new UnquoteSliceValue([1,2])
-    test.deepEqual solve(qq(add(uqs([1,2])))), a
-    test.done()
-
+#exports.Test =
   "test argsCont": (test) ->
     incall = fun(-1, (args...) ->_.map(args, (x) -> x+1))
     test.deepEqual  solve(incall(1)), [2]
@@ -118,3 +120,14 @@ exports.Test =
     test.deepEqual  solve(incall(1, 2, 3, 4, 5, 6, 7, 8)), [2, 3, 4, 5, 6, 7, 8, 9]
     test.deepEqual  solve(incall(1, 2, 3, 4, 5, 6, 7, 8, 9)), [2, 3, 4, 5, 6, 7, 8, 9, 10]
     test.done()
+
+xexports.Test =
+  "test quasiquote": (test) ->
+    test.equal solve(qq(1)), 1
+    a = add(1, 2)
+    test.deepEqual solve(qq(a)), a
+    test.deepEqual solve(qq(uq(a))), 3
+    test.deepEqual solve(qq(uqs([1,2]))), new UnquoteSliceValue([1,2])
+    test.deepEqual solve(qq(add(uqs([1,2])))), a
+    test.done()
+
