@@ -13,6 +13,9 @@ optimization:
   ☐ il.let_, il.clamda, il.rclamda(can replace parmenter v directly)
   ✔ il.equalcont @done (13-06-23 21:03)
 lisp features:
+  ✔ quote, eval @done (13-06-27 18:04)
+  ✔ lamda @done (13-06-27 18:05)
+  ✔ block/break/continue @done (13-06-27 18:04)
   ✔ catch/throw @done (13-06-18 08:53)
   ✔ unwind-protect @done (13-06-18 08:53)
   ✔ callcc @done (13-06-18 10:58)
