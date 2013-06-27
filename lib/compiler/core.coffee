@@ -40,9 +40,10 @@ exports.Compiler = class Compiler
     @continues = {}
     @protect = (cont) -> cont
 
+
   compile: (exp) ->
     v = il.vari('v')
-    fromCont = @cont(exp, il.clamda(v, il.throw(il.new(il.symbol('SolverFinish').call(v)))))
+    fromCont = @cont(exp, @clamda(v, il.throw(il.new(il.symbol('SolverFinish').call(v)))))
     f = il.assign(il.vari('exports.main'), il.clamda(v
           il.assign(il.solver, il.new(il.symbol('Solver').call())),
           il.assign(il.state, null),
@@ -58,28 +59,7 @@ exports.Compiler = class Compiler
     f = f.jsify()
     f.toCode(@)
 
-  xxxanalyse: (exp) ->
-    if _.isString(exp) then return [exp]
-    if not _.isArray(exp) then return []
-    length = exp.length
-    if length is 0 then return []
-    head = exp[0]
-    if not _.isString(head) then return []
-    if not @specials.hasOwnProperty(head) then return []
-    switch head
-      when 'string' then []
-      when 'logicvar' then []
-      when 'quote' then []
-      when 'quasiquote' then []
-      when 'lambda', 'macro'
-        bodyVars = analyseExps(exp[2...])
-        exp.bodyVars = bodyVars
-        exp.vars = result = _.difference(bodyVars, exp[1])
-        result
-      when 'with-vars'
-        body = exp[2...]
-        bodyVars = analyseExps(exp[2...])
-      else analyseExps(exp[1...])
+  clamda: (v, body...) -> @globalCont = cont = il.clamda(v, body...); cont
 
   # compile to continuation
   cont: (exp, cont) ->
@@ -97,7 +77,7 @@ exports.Compiler = class Compiler
       item = il.vari(item)
       v = il.vari('v')
       switch task
-        when 'assign' then return @cont(exp, il.clamda(v, il.assign(item, v), cont.call(v)))
+        when 'assign' then return @cont(exp, @clamda(v, il.assign(item, v), cont.call(v)))
         when 'augment-assign'
           return @cont(exp, il.clamda(v, new augmentOperators[op](item, v), cont.call(v)))
         when 'incp'
@@ -149,7 +129,7 @@ exports.Compiler = class Compiler
     "eval": (cont, exp, path) ->
       v = il.vari('v')
       p = il.vari('path')
-      @cont(exp, il.clamda(v, @cont(path, il.clamda(p, cont.call(il.evalexpr(v, p))))))
+      @cont(exp, @clamda(v, @cont(path, @clamda(p, cont.call(il.evalexpr(v, p))))))
     'string': (cont, exp) -> cont.call(exp)
     "begin": (cont, exps...) -> @expsCont(exps, cont)
 
@@ -167,7 +147,7 @@ exports.Compiler = class Compiler
 
     "if": (cont, test, then_, else_) ->
         v = il.vari('v')
-        @cont(test, il.clamda(v, il.if_(v, @cont(then_, cont), @cont(else_, cont))))
+        @cont(test, @clamda(v, il.if_(v, @cont(then_, cont), @cont(else_, cont))))
 
     "jsfun": (cont, func) ->
       f = il.jsfun(func)
@@ -196,9 +176,9 @@ exports.Compiler = class Compiler
       result
 
     "lambda": (cont, params, body...) ->
-      k = il.vari('cont')
+      v = il.vari('v')
       params = (il.vari(p) for p in params)
-      cont.call(il.lamda([k].concat(params), @expsCont(body, k)))
+      cont.call(il.lamda(params, @expsCont(body, il.clamda(v, v))))
 
     "macro": (cont, params, body...) ->
       k = il.vari('cont')
@@ -222,7 +202,7 @@ exports.Compiler = class Compiler
       f = il.vari('f')
       length = args.length
       params = (il.vari('a'+i) for i in [0...length])
-      cont = f.apply([cont].concat(params))
+      cont = cont.call(f.apply(params))
       for i in [length-1..0] by -1
         cont = do (i=i, cont=cont) ->
           compiler.cont(args[i], il.clamda(params[i], cont))
@@ -255,6 +235,7 @@ exports.Compiler = class Compiler
       if not _.isString(label) then (label = ''; body = [label].concat(body))
       exits = @exits[label] ?= []
       exits.push(cont)
+      exits.push(@globalCont)
       defaultExits = @exits[''] ?= []  # if no label, go here
       defaultExits.push(cont)
       continues = @continues[label] ?= []
@@ -717,7 +698,7 @@ exports.Compiler = class Compiler
     else if length is 1 then @cont(exps[0], cont)
     else
       v = il.vari('v')
-      @cont(exps[0], il.clamda(v, @expsCont(exps[1...], cont)))
+      @cont(exps[0], @clamda(v, @expsCont(exps[1...], cont)))
 
   quasiquote: (exp, cont) ->
     if not _.isArray(exp) then return cont.call(exp)

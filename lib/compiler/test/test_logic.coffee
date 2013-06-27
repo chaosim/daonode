@@ -63,7 +63,7 @@ exports.Test =
     test.equal  solve(orp(cutable(orp(andp(print_(1), cut, fail), print_(2))), print_(3))), null
     test.done()
 
-exports.Test =
+xexports.Test =
   "test findall once": (test) ->
     x = vari('x')
     result = vari('result')

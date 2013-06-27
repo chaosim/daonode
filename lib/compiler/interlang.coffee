@@ -432,11 +432,7 @@ Begin::toCode = (compiler) ->
 Print::toCode = (compiler) ->  "console.log(#{(compiler.toCode(exp) for exp in @exps).join(', ')})"
 Deref::toCode = (compiler) ->  "solver.trail.deref(#{compiler.toCode(@exp)})"
 Code::toCode = (compiler) ->  @string
-JSFun::toCode = (compiler) ->  "function() {\n"+\
-                               " var args, cont;\n "+\
-                               "  cont = arguments[0], args = 2 <= arguments.length ? [].slice.call(arguments, 1) : [];\n"+\
-                               "   return cont(#{@fun}.apply(this, args));"+\
-                               "   }"
+JSFun::toCode = (compiler) ->  if _.isString(@fun) then @fun  else compiler.toCode(@fun)
 
 isStatement = (exp) ->
   exp_isStatement = exp?.isStatement

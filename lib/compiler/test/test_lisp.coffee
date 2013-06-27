@@ -51,29 +51,7 @@ exports.Test =
     test.equal  solve(iff([[0, 2], [1, 3]], 5)), 3
     test.done()
 
-  "test block break continue": (test) ->
-    a = makeLabel('a')
-    b = makeLabel('b')
-    x = vari('x')
-    test.equal  solve(begin(assign(x, 1), block(a, print_(x), 1))), 1
-    test.equal  solve(block(a, break_(a, 2), 1)), 2
-    test.equal  solve(block(a, block(b, break_(b, 2), 1), 3)), 3
-    x = vari('x')
-    test.equal  solve(begin(assign(x, 1),  block(a, if_(eq(x, 5), break_(a, x)), inc(x), continue_(a)))), 5 #print_(x),
-    test.done()
-
-exports.Test =
-  "test block lamda": (test) ->
-    a = makeLabel('a')
-    b = makeLabel('b')
-    x = vari('x'); f = vari('f')
-#    test.equal  solve(block(a, block(b, funcall(lamda([x], break_(b, 2)), 1), 1), 3)), 3
-    test.equal  solve(block(a, block(b, assign(f, lamda([x], break_(b, 2))), funcall(f, 1), 1), 3)), 3  # optimization error
-#    test.equal  solve(block(a, block(b, funcall(lamda([x], break_(a, 2)), 1), 1), 3)), 2
-#    test.equal  solve(block(a, block(b, assign(f, lamda([x], break_(a, 2))), funcall(f, 1), 1), 3)), 2  # optimization error
-    test.done()
-
-xexports.Test =
+#xexports.Test =
   "test loop while until": (test) ->
     x = vari('x')
     a = makeLabel('x')
@@ -102,3 +80,29 @@ xexports.Test =
   "test callcc": (test) ->
     test.equal solve(begin(callcc(jsfun((k) -> k(null))), add(1, 2))), 3
     test.done()
+
+#exports.Test =
+  "test block lamda": (test) ->
+    a = makeLabel('a')
+    b = makeLabel('b')
+    x = vari('x'); f = vari('f')
+#    test.equal  solve(block(a, funcall(lamda([x], break_(a, 2)), 1), 3)), 2
+#    test.equal  solve(block(a, block(b, funcall(lamda([x], break_(b, 2)), 1), 1), 3)), 3
+#    test.equal  solve(block(a, block(b, assign(f, lamda([x], break_(b, 2))), funcall(f, 1), 1), 3)), 3  # optimization error
+#    test.equal  solve(block(a, block(b, funcall(lamda([x], break_(a, 2)), 1), 1), 3)), 2
+#    test.equal  solve(block(a, block(b, assign(f, lamda([x], break_(a, 2))), funcall(f, 1), 1), 3)), 2  # optimization error
+    test.equal  solve(block(a, assign(f, lamda([x], block(b, break_(a, 2), 1))), funcall(f, 1), 3)), 2  # optimization error
+    test.done()
+
+#xexports.Test =
+  "test block break continue": (test) ->
+    a = makeLabel('a')
+    b = makeLabel('b')
+    x = vari('x')
+    test.equal  solve(begin(assign(x, 1), block(a, print_(x), 1))), 1
+    test.equal  solve(block(a, break_(a, 2), 1)), 2
+    test.equal  solve(block(a, block(b, break_(b, 2), 1), 3)), 3
+    x = vari('x')
+    test.equal  solve(begin(assign(x, 1),  block(a, if_(eq(x, 5), break_(a, x)), inc(x), continue_(a)))), 5 #print_(x),
+    test.done()
+
