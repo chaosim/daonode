@@ -198,7 +198,7 @@ class exports.Solver
         cont
 
   # used by lisp style quasiquote, unquote, unquoteSlice
-  quasiquote: (exp, cont) -> exp?.quasiquote?(@, cont) or ((v) -> cont(exp))
+  quasiquote: (exp, cont) -> exp?.quasiquote?(@, cont) or cont(exp)
 
   # an utility that is useful for some logic builtins<br/>
   # when backtracking, execute fun at first, and then go to original failcont
@@ -374,21 +374,35 @@ class exports.Apply
   # play with lisp style quasiquote/unquote/unquoteSlice
   quasiquote:  (solver, cont) ->
     if @caller.name is "unquote"
-      return  solver.cont(@args[0], (v) -> cont(v))
+      return  solver.cont(@args[0], cont)
     else if @caller.name is "unquoteSlice"
       # use the flag class UnquoteSliceValue to find unquoteSlice expression
       return solver.cont(@args[0], (v) -> cont(new UnquoteSliceValue(v)))
-    params = []
-    cont = do (cont=cont) => ((v) => [cont, new @constructor(@caller, params)])
     args = @args
-    for i in [args.length-1..0] by -1
-      cont = do (i=i, cont=cont) ->
-        solver.quasiquote(args[i], (v) ->
-          if v instanceof UnquoteSliceValue
-            for x in v.value then params.push x
-          else params.push(v);
-          cont(null))
-    cont
+    length = args.length
+    switch length
+      when 0 then  cont(new @constructor(@caller, []))
+      when 1 then  solver.quasiquote(args[0], (v) ->
+        if v instanceof UnquoteSliceValue
+          cont(new @constructor(@caller, v.value))
+        else
+          cont(new @constructor(@caller, [v.value])))
+      else
+        params = []
+        cont = do (cont=cont) => (v) =>
+          solver.quasiquote(args[length-1], (v) ->
+            if v instanceof UnquoteSliceValue
+              for x in v.value then params.push x
+            else params.push(v)
+            cont(new @constructor(@caller, params)))
+        for i in [args.length-2..1] by -1
+          cont = do (i=i, cont=cont) ->
+            (v) ->
+              if v instanceof UnquoteSliceValue
+                for x in v.value then params.push x
+              else params.push(v);
+              solver.quasiquote(args[i], cont(null))
+        solver.quasiquote(args[0], cont)
 
 # A flag class is used to process unquoteSlice
 UnquoteSliceValue = class exports.UnquoteSliceValue

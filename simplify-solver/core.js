@@ -29,12 +29,12 @@
       this.done = function(value) {
         solver.finished = true;
         exports.status = exports.SUCCESS;
-        return [null, value];
+        return value;
       };
       this.faildone = function(value) {
         solver.finished = true;
         exports.status = exports.SUCCESS;
-        return [null, value];
+        return value;
       };
       this.failcont = this.faildone;
       this.cutCont = this.failcont;
@@ -52,7 +52,7 @@
       result.trail = this.trail.copy();
       result.catches = _.extend({}, this.catches);
       result.exits = _.extend({}, this.exits);
-      result.continues = _.extend({}, this.continues);
+      result.continues = _.extend({}, this.solveinues);
       result.purememo = _.extend({}, this.purememo);
       result.memo = _.extend({}, this.memo);
       result.done = this.done;
@@ -67,7 +67,7 @@
       this.trail = faked.trail;
       this.catches = faked.catches;
       this.exits = faked.exits;
-      this.continues = faked.continues;
+      this.solveinues = faked.continues;
       this.purememo = faked.purememo;
       this.memo = faked.memo;
       this.done = faked.done;
@@ -78,234 +78,143 @@
     };
 
     Solver.prototype.solve = function(exp, toCont) {
-      var cont, fromCont, value, _ref;
-
       if (toCont == null) {
         toCont = this.done;
       }
-      fromCont = this.cont(exp, toCont);
-      _ref = this.run(null, fromCont), cont = _ref[0], value = _ref[1];
-      return this.trail.getvalue(value);
+      return (exp != null ? typeof exp.solve === "function" ? exp.solve(this, toCont) : void 0 : void 0) || toCont(exp);
     };
 
-    Solver.prototype.run = function(value, cont) {
-      var _ref;
-
-      while (!this.finished) {
-        _ref = cont(value), cont = _ref[0], value = _ref[1];
-      }
-      return [cont, value];
-    };
-
-    Solver.prototype.cont = function(exp, cont) {
-      return (exp != null ? typeof exp.cont === "function" ? exp.cont(this, cont) : void 0 : void 0) || (function(v) {
-        return cont(exp);
-      });
-    };
-
-    Solver.prototype.expsCont = function(exps, cont) {
-      var length;
+    Solver.prototype.solveExps = function(exps, cont) {
+      var length,
+        _this = this;
 
       length = exps.length;
       if (length === 0) {
         throw exports.TypeError(exps);
       } else if (length === 1) {
-        return this.cont(exps[0], cont);
+        return this.solve(exps[0], cont);
       } else {
-        return this.cont(exps[0], this.expsCont(exps.slice(1), cont));
+        return this.solve(exps[0], function(v) {
+          return _this.solveExps(exps.slice(1), cont);
+        });
       }
     };
 
-    Solver.prototype.argsCont = function(args, cont) {
-      var arg0, arg1, arg2, arg3, arg4, arg5, cont0, cont1, cont2, cont3, cont4, cont5, cont6, i, length, params, solver, _cont1, _cont2, _cont3, _cont4, _cont5, _cont6, _i, _ref;
+    Solver.prototype.solveArgs = function(args, cont) {
+      var cont0, i, length, params, solver, _i, _ref;
 
       length = args.length;
       switch (length) {
         case 0:
-          return function(v) {
-            return cont([]);
-          };
+          return cont([]);
         case 1:
           cont0 = function(v) {
             return cont([v]);
           };
-          return this.cont(args[0], cont0);
+          return this.solve(args[0], cont0);
         case 2:
-          arg0 = null;
-          _cont1 = function(arg1) {
-            return cont([arg0, arg1]);
-          };
-          cont1 = this.cont(args[1], _cont1);
-          cont0 = function(v) {
-            arg0 = v;
-            return cont1(null);
-          };
-          return this.cont(args[0], cont0);
+          solver = this;
+          return this.solve(args[0], function(arg0) {
+            return solver.solve(args[1], function(arg1) {
+              return cont([arg0, arg1]);
+            });
+          });
         case 3:
-          arg0 = null;
-          arg1 = null;
-          _cont2 = function(arg2) {
-            return cont([arg0, arg1, arg2]);
-          };
-          cont2 = this.cont(args[2], _cont2);
-          _cont1 = function(v) {
-            arg1 = v;
-            return cont2(null);
-          };
-          cont1 = this.cont(args[1], _cont1);
-          cont0 = function(v) {
-            arg0 = v;
-            return cont1(null);
-          };
-          return this.cont(args[0], cont0);
+          solver = this;
+          return this.solve(args[0], function(arg0) {
+            return solver.solve(args[1], function(arg1) {
+              return solver.solve(args[2], function(arg2) {
+                return cont([arg0, arg1, arg2]);
+              });
+            });
+          });
         case 4:
-          arg0 = null;
-          arg1 = null;
-          arg2 = null;
-          _cont3 = function(arg3) {
-            return cont([arg0, arg1, arg2, arg3]);
-          };
-          cont3 = this.cont(args[3], _cont3);
-          _cont2 = function(v) {
-            arg2 = v;
-            return cont3(null);
-          };
-          cont2 = this.cont(args[2], _cont2);
-          _cont1 = function(v) {
-            arg1 = v;
-            return cont2(null);
-          };
-          cont1 = this.cont(args[1], _cont1);
-          cont0 = function(v) {
-            arg0 = v;
-            return cont1(null);
-          };
-          return this.cont(args[0], cont0);
+          solver = this;
+          return this.solve(args[0], function(arg0) {
+            return solver.solve(args[1], function(arg1) {
+              return solver.solve(args[2], function(arg2) {
+                return solver.solve(args[3], function(arg3) {
+                  return cont([arg0, arg1, arg2, arg3]);
+                });
+              });
+            });
+          });
         case 5:
-          arg0 = null;
-          arg1 = null;
-          arg2 = null;
-          arg3 = null;
-          _cont4 = function(arg4) {
-            return cont([arg0, arg1, arg2, arg3, arg4]);
-          };
-          cont4 = this.cont(args[4], _cont4);
-          _cont3 = function(v) {
-            arg3 = v;
-            return cont4(null);
-          };
-          cont3 = this.cont(args[3], _cont3);
-          _cont2 = function(v) {
-            arg2 = v;
-            return cont3(null);
-          };
-          cont2 = this.cont(args[2], _cont2);
-          _cont1 = function(v) {
-            arg1 = v;
-            return cont2(null);
-          };
-          cont1 = this.cont(args[1], _cont1);
-          cont0 = function(v) {
-            arg0 = v;
-            return cont1(null);
-          };
-          return this.cont(args[0], cont0);
+          solver = this;
+          return this.solve(args[0], function(arg0) {
+            return solver.solve(args[1], function(arg1) {
+              return solver.solve(args[2], function(arg2) {
+                return solver.solve(args[3], function(arg3) {
+                  return solver.solve(args[4], function(arg4) {
+                    return cont([arg0, arg1, arg2, arg3, arg4]);
+                  });
+                });
+              });
+            });
+          });
         case 6:
-          arg0 = null;
-          arg1 = null;
-          arg2 = null;
-          arg3 = null;
-          arg4 = null;
-          _cont5 = function(arg5) {
-            return cont([arg0, arg1, arg2, arg3, arg4, arg5]);
-          };
-          cont5 = this.cont(args[5], _cont5);
-          _cont4 = function(v) {
-            arg4 = v;
-            return cont5(null);
-          };
-          cont4 = this.cont(args[4], _cont4);
-          _cont3 = function(v) {
-            arg3 = v;
-            return cont4(null);
-          };
-          cont3 = this.cont(args[3], _cont3);
-          _cont2 = function(v) {
-            arg2 = v;
-            return cont3(null);
-          };
-          cont2 = this.cont(args[2], _cont2);
-          _cont1 = function(v) {
-            arg1 = v;
-            return cont2(null);
-          };
-          cont1 = this.cont(args[1], _cont1);
-          cont0 = function(v) {
-            arg0 = v;
-            return cont1(null);
-          };
-          return this.cont(args[0], cont0);
+          solver = this;
+          return this.solve(args[0], function(arg0) {
+            return solver.solve(args[1], function(arg1) {
+              return solver.solve(args[2], function(arg2) {
+                return solver.solve(args[3], function(arg3) {
+                  return solver.solve(args[4], function(arg4) {
+                    return solver.solve(args[5], function(arg5) {
+                      return cont([arg0, arg1, arg2, arg3, arg4, arg5]);
+                    });
+                  });
+                });
+              });
+            });
+          });
         case 7:
-          arg0 = null;
-          arg1 = null;
-          arg2 = null;
-          arg3 = null;
-          arg4 = null;
-          arg5 = null;
-          _cont6 = function(arg6) {
-            return cont([arg0, arg1, arg2, arg3, arg4, arg5, arg6]);
-          };
-          cont6 = this.cont(args[6], _cont6);
-          _cont5 = function(v) {
-            arg5 = v;
-            return cont6(null);
-          };
-          cont5 = this.cont(args[5], _cont5);
-          _cont4 = function(v) {
-            arg4 = v;
-            return cont5(null);
-          };
-          cont4 = this.cont(args[4], _cont4);
-          _cont3 = function(v) {
-            arg3 = v;
-            return cont4(null);
-          };
-          cont3 = this.cont(args[3], _cont3);
-          _cont2 = function(v) {
-            arg2 = v;
-            return cont3(null);
-          };
-          cont2 = this.cont(args[2], _cont2);
-          _cont1 = function(v) {
-            arg1 = v;
-            return cont2(null);
-          };
-          cont1 = this.cont(args[1], _cont1);
-          cont0 = function(v) {
-            arg0 = v;
-            return cont1(null);
-          };
-          return this.cont(args[0], cont0);
+          solver = this;
+          return this.solve(args[0], function(arg0) {
+            return solver.solve(args[1], function(arg1) {
+              return solver.solve(args[2], function(arg2) {
+                return solver.solve(args[3], function(arg3) {
+                  return solver.solve(args[4], function(arg4) {
+                    return solver.solve(args[5], function(arg5) {
+                      return solver.solve(args[6], function(arg6) {
+                        return cont([arg0, arg1, arg2, arg3, arg4, arg5, arg6]);
+                      });
+                    });
+                  });
+                });
+              });
+            });
+          });
         default:
           params = [];
           solver = this;
-          for (i = _i = _ref = length - 1; _i >= 0; i = _i += -1) {
+          cont = (function(cont) {
+            return function(argi) {
+              params.push(argi);
+              return cont(params);
+            };
+          })(cont);
+          cont = (function(cont) {
+            return function(argi) {
+              params.push(argi);
+              return solver.solve(args[length - 1], cont);
+            };
+          })(cont);
+          for (i = _i = _ref = length - 2; _i >= 1; i = _i += -1) {
             cont = (function(i, cont) {
-              var _cont;
-
-              _cont = function(argi) {
+              return function(argi) {
                 params.push(argi);
-                return cont(params);
+                return solver.solve(args[i], cont);
               };
-              return solver.cont(args[i], _cont);
             })(i, cont);
           }
-          return cont;
+          return solver.solve(args[0], cont);
       }
     };
 
     Solver.prototype.quasiquote = function(exp, cont) {
-      return (exp != null ? typeof exp.quasiquote === "function" ? exp.quasiquote(this, cont) : void 0 : void 0) || cont(exp);
+      return (exp != null ? typeof exp.quasiquote === "function" ? exp.quasiquote(this, cont) : void 0 : void 0) || (function(v) {
+        return cont(exp);
+      });
     };
 
     Solver.prototype.appendFailcont = function(fun) {
@@ -495,12 +404,8 @@
       }
     };
 
-    Var.prototype.cont = function(solver, cont) {
-      var _this = this;
-
-      return function(v) {
-        return cont(_this.deref(solver.trail));
-      };
+    Var.prototype.solve = function(solver, cont) {
+      return cont(this.deref(solver.trail));
     };
 
     Var.prototype.toString = function() {
@@ -636,74 +541,49 @@
       return "" + this.caller + "(" + (this.args.join(', ')) + ")";
     };
 
-    Apply.prototype.cont = function(solver, cont) {
-      return this.caller.applyCont(solver, cont, this.args);
+    Apply.prototype.solve = function(solver, cont) {
+      return this.caller.solveApply(solver, cont, this.args);
     };
 
     Apply.prototype.quasiquote = function(solver, cont) {
-      var args, i, length, params, _i, _ref,
+      var args, i, params, _i, _ref,
         _this = this;
 
       if (this.caller.name === "unquote") {
-        return solver.cont(this.args[0], cont);
+        return solver.solve(this.args[0], function(v) {
+          return cont(v);
+        });
       } else if (this.caller.name === "unquoteSlice") {
-        return solver.cont(this.args[0], function(v) {
+        return solver.solve(this.args[0], function(v) {
           return cont(new UnquoteSliceValue(v));
         });
       }
+      params = [];
+      cont = (function(cont) {
+        return function(v) {
+          return [cont, new _this.constructor(_this.caller, params)];
+        };
+      })(cont);
       args = this.args;
-      length = args.length;
-      switch (length) {
-        case 0:
-          return cont(new this.constructor(this.caller, []));
-        case 1:
-          return solver.quasiquote(args[0], function(v) {
+      for (i = _i = _ref = args.length - 1; _i >= 0; i = _i += -1) {
+        cont = (function(i, cont) {
+          return solver.quasiquote(args[i], function(v) {
+            var x, _j, _len, _ref1;
+
             if (v instanceof UnquoteSliceValue) {
-              return cont(new this.constructor(this.caller, v.value));
+              _ref1 = v.value;
+              for (_j = 0, _len = _ref1.length; _j < _len; _j++) {
+                x = _ref1[_j];
+                params.push(x);
+              }
             } else {
-              return cont(new this.constructor(this.caller, [v.value]));
+              params.push(v);
             }
+            return cont(null);
           });
-        default:
-          params = [];
-          cont = (function(cont) {
-            return function(v) {
-              return solver.quasiquote(args[length - 1], function(v) {
-                var x, _i, _len, _ref;
-
-                if (v instanceof UnquoteSliceValue) {
-                  _ref = v.value;
-                  for (_i = 0, _len = _ref.length; _i < _len; _i++) {
-                    x = _ref[_i];
-                    params.push(x);
-                  }
-                } else {
-                  params.push(v);
-                }
-                return cont(new this.constructor(this.caller, params));
-              });
-            };
-          })(cont);
-          for (i = _i = _ref = args.length - 2; _i >= 1; i = _i += -1) {
-            cont = (function(i, cont) {
-              return function(v) {
-                var x, _j, _len, _ref1;
-
-                if (v instanceof UnquoteSliceValue) {
-                  _ref1 = v.value;
-                  for (_j = 0, _len = _ref1.length; _j < _len; _j++) {
-                    x = _ref1[_j];
-                    params.push(x);
-                  }
-                } else {
-                  params.push(v);
-                }
-                return solver.quasiquote(args[i], cont(null));
-              };
-            })(i, cont);
-          }
-          return solver.quasiquote(args[0], cont);
+        })(i, cont);
       }
+      return cont;
     };
 
     return Apply;
@@ -802,7 +682,7 @@
       return _ref;
     }
 
-    Special.prototype.applyCont = function(solver, cont, args) {
+    Special.prototype.solveApply = function(solver, cont, args) {
       return this.fun.apply(this, [solver, cont].concat(__slice.call(args)));
     };
 
@@ -813,29 +693,29 @@
   exports.special = special = commandMaker(exports.Special);
 
   exports.call = special(-1, 'call', function() {
-    var args, argsCont, cont, goal, goal1, solver;
+    var args, cont, goal, goal1, solveArgs, solver;
 
     solver = arguments[0], cont = arguments[1], goal = arguments[2], args = 4 <= arguments.length ? __slice.call(arguments, 3) : [];
     goal1 = null;
-    argsCont = solver.argsCont(args, function(params, solver) {
-      return solver.cont(goal1.apply(null, params), cont)(null);
+    solveArgs = solver.solveArgs(args, function(params, solver) {
+      return solver.solve(goal1.apply(null, params), cont)(null);
     });
-    return solver.cont(goal, function(v) {
+    return solver.solve(goal, function(v) {
       goal1 = goal;
-      return argsCont(null);
+      return solveArgs(null);
     });
   });
 
   exports.apply = special(2, 'apply', function(solver, cont, goal, args) {
-    var argsCont, goal1;
+    var goal1, solveArgs;
 
     goal1 = null;
-    argsCont = solver.argsCont(args, function(params, solver) {
-      return solver.cont(goal1.apply(null, params), cont)(null);
+    solveArgs = solver.solveArgs(args, function(params, solver) {
+      return solver.solve(goal1.apply(null, params), cont)(null);
     });
-    return solver.cont(goal, function(v) {
+    return solver.solve(goal, function(v) {
       goal1 = goal;
-      return argsCont(null);
+      return solveArgs(null);
     });
   });
 
@@ -847,11 +727,11 @@
       return _ref1;
     }
 
-    Fun.prototype.applyCont = function(solver, cont, args) {
+    Fun.prototype.solveApply = function(solver, cont, args) {
       var _this = this;
 
-      return solver.argsCont(args, function(params) {
-        return [cont, _this.fun.apply(_this, params)];
+      return solver.solveArgs(args, function(params) {
+        return cont(_this.fun.apply(_this, params));
       });
     };
 
@@ -869,12 +749,12 @@
       return _ref2;
     }
 
-    Fun2.prototype.applyCont = function(solver, cont, args) {
+    Fun2.prototype.solveApply = function(solver, cont, args) {
       var fun;
 
       fun = this.fun;
-      return solver.argsCont(args, function(params) {
-        return solver.cont(fun.apply(null, params), cont)(params);
+      return solver.solveArgs(args, function(params) {
+        return solver.solve(fun.apply(null, params), cont)(params);
       });
     };
 
@@ -892,7 +772,7 @@
       return _ref3;
     }
 
-    Lamda.prototype.applyCont = function(solver, cont, args) {
+    Lamda.prototype.solveApply = function(solver, cont, args) {
       var f, fun;
 
       fun = this.fun;
@@ -900,9 +780,9 @@
         var args, k;
 
         k = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
-        return solver.cont(fun.apply(null, args), k);
+        return solver.solve(fun.apply(null, args), k);
       };
-      return solver.argsCont(args, function(params) {
+      return solver.solveArgs(args, function(params) {
         return f.apply(null, [cont].concat(__slice.call(params)));
       });
     };
@@ -928,7 +808,7 @@
       this.id = (Macro.id++).toString();
     }
 
-    Macro.prototype.applyCont = function(solver, cont, args) {
+    Macro.prototype.solveApply = function(solver, cont, args) {
       var exp, id, idMap, result;
 
       exp = this.fun.apply(this, args);
@@ -936,13 +816,13 @@
       id = this.id;
       if (!idMap[id]) {
         idMap[id] = true;
-        result = solver.cont(exp, cont);
+        result = solver.solve(exp, cont);
         delete idMap[id];
         return result;
       } else {
         return function(v) {
           delete idMap[id];
-          return solver.cont(exp, cont)(v);
+          return solver.solve(exp, cont)(v);
         };
       }
     };
@@ -961,7 +841,7 @@
       return _ref4;
     }
 
-    Proc.prototype.applyCont = function(solver, cont, args) {
+    Proc.prototype.solveApply = function(solver, cont, args) {
       var _this = this;
 
       return function(v) {
@@ -992,8 +872,8 @@
       var args, cont, solver;
 
       solver = arguments[0], cont = arguments[1], args = 3 <= arguments.length ? __slice.call(arguments, 2) : [];
-      return solver.argsCont(args, function(params) {
-        return [solver.cont(cmd.apply(null, params), cont), params];
+      return solver.solveArgs(args, function(params) {
+        return [solver.solve(cmd.apply(null, params), cont), params];
       });
     });
   };
