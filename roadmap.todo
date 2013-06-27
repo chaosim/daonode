@@ -1,5 +1,5 @@
 just javascript:
-  ☐ function without cont as parameter
+  ✔ function without cont as parameter @done (13-06-28 07:57)
   ✔ augment assign @done (13-06-17 15:32)
   ☐ while
   ☐ javascript's try/catch/throw

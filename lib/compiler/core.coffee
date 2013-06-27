@@ -79,7 +79,7 @@ exports.Compiler = class Compiler
       switch task
         when 'assign' then return @cont(exp, @clamda(v, il.assign(item, v), cont.call(v)))
         when 'augment-assign'
-          return @cont(exp, il.clamda(v, new augmentOperators[op](item, v), cont.call(v)))
+          return @cont(exp, @clamda(v, new augmentOperators[op](item, v), cont.call(v)))
         when 'incp'
           fc = il.vari('fc')
           return il.let_([fc, il.failcont], il.setfailcont(il.clamda(v, il['dec'](item), fc.call(v))), cont.call(il['inc'](item)))
@@ -105,9 +105,9 @@ exports.Compiler = class Compiler
       obj = il.vari('obj'); i = il.vari('i'); v = il.vari('v')
       item = il.index(obj, i)
       switch task
-        when 'assign' then cont1 = @cont(exp, il.clamda(v,  il.assign(item, v), cont.call(v)))
+        when 'assign' then cont1 = @cont(exp, @clamda(v,  il.assign(item, v), cont.call(v)))
         when 'augment-assign'
-          cont1 = @cont(exp, il.clamda(v,  new augmentOperators[op](item, v), cont.call(v)))
+          cont1 = @cont(exp, @clamda(v,  new augmentOperators[op](item, v), cont.call(v)))
         when 'incp'
           fc = il.vari('fc')
           il.let_([fc, il.failcont], il.setfailcont(il.clamda(v, il['dec'](item), fc.call(v))), cont.call(il['inc'](item)))
@@ -178,21 +178,18 @@ exports.Compiler = class Compiler
     "lambda": (cont, params, body...) ->
       v = il.vari('v')
       params = (il.vari(p) for p in params)
-      cont.call(il.lamda(params, @expsCont(body, il.clamda(v, v))))
+      globalCont = @globalCont
+      cont = cont.call(il.lamda(params, @expsCont(body, @clamda(v, v))))
+      @globalCont = globalCont
+      cont
 
     "macro": (cont, params, body...) ->
-      k = il.vari('cont')
+      v = il.vari('v')
       params1 = (il.vari(p) for p in params)
       body = (@substMacroArgs(body[i], params) for i in [0...body.length])
-      cont.call(il.lamda([k].concat(params1), @expsCont(body, k)))
-
-    'with-vars': (cont, names, body) ->
-      bindings = {}
-      bindings[name] = @newvar(name)
-      env = @withEnv
-      @withEnv = env.extendBindings(bindings)
-      cont = @cont(['begin', body...])
-      @withEnv = env
+      globalCont = @globalCont
+      cont = cont.call(il.lamda(params1, @expsCont(body, @clamda(v, v))))
+      @globalCont = globalCont
       cont
 
     "evalarg": (cont, name) -> cont.call(il.vari(name).call(cont))
@@ -205,19 +202,23 @@ exports.Compiler = class Compiler
       cont = cont.call(f.apply(params))
       for i in [length-1..0] by -1
         cont = do (i=i, cont=cont) ->
-          compiler.cont(args[i], il.clamda(params[i], cont))
-      @cont(caller, il.clamda(f, cont))
+          compiler.cont(args[i], compiler.clamda(params[i], cont))
+      @cont(caller, @clamda(f, cont))
 
     "macall": (cont, caller, args...) ->
       compiler = @
       f = il.vari('f'); v = il.vari('v')
       length = args.length
       params = (il.vari('a'+i) for i in [0...length])
-      cont = f.apply([cont].concat(params))
+      cont = f.apply(params)
       for i in [length-1..0] by -1
         cont = do (i=i, cont=cont) ->
-          il.clamda(params[i], cont).call(il.lamda([], compiler.cont(args[i], il.idcont)))
-      @cont(caller, il.clamda(f, cont))
+          globalCont = compiler.globalCont
+          compiler.globalCont = il.idcont
+          body = compiler.cont(args[i], il.idcont)
+          compiler.globalCont = globalCont
+          compiler.clamda(params[i], cont).call(il.lamda([], body))
+      @cont(caller, @clamda(f, cont))
 
     "quasiquote": (cont, exp) -> @quasiquote(exp, cont)
 
@@ -259,7 +260,10 @@ exports.Compiler = class Compiler
       exits = @exits[label]
       if not exits or exits==[] then throw new  Error(label)
       exitCont = exits[exits.length-1]
-      @cont(value, @protect(exitCont))
+      globalCont = @globalCont
+      cont = @cont(value, @protect(exitCont))
+      @globalCont = globalCont
+      cont
 
     # continue a block
     'continue': (cont, label) ->
@@ -272,17 +276,17 @@ exports.Compiler = class Compiler
     # aka. lisp style catch/throw
     'catch': (cont, tag, forms...) ->
       v = il.vari('v'); v2 = il.vari('v2')
-      @cont(tag, il.clamda(v,
+      @cont(tag, @clamda(v,
                            il.pushCatch(v, cont),
-                           @expsCont(forms, il.clamda(v2
+                           @expsCont(forms, @clamda(v2
                                                       il.popCatch(v),
                                                       cont.call(v2)))))
 
     # aka lisp style throw
     "throw": (cont, tag, form) ->
       v = il.vari('v'); v2 = il.vari('v2')
-      @cont(tag, il.clamda(v,
-                           @cont(form, il.clamda(v2,
+      @cont(tag, @clamda(v,
+                           @cont(form, @clamda(v2,
                                                  @protect(il.findCatch(v)).call(v2)))))
 
 
@@ -291,11 +295,11 @@ exports.Compiler = class Compiler
       oldprotect = @protect
       v1 = il.vari('v3'); v2 = il.vari('v4')
       compiler = @
-      @protect = (cont) -> il.clamda(v1,
-                                     compiler.expsCont(cleanup, il.clamda(v2,
+      @protect = (cont) -> compiler.clamda(v1,
+                                     compiler.expsCont(cleanup, compiler.clamda(v2,
                                           oldprotect(cont).call(v1))))
-      result = @cont(form,  il.clamda(v1,
-                              @expsCont(cleanup, il.clamda(v2,
+      result = @cont(form,  compiler.clamda(v1,
+                              @expsCont(cleanup, @clamda(v2,
                                     cont.call(v1)))))
       @protect = oldprotect
       result
@@ -305,31 +309,31 @@ exports.Compiler = class Compiler
     #current continuation @cont can be captured in someFunction
     'callcc': (cont, fun) ->
       v = il.vari('v')
-      @cont(fun, il.clamda(v, cont.call(v.call(cont, cont))))
+      @cont(fun, @clamda(v, cont.call(v.call(cont, cont))))
 
     # aka. lisp's call/fc
     # callfc(someFunction(kont) -> body)
     #current continuation @cont can be captured in someFunction
     'callfc': (cont, fun) ->
       v = il.vari('v')
-      @cont(fun, il.clamda(v, cont.call(v.call(il.failcont, cont))))
+      @cont(fun, @clamda(v, cont.call(v.call(il.failcont, cont))))
 
     'logicvar': (cont, name) -> cont.call(il.newLogicVar(name))
     'dummy': (cont, name) -> cont.call(il.newDummyVar(name))
     'unify': (cont, x, y) ->
       x1 = il.vari('x'); y1 = il.vari('y')
-      @cont(x, il.clamda(x1, @cont(y, il.clamda(y1,
+      @cont(x, @clamda(x1, @cont(y, @clamda(y1,
           il.if_(il.unify(x1, y1), cont.call(true),
              il.failcont.call(false))))))
     'notunify': (cont, x, y) ->
       x1 = il.vari('x'); y1 = il.vari('y')
-      @cont(x, il.clamda(x1, @cont(y, il.clamda(y1,
+      @cont(x, @clamda(x1, @cont(y, @clamda(y1,
           il.if_(il.unify(x, y), il.failcont.call(false),
              cont.call(true))))))
     # evaluate @exp and bind it to vari
     'is': (cont, vari, exp) ->
       v = il.vari('v')
-      @cont(exp, il.clamda(v, il.bind(vari, v), cont.call(true)))
+      @cont(exp, @clamda(v, il.bind(vari, v), cont.call(true)))
     'bind': (cont, vari, term) -> il.begin(il.bind(vari, il.deref(term)), cont.call(true))
     'getvalue': (cont, term) -> cont.call(il.getvalue(@interlang(term)))
     'succeed': (cont) -> cont.call(true)
@@ -341,8 +345,8 @@ exports.Compiler = class Compiler
       value1 = il.vari('value')
       fc = il.vari('fc')
       v = il.vari('v')
-      @cont(list, il.clamda(list1,
-        @cont(value, il.clamda(value1,
+      @cont(list, @clamda(list1,
+        @cont(value, @clamda(value1,
           il.let_([fc, il.failcont],
             il.setfailcont(il.clamda(v, il.pop(list1), fc.call(v)))
             il.push(list1, value1),
@@ -372,7 +376,7 @@ exports.Compiler = class Compiler
       v = il.vari('v')
       fc = il.vari('fc')
       il.let_([fc, il.failcont],
-        @cont(test, il.clamda(v,
+        @cont(test, @clamda(v,
           il.setfailcont(fc),
           @cont(action, cont))))
 
@@ -401,7 +405,7 @@ exports.Compiler = class Compiler
       v = il.vari('v')
       il.begin(il.assign(cc, il.cutcont),
                il.assign(il.cutcont, il.failcont),
-               @cont(goal, il.clamda(v, il.assign(il.cutcont, cc), cont.call(v))))
+               @cont(goal, @clamda(v, il.assign(il.cutcont, cc), cont.call(v))))
     # prolog's cut, aka "!"
     'cut': (cont) -> il.begin(il.setfailcont(il.cutcont), cont.call(null))
     # find all solution to the goal @exp in prolog
@@ -419,7 +423,7 @@ exports.Compiler = class Compiler
           il.setfailcont(il.clamda(v,
             il.if_(il.unify(result, result1), fc.call(v),
                    il.begin(il.setfailcont(fc), cont.call(v))))),
-          @cont(exp, il.clamda(v,
+          @cont(exp, @clamda(v,
             il.push(result1, il.getvalue(template)),
             il.failcont.call(v))))
 
@@ -428,31 +432,31 @@ exports.Compiler = class Compiler
       fc = il.vari('fc')
       v = il.vari('v')
       il.let_([fc, il.failcont],
-        @cont(goal, il.clamda(v, il.setfailcont(fc), cont.call(v))))
+        @cont(goal, @clamda(v, il.setfailcont(fc), cont.call(v))))
 
     'parse': (cont, exp, state) ->
       v = il.vari('v')
       oldState = il.vari('state')
-      @cont(state, il.clamda(v,
+      @cont(state, @clamda(v,
                              il.assign(oldState, il.state),
                              il.setstate(v),
-                             @cont(exp, il.clamda(v, il.setstate(oldState), cont.call(v)))))
+                             @cont(exp, @clamda(v, il.setstate(oldState), cont.call(v)))))
     'parsetext': (cont, exp, text) ->
       v = il.vari('v')
       oldState = il.vari('state')
-      @cont(text, il.clamda(v,
+      @cont(text, @clamda(v,
                              il.assign(oldState, il.state),
                              il.setstate(il.array(v, 0)),
-                             @cont(exp, il.clamda(v, il.setstate(oldState), cont.call(v)))))
+                             @cont(exp, @clamda(v, il.setstate(oldState), cont.call(v)))))
     'setstate': (cont, state) ->
       v = il.vari('v')
-      @cont(state, il.clamda(v, il.setstate(v), cont.call(v)))
+      @cont(state, @clamda(v, il.setstate(v), cont.call(v)))
     'settext': (cont, text) ->
       v = il.vari('v')
-      @cont(text, il.clamda(v, il.setstate(il.array(v, 0)), cont.call(v)))
+      @cont(text, @clamda(v, il.setstate(il.array(v, 0)), cont.call(v)))
     'setpos': (cont, pos) ->
       v = il.vari('v')
-      @cont(pos, il.clamda(v, il.assign(il.index(il.state, 1), v), cont.call(v)))
+      @cont(pos, @clamda(v, il.assign(il.index(il.state, 1), v), cont.call(v)))
     'getstate': (cont) -> cont.call(il.state)
     'gettext': (cont) -> cont.call(il.index(il.state, 0))
     'getpos': (cont) -> cont.call(il.index(il.state, 1))
@@ -485,7 +489,7 @@ exports.Compiler = class Compiler
 
     'step': (cont, n) ->
       v = il.vari('v'); text = il.vari('text'); pos = il.vari('pos');
-      @cont(n, il.clamda(v,
+      @cont(n, @clamda(v,
         il.listassign(text, pos, il.state),
         il.addassign(pos, v),
         il.setstate(il.array(text, pos)),
@@ -532,7 +536,7 @@ exports.Compiler = class Compiler
          il.setfailcont(il.clamda(v,
            il.setfailcont(fc),
            cont.call(v))),
-         @cont(exp, il.clamda(v,
+         @cont(exp, @clamda(v,
                     il.setfailcont(fc),
                     cont.call(v))))
     'any': (cont, exp) ->
@@ -588,10 +592,10 @@ exports.Compiler = class Compiler
       right = il.vari('right')
       v = il.vari('v')
       il.let_([state, il.state],
-        @cont(x,  il.clamda(v,
+        @cont(x,  @clamda(v,
         il.assign(right, il.state),
         il.setstate(state),
-        @cont(y, il.clamda(v,
+        @cont(y, @clamda(v,
           il.if_(il.fun(checkFunction).call(il.state, right), cont.call(v),
                 il.failcont.call(false)))))))
     # follow: if item is followed, succeed, else fail. after eval, state is restored
@@ -601,7 +605,7 @@ exports.Compiler = class Compiler
       state = il.vari('state')
       il.let_(
                [state, il.state],
-               @cont(item, il.clamda(v,
+               @cont(item, @clamda(v,
                                      il.setstate(state),
                                      cont.call(v))))
 
@@ -614,7 +618,7 @@ exports.Compiler = class Compiler
                [fc, il.failcont,
                 state, il.state],
                il.setfailcont(cont),
-               @cont(item, il.clamda(v,
+               @cont(item, @clamda(v,
                                      il.setstate(state),
                                      fc.call(v))))
 
@@ -627,7 +631,7 @@ exports.Compiler = class Compiler
       x = il.vari('x')
       c = il.vari('c')
       v = il.vari('v')
-      @cont(item, il.clamda(v,
+      @cont(item, @clamda(v,
           il.listassign(data, pos, il.state),
           il.if_(il.gt(pos, il.length(data)), il.return(il.failcont.call(v))),
           il.assign(x, il.deref(v)),
@@ -661,7 +665,7 @@ exports.Compiler = class Compiler
         cont = cont.call(vop(params...))
         for i in [length-1..0] by -1
           cont = do (i=i, cont=cont) ->
-            compiler.cont(args[i], il.clamda(params[i], cont))
+            compiler.cont(args[i], compiler.clamda(params[i], cont))
         cont
 
   for name in ['char', 'followChars', 'notFollowChars', 'charWhen', 'stringWhile', 'stringWhile0',
@@ -669,7 +673,7 @@ exports.Compiler = class Compiler
     do (name=name, vop=vop) -> Compiler::specials[name] = (cont, item) ->
       compiler = @
       v = il.vari('v')
-      compiler.cont(item, il.clamda(v, cont.call(il[name](il.solver, v))))
+      compiler.cont(item, compiler.clamda(v, cont.call(il[name](il.solver, v))))
 
   optimize: (exp, env) ->
     expOptimize = exp?.optimize
@@ -719,9 +723,9 @@ exports.Compiler = class Compiler
       for i in [exp.length-1..1] by -1
         e = exp[i]
         if  _.isArray(e) and e.length>0 and e[0] is "unquote-slice"
-          cont = @quasiquote(e, il.clamda(v, il.assign(quasilist, il.concat(quasilist, v)), cont))
+          cont = @quasiquote(e, @clamda(v, il.assign(quasilist, il.concat(quasilist, v)), cont))
         else
-          cont = @quasiquote(e, il.clamda(v, il.push(quasilist, v), cont))
+          cont = @quasiquote(e, @clamda(v, il.push(quasilist, v), cont))
       il.begin( il.assign(quasilist, il.list(head)),
         cont)
 

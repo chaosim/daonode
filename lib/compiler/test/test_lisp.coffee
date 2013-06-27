@@ -86,11 +86,11 @@ exports.Test =
     a = makeLabel('a')
     b = makeLabel('b')
     x = vari('x'); f = vari('f')
-#    test.equal  solve(block(a, funcall(lamda([x], break_(a, 2)), 1), 3)), 2
-#    test.equal  solve(block(a, block(b, funcall(lamda([x], break_(b, 2)), 1), 1), 3)), 3
-#    test.equal  solve(block(a, block(b, assign(f, lamda([x], break_(b, 2))), funcall(f, 1), 1), 3)), 3  # optimization error
-#    test.equal  solve(block(a, block(b, funcall(lamda([x], break_(a, 2)), 1), 1), 3)), 2
-#    test.equal  solve(block(a, block(b, assign(f, lamda([x], break_(a, 2))), funcall(f, 1), 1), 3)), 2  # optimization error
+    test.equal  solve(block(a, funcall(lamda([x], break_(a, 2)), 1), 3)), 2
+    test.equal  solve(block(a, block(b, funcall(lamda([x], break_(b, 2)), 1), 1), 3)), 3
+    test.equal  solve(block(a, block(b, assign(f, lamda([x], break_(b, 2))), funcall(f, 1), 1), 3)), 3  # optimization error
+    test.equal  solve(block(a, block(b, funcall(lamda([x], break_(a, 2)), 1), 1), 3)), 2
+    test.equal  solve(block(a, block(b, assign(f, lamda([x], break_(a, 2))), funcall(f, 1), 1), 3)), 2  # optimization error
     test.equal  solve(block(a, assign(f, lamda([x], block(b, break_(a, 2), 1))), funcall(f, 1), 3)), 2  # optimization error
     test.done()
 
