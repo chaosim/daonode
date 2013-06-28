@@ -35,7 +35,7 @@ exports.Test =
     test.deepEqual  solve(parsetext(subtext(1, 3), string('\ras\ndf'))), '\n'
     test.done()
 
-#xexports.Test =
+#exports.Test =
   "test char": (test) ->
     x = logicvar('x')
     test.equal  solve(parsetext(1, string('a'))), 1

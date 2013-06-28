@@ -205,19 +205,22 @@ Clamda::optimizeApply = (args, env, compiler) ->
   count = cont.refMap[v]
   if sideEffect(value)
     switch count
-      when 0, undefined then il.begin(value, compiler.optimize(body, env))
+      when 0, undefined
+        if value instanceof Lamda
+          compiler.optimize(body, env)
+        else
+          il.begin(value, compiler.optimize(body, env))
       else il.begin(il.assign(v, value), il.clamdabody(v, compiler.optimize(body, env.extend(v, v))))
   else compiler.optimize(body, env.extend(v, value))
 
 IdCont::optimizeApply = (args, env, compiler) -> compiler.optimize(args[0], env)
 
 JSFun::optimizeApply = (args, env, compiler) ->
-    cont = args[0]
     f = @fun
     t = typeof f
-    if t is 'function' then cont.call(new Apply(f, args[1...]))
-    else if t is 'string' then cont.call(new Apply(il.fun(f), args[1...]))
-    else cont.call(f.apply(args[1...])).optimize(env, compiler)
+    if t is 'function' then new Apply(f, args)
+    else if t is 'string' then new Apply(il.fun(f), args)
+    else f.apply(args).optimize(env, compiler)
 
 MAX_EXTEND_CODE_SIZE = 10
 
@@ -351,7 +354,19 @@ jsify = (exp) ->
   if exp_jsify then exp_jsify.call(exp)
   else exp
 
-Assign::jsify = () -> new @constructor(@left, jsify(@exp))
+Assign::jsify = () ->
+  exp = @exp
+  if exp instanceof Begin
+    exps = exp.exps
+    length = exps.length
+    assign = new @constructor(@left, jsify(exps[length-1])).jsify()
+    il.begin((exps[0...length-1].concat([assign]))...)
+  if exp instanceof ClamdaBody
+    new @constructor(@left, exp.body).jsify()
+  else if exp instanceof If
+    new If(exp.test, new @constructor(@left, exp.then_).jsify,
+           new @constructor(@left, exp.else_).jsify)
+  else new @constructor(@left, jsify(exp))
 ListAssign::jsify = () ->
   lefts = @lefts; exp =  @exp
   il.begin((new Assign(lefts[i], il.index(exp, i)) for i in [0...lefts.length])...)

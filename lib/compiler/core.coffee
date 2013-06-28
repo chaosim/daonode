@@ -56,7 +56,7 @@ exports.Compiler = class Compiler
 #    f = fromCont
     f.refMap = {}
     f.analyze(@, f.refMap)
-#    f = f.optimize(new Env(), @)
+    f = f.optimize(new Env(), @)
     f = f.jsify()
     f.toCode(@)
 
