@@ -72,7 +72,7 @@ exports.Test =
     test.equal  solve(parsetext(may(char(string('a'))), string('b'))), 0
     test.done()
 
-#exports.Test =
+#xexports.Test =
   "test greedyany": (test) ->
     _ = vari('__')
     result = vari('result')
@@ -106,7 +106,7 @@ exports.Test =
   "test lazyany": (test) ->
     _ = vari('__')
     result = vari('result')
-    test.equal  solve(begin(assign(_, dummy('__')), parsetext(lazyany(char(_)), string('a')))), 'a'
+    test.equal  solve(begin(assign(_, dummy('__')), parsetext(lazyany(char(_)), string('a')))), null
     test.deepEqual  solve(begin(assign(_, dummy('__')), assign(result, logicvar('result')),
                                 parsetext(lazyany(char(_), result, _), string('a')), getvalue(result))), []
     test.deepEqual  solve(begin(assign(_, dummy('__')), assign(result, logicvar('result')),
@@ -114,7 +114,7 @@ exports.Test =
     test.equal  solve(parsetext(begin(assign(_, dummy('__')), lazyany(char(_)), char(string('c')), eoi), string('abc'))), true
     test.equal  solve(parsetext(begin(lazyany(char(string('a'))), nextchar), string('b'))), 'b'
     test.equal  solve(parsetext(begin(lazyany(char(string('a'))), eoi), string('b'))), 0
-    test.equal  solve(begin(assign(_, dummy('__')), parsetext(lazyany(begin(char(_), print_(getvalue(_)))), string('abc')))), 'abc'
+    test.equal  solve(begin(assign(_, dummy('__')), parsetext(lazyany(begin(char(_), print_(getvalue(_)))), string('abc')))), null
     test.equal  solve(begin(assign(_, dummy('__')), parsetext(findall(lazyany(begin(char(_), print_(getvalue(_))))), string('abc')))), 3
     test.done()
 
@@ -130,10 +130,10 @@ exports.Test =
                                 parsetext(greedysome(char(_), result, _), string('a')), getvalue(result))), ['a']
     test.deepEqual  solve(begin(assign(_, dummy('__')), assign(result, logicvar('result')),
                                 settext(string('ab')), greedysome(char(_), result, _), eoi, getvalue(result))), ['a', 'b']
-    test.equal  solve(parsetext(orp(begin(greedysome(char(_)), char('c'), eoi), 1), string('abc'))), 1
+    test.equal  solve(parsetext(orp(begin(greedysome(char(_)), char(string('c')), eoi), 1), string('abc'))), 1
     test.done()
 
-#exports.Test =
+#xexports.Test =
   "test some": (test) ->
     _ = vari('__')
     result = vari('result')
@@ -156,7 +156,7 @@ exports.Test =
   "test lazysome": (test) ->
     _ = vari('__')
     result = vari('result')
-    test.equal  solve(begin(assign(_, dummy('__')), parsetext(lazysome(char(_)), string('a')))), 1
+    test.equal  solve(begin(assign(_, dummy('__')), parsetext(lazysome(char(_)), string('a')))), null
     test.deepEqual  solve(begin(assign(_, dummy('__')), assign(result, logicvar('result')),
                                 parsetext(lazysome(char(_), result, _), string('a')), getvalue(result))), ['a']
     test.deepEqual  solve(begin(assign(_, dummy('__')), assign(result, logicvar('result')),
@@ -168,7 +168,7 @@ exports.Test =
     test.equal  solve(begin(assign(_, dummy('__')), parsetext(findall(lazysome(begin(char(_), print_(getvalue(_))))), string('abc')))), 3
     test.done()
 
-#exports.Test =
+#xexports.Test =
   "test times": (test) ->
     _ = vari('__')
     result = vari('result')

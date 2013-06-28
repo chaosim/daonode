@@ -576,6 +576,7 @@ il.bind = vop('bind', (compiler)->args = @args; "#{compiler.toCode(args[0])}.bin
 il.undotrail = vop('undotrail', (compiler)->args = @args; "#{compiler.toCode(args[0])}.undo()")
 il.failcont = new Var('solver.failcont')
 il.setfailcont = (cont) -> il.assign(il.failcont, cont)
+il.setcutcont = (cont) -> il.assign(il.cutcont, cont)
 il.appendFailcont = vop('appendFailcont', (compiler)->args = @args; "solver.appendFailcont(#{compiler.toCode(args[0])})")
 il.cutcont = new Var('solver.cutcont')
 il.state = new Var('solver.state')
@@ -606,6 +607,15 @@ il.let_ = (bindings, body...) ->
   for i in [0...bindings.length] by 2
     params.push(bindings[i])
     values.push(bindings[i+1])
+  new Apply(il.lamda(params, body...), values)
+
+il.listlet = (varsValue, body...) ->
+  length = varsValue.length
+  params = varsValue[0...length-1]
+  value = varsValue[length-1]
+  values = []
+  for i in [0...length-1]
+    values.push(il.index(value, i))
   new Apply(il.lamda(params, body...), values)
 
 il.iff = (clauses..., else_) ->

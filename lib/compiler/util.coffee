@@ -178,7 +178,7 @@ exports.lazymay = (exp) -> ['lazymay', exp]
 exports.greedymay = (exp) -> ['greedymay', exp]
 
 index = 1
-exports.internalvar = internalvar = (name) -> name+'_$$'+index++
+exports.internalvar = internalvar = (name) -> name+'_$0'+index++
 
 # ##### normal mode, lazy mode, greedy mode
 #normal mode: try the goal at first, <br/>
