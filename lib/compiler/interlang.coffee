@@ -19,6 +19,7 @@ class Element
 class Var extends Element
   constructor: (@name) ->
   toString: () -> @name
+class GlobalVar extends Var
 class Symbol extends Var
 class Assign extends Element
   constructor: (@left, @exp) -> super
@@ -36,6 +37,7 @@ class Throw extends Return
 class Begin extends Element
   constructor: (@exps) -> super
   toString: () -> "begin(#{(toString(e) for e in @exps).join(',')})"
+class TopBegin extends Begin
 class Print extends Begin
   toString: () -> "print(#{(toString(e) for e in @exps).join(',')})"
 class Lamda extends Element
@@ -141,8 +143,8 @@ Clamda::optimize = (env, compiler) ->
   body = compiler.optimize(@body, env.extend(@v, @v))
   bindings = env.bindings
   locals = (k for k in bindings when hasOwnProperty.call(bindings, k) and k isnt @v)
-  if locals.length isnt 0 then body = il.begin(il.vardecl(locals...), body)
-  result = new Clamda(@v, body)
+  if locals.length isnt 0 then body = il.topbegin(il.vardecl(locals...), body)
+  result = il.clamda(@v, body)
   result.refMap = {}
   result.analyze(compiler,  result.refMap)
   return result
@@ -170,7 +172,7 @@ Begin::optimize = (env, compiler) ->
     e = compiler.optimize(exp, env)
     if e instanceof Begin then result = result.concat(e.exps)
     else result.push e
-  return new Begin(result)
+  return new @constructor(result)
 Deref::optimize = (env, compiler) ->
   exp = @exp
   if _.isString(exp) then exp
@@ -184,67 +186,14 @@ Apply::optimizeApply = (args, env, compiler) ->  new Apply(@, args)
 
 Lamda::optimizeApply = (args, env, compiler) ->
   params = @params
-  body = @body
   paramsLength = params.length
   if paramsLength is 0 then return compiler.optimize(body, env)
-  newParams = []; newArgs = []; bindings = {}
-  refMap = @refMap
-  for p, i in params
-    arg = args[i]
-    if sideEffect(arg)
-      newParams.push(p)
-      newArgs.push(arg)
-      continue
-    else
-      refCount = refMap[p]
-      switch refCount
-        when 1 then bindings[p] = arg
-        else
-          if codeSize(arg)*refCount>MAX_EXTEND_CODE_SIZE
-            newParams.push(p)
-            newArgs.push(arg)
-          else bindings[p] = arg
-  if newParams.length isnt 0
-    if not isEmpty(bindings) then env = env.extendBindings(bindings)
-    new Apply(new Lamda(newParams, compiler.optimize(body, env)), newArgs)
-  else
-    if bindings then compiler.optimize(body, env.extendBindings(bindings))
-    else  compiler.optimize(body, env)
-
-LetLamda::optimizeApply = (args, env, compiler) ->
-  params = @params
-  body = @body
-  paramsLength = params.length
-  if paramsLength is 0 then return compiler.optimize(body, env)
-  exps = []
-  temps = []
-  bindings = env.bindings
-  for p, i in params
-    if hasOwnProperty.call(env.variables, p)
-      pi = compiler.il_vari(p.name)
-      temps.push([p, pi])
-      exps.push(il.assign(pi, p))
-  for p, i in params
-    exps.push(il.assign(p, args[i]))
-  exps.push(body)
-  for pair, i in temps
-    [p, pi] = temps[i]
-    exps.push(il.assign(p, pi))
-  il.begin(exps...).optimize(env, compiler)
+  exps = (il.assign(p, args[i]) for p, i in params)
+  exps.push @body
+  new Apply(new Lamda([], compiler.optimize(il.begin(exps...), env)), [])
 
 Clamda::optimizeApply = (args, env, compiler) ->
-  cont = @; body = cont.body; v = cont.v; value = compiler.optimize(args[0], env)
-  count = cont.refMap[v]
-  if sideEffect(value)
-    switch count
-      when 0, undefined
-        if value instanceof Lamda or value instanceof Clamda
-          compiler.optimize(body, env)
-        else
-          il.begin(value, compiler.optimize(body, env))
-#      else il.begin(il.assign(v, value), il.clamdabody(v, compiler.optimize(body, env.extend(v, v))))
-      else il.begin(il.assign(v, value), compiler.optimize(body, env.extend(v, v)))
-  else compiler.optimize(body, env.extend(v, value))
+  il.begin(il.assign(@v, compiler.optimize(args[0], env)), @body).optimize(env, compiler)
 
 IdCont::optimizeApply = (args, env, compiler) -> compiler.optimize(args[0], env)
 
@@ -415,7 +364,7 @@ Begin::jsify = () ->
   result = []
   for e in exps
     result.push(jsify(e))
-  new Begin(result)
+  new @constructor(result)
 Lamda::jsify = () ->
   body = jsify(@body)
   body = insertReturn(body)
@@ -423,7 +372,7 @@ Lamda::jsify = () ->
 Clamda::jsify = () ->
   body = jsify(@body)
   body = insertReturn(body)
-  new Clamda(@v, body)
+  il.clamda(@v, body)
 ClamdaBody::jsify = () -> jsify(@body)
 Apply::jsify = () ->
   args = (jsify(a) for a in @args)
@@ -446,8 +395,8 @@ If::insertReturn = () ->
 Begin::insertReturn = () ->
   exps = @exps
   length = exps.length
-  exps[length-1] = insertReturn(exps[length-1])
-  il.begin(exps...)
+  last = insertReturn(exps[length-1])
+  begin(@constructor, [exps[0...length-1]..., last]...)
 
 Lamda::toCode = (compiler) ->
   compiler.parent = @
@@ -474,11 +423,8 @@ If::toCode = (compiler) ->
 Apply::toCode = (compiler) ->
   "(#{compiler.toCode(@caller)})(#{(compiler.toCode(arg) for arg in @args).join(', ')})"
 CApply::toCode = (compiler) -> "(#{compiler.toCode(@caller)})(#{compiler.toCode(@args[0])})"
-Begin::toCode = (compiler) ->
-  if compiler.parent instanceof Lamda
-    compiler.parent = @; "#{(compiler.toCode(exp) for exp in @exps).join('; ')}"
-  else
-    compiler.parent = @; "{#{(compiler.toCode(exp) for exp in @exps).join('; ')}}"
+Begin::toCode = (compiler) -> compiler.parent = @; "{#{(compiler.toCode(exp) for exp in @exps).join('; ')}}"
+TopBegin::toCode = (compiler) -> compiler.parent = @; "#{(compiler.toCode(exp) for exp in @exps).join('; ')}"
 Print::toCode = (compiler) ->  "console.log(#{(compiler.toCode(exp) for exp in @exps).join(', ')})"
 Deref::toCode = (compiler) ->  "solver.trail.deref(#{compiler.toCode(@exp)})"
 Code::toCode = (compiler) ->  @string
@@ -495,24 +441,29 @@ Return::isStatement = () -> true
 Assign::isStatement = () -> true
 
 il.vari = (name) -> new Var(name)
+il.global = (name) -> new GlobalVar(name)
 il.symbol = (name) -> new Symbol(name)
 il.assign = (left, exp) -> new Assign(left, exp)
+il.globalassign = (left, exp) -> new Assign(il.global(left), exp)
 il.if_ = (test, then_, else_) -> new If(test, then_, else_)
 il.deref = (exp) -> new Deref(exp)
-il.begin = (exps...) ->
+
+begin = (klass, exps...) ->
   length = exps.length
   if length is 0 then throw new Error "begin should have at least one exp"
-  if length is 1 then return exps[0]
   result = []
   for e in exps
     if e instanceof Begin then result = result.concat(e.exps)
     else result.push e
-  new Begin(result)
+  if result.length is 1 then return result[0]
+  else new klass(result)
+il.begin = (exps...) -> begin(Begin, exps...)
+il.topbegin = (exps...) -> begin(TopBegin, exps...)
 il.print = (exps...) -> new Print(exps)
 il.return = (value) -> new Return(value)
 il.throw = (value) -> new Throw(value)
-il.lamda = (params, body...) -> new Lamda(params, il.begin(body...))
-il.clamda = (v, body...) -> new Clamda(v, il.begin(body...))
+il.lamda = (params, body...) -> new Lamda(params, il.topbegin(body...))
+il.clamda = (v, body...) -> new Clamda(v, il.topbegin(body...))
 il.clamdabody = (v, body) -> new ClamdaBody(v, body)
 il.idcont = do -> v = il.vari('v'); new IdCont(v, v)
 il.code = (string) -> new Code(string)
@@ -618,6 +569,7 @@ il.instanceof = vop('instanceof', ((compiler)->args = @args; "(#{compiler.toCode
 il.run = vop('run', (compiler)->args = @args; "solver.run(#{compiler.toCode(args[0])})")
 il.new = vop('new', (compiler)->args = @args; "new #{compiler.toCode(args[0])}")
 il.evalexpr = vop('evalexpr', (compiler)->args = @args; "solve(#{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})")
+il.require = vop('require', (compiler)->args = @args; "require(#{compiler.toCode(args[0])})")
 
 il.newLogicVar = vop('newLogicVar', ((compiler)->args = @args; "new Var(#{compiler.toCode(args[0])})"), il.PURE)
 il.newDummyVar = vop('newDummyVar', ((compiler)->args = @args; "new DummyVar(#{compiler.toCode(args[0])})"), il.PURE)
@@ -658,15 +610,6 @@ il.let_ = (bindings, body...) ->
   for i in [0...bindings.length] by 2
     params.push(bindings[i])
     values.push(bindings[i+1])
-  new Apply(il.lamda(params, body...), values)
-
-il.listlet = (varsValue, body...) ->
-  length = varsValue.length
-  params = varsValue[0...length-1]
-  value = varsValue[length-1]
-  values = []
-  for i in [0...length-1]
-    values.push(il.index(value, i))
   new Apply(il.lamda(params, body...), values)
 
 il.iff = (clauses..., else_) ->

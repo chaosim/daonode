@@ -14,18 +14,7 @@ exports.solve = (exp, path) ->
 
 compile = (exp, path) ->
   compiler = new Compiler()
-  code = "_ = require('underscore');\n"\
-  +'__slice = [].slice\n'\
-  +"solve = require('f:/daonode/lib/compiler/core.js').solve;\n"\
-  +"parser = require('f:/daonode/lib/compiler/parser.js');\n"\
-  +"solvecore = require('f:/daonode/lib/compiler/solve.js');\n"\
-  +"SolverFinish = solvecore.SolverFinish;\n"\
-  +"Solver = solvecore.Solver;\n"\
-  +"Trail = solvecore.Trail;\n"\
-  +"Var = solvecore.Var;\n"\
-  +"DummyVar = solvecore.DummyVar;\n\n"\
-  +compiler.compile(exp)\
-  +"\n//exports.main();"
+  code = compiler.compile(exp) + "\n//exports.main();"
   code = beautify(code, { indent_size: 2})
   path = path or "f:/daonode/lib/compiler/test/compiled.js"
   fd = fs.openSync(path, 'w')
@@ -33,6 +22,17 @@ compile = (exp, path) ->
   fs.closeSync fd
   path
 
+prelude = [il.globalassign('_', il.require('underscore')),
+           il.globalassign('__slice', il.attr([], il.symbol('slice'))),
+           il.globalassign('solve', il.attr(il.require('f:/daonode/lib/compiler/core.js'), il.symbol('solve'))),
+           il.globalassign('parser', il.require('f:/daonode/lib/compiler/parser.js')),
+           il.globalassign('solvecore', il.require('f:/daonode/lib/compiler/solve.js')),
+           il.globalassign('SolverFinish', il.attr(il.vari('solvecore'), il.symbol('SolverFinish'))),
+           il.globalassign('Solver', il.attr(il.vari('solvecore'), il.symbol('Solver'))),
+           il.globalassign('Trail', il.attr(il.vari('solvecore'), il.symbol('Trail'))),
+           il.globalassign('Var', il.attr(il.vari('solvecore'), il.symbol('Var'))),
+           il.globalassign('DummyVar', il.attr(il.vari('solvecore'), il.symbol('DummyVar')))
+          ]
 # ####class Compiler
 # the compiler for dao expression
 exports.Compiler = class Compiler
@@ -46,21 +46,19 @@ exports.Compiler = class Compiler
 
   compile: (exp) ->
     v = @il_vari('v')
-    fromCont = @cont(exp, @clamda(v, il.throw(il.new(il.symbol('SolverFinish').call(v)))))
-    f = il.assign(il.vari('exports.main'), il.clamda(v
+    exp = @cont(exp, @clamda(v, il.throw(il.new(il.symbol('SolverFinish').call(v)))))
+    exps = [prelude...]
+    exps.push(il.assign(il.attr(il.global('exports'), il.symbol('main')), il.lamda([],
           il.assign(il.solver, il.new(il.symbol('Solver').call())),
           il.assign(il.state, null),
           il.assign(il.catches, {}),
           il.assign(il.trail, il.newTrail),
           il.assign(il.failcont, il.clamda(v, il.throw(il.new(il.symbol('SolverFinish').call(v))))),
           il.assign(il.cutcont, il.failcont),
-          il.run(il.clamda(v, fromCont))))
-#    f = fromCont
-    f.refMap = {}
-    f.analyze(@, f.refMap)
-    f = f.optimize(new Env(), @)
-    f = f.jsify()
-    f.toCode(@)
+          il.run(il.clamda(v, exp)))))
+    exp = il.topbegin(exps...).optimize(new Env(), @)
+    exp = exp.jsify()
+    exp.toCode(@)
 
   il_vari:(name) ->
     il.vari(name+'_$'+@index++)
@@ -88,16 +86,16 @@ exports.Compiler = class Compiler
           return @cont(exp, @clamda(v, new augmentOperators[op](item, v), cont.call(v)))
         when 'incp'
           fc = @il_vari('fc')
-          return il.let_([fc, il.failcont], il.setfailcont(il.clamda(v, il['dec'](item), fc.call(v))), cont.call(il['inc'](item)))
+          return il.begin(il.assign(fc, il.failcont), il.setfailcont(il.clamda(v, il['dec'](item), fc.call(v))), cont.call(il['inc'](item)))
         when 'decp'
           fc = @il_vari('fc')
-          return il.let_([fc, il.failcont], il.setfailcont(il.clamda(v, il['inc'](item), fc)), cont.call(il['dec'](item)))
+          return il.begin(il.assign(fc, il.failcont), il.setfailcont(il.clamda(v, il['inc'](item), fc)), cont.call(il['dec'](item)))
         when 'suffixincp'
           fc = @il_vari('fc')
-          return il.let_([fc, il.failcont], il.setfailcont(il.clamda(v, il['suffixdec'](item), fc.call(v))), cont.call(il['suffixinc'](item)))
+          return il.begin(il.assign(fc, il.failcont), il.setfailcont(il.clamda(v, il['suffixdec'](item), fc.call(v))), cont.call(il['suffixinc'](item)))
         when 'suffixdecp'
           fc = @il_vari('fc')
-          return il.let_([fc, il.failcont], il.setfailcont(il.clamda(v, il['suffixinc'](item), fc)), cont.call(il['suffixdec'](item)))
+          return il.begin(il.assign(fc, il.failcont), il.setfailcont(il.clamda(v, il['suffixinc'](item), fc)), cont.call(il['suffixdec'](item)))
         else # when 'inc', 'dec', 'suffixinc', 'suffixdec'
           return cont.call(il[task](item))
 
@@ -116,16 +114,16 @@ exports.Compiler = class Compiler
           cont1 = @cont(exp, @clamda(v, new augmentOperators[op](item, v), cont.call(v)))
         when 'incp'
           fc = @il_vari('fc')
-          il.let_([fc, il.failcont], il.setfailcont(il.clamda(v, il['dec'](item), fc.call(v))), cont.call(il['inc'](item)))
+          il.begin(il.assign(fc, il.failcont), il.setfailcont(il.clamda(v, il['dec'](item), fc.call(v))), cont.call(il['inc'](item)))
         when 'decp'
           fc = @il_vari('fc')
-          il.let_([fc, il.failcont], il.setfailcont(il.clamda(v, il['inc'](item), fc)), cont.call(il['dec'](item)))
+          il.begin(il.assign(fc, il.failcont), il.setfailcont(il.clamda(v, il['inc'](item), fc)), cont.call(il['dec'](item)))
         when 'suffixincp'
           fc = @il_vari('fc')
-          il.let_([fc, il.failcont], il.setfailcont(il.clamda(v, il['suffixdec'](item), fc.call(v))), cont.call(il['suffixinc'](item)))
+          il.begin(il.assign(fc, il.failcont), il.setfailcont(il.clamda(v, il['suffixdec'](item), fc.call(v))), cont.call(il['suffixinc'](item)))
         when 'suffixdecp'
           fc = @il_vari('fc')
-          il.let_([fc, il.failcont], il.setfailcont(il.clamda(v, il['suffixinc'](item), fc)), cont.call(il['suffixdec'](item)))
+          il.begin(il.assign(fc, il.failcont), il.setfailcont(il.clamda(v, il['suffixinc'](item), fc)), cont.call(il['suffixdec'](item)))
         else cont1 = cont.call(il[task](item))
       @cont(object, il.clamda(obj, @cont(index, il.clamda(i, cont1))))
     else throw new Error "Left Value side should be assignable expression."
@@ -353,7 +351,7 @@ exports.Compiler = class Compiler
       v = @il_vari('v')
       @cont(list, @clamda(list1,
         @cont(value, @clamda(value1,
-          il.let_([fc, il.failcont],
+          il.begin(il.assign(fc, il.failcont),
             il.setfailcont(il.clamda(v, il.pop(list1), fc.call(v)))
             il.push(list1, value1),
             cont.call(value1))))))
@@ -363,11 +361,11 @@ exports.Compiler = class Compiler
       trail = @il_vari('trail')
       state = @il_vari('state')
       fc = @il_vari('fc')
-      il.let_([trail, il.trail,
-               state, il.state,
-               fc, il.failcont],
-           il.settrail(il.newTrail),
-           il.setfailcont(il.clamda(v,
+      il.begin(il.assign(trail, il.trail),
+               il.assign(state, il.state),
+               il.assign(fc, il.failcont),
+               il.settrail(il.newTrail),
+               il.setfailcont(il.clamda(v,
                    il.undotrail(il.trail),
                    il.settrail(trail),
                    il.setstate(state),
@@ -381,7 +379,7 @@ exports.Compiler = class Compiler
       #If -> Then :- If, !, Then
       v = @il_vari('v')
       fc = @il_vari('fc')
-      il.let_([fc, il.failcont],
+      il.begin(il.assign(fc, il.failcont),
         @cont(test, @clamda(v,
           il.setfailcont(fc),
           @cont(action, cont))))
@@ -392,9 +390,9 @@ exports.Compiler = class Compiler
       trail = @il_vari('trail')
       state = @il_vari('state')
       fc = @il_vari('fc')
-      il.let_([trail, il.trail,
-               fc, il.failcont,
-               state, il.state],
+      il.begin(il.assign(trail, il.trail),
+               il.assign(fc, il.failcont),
+               il.assign(state, il.state),
             il.settrail(il.newTrail),
             il.setfailcont(il.clamda(v,
               il.undotrail(il.trail),
@@ -408,7 +406,7 @@ exports.Compiler = class Compiler
     'cutable': (cont, goal) ->
       cc = @il_vari('cutcont')
       v = @il_vari('v')
-      il.let_([cc, il.cutcont],
+      il.begin(il.assign(cc, il.cutcont),
                il.assign(il.cutcont, il.failcont),
                @cont(goal, @clamda(v, il.setcutcont(cc), cont.call(v))))
     # prolog's cut, aka "!"
@@ -418,13 +416,14 @@ exports.Compiler = class Compiler
       fc = @il_vari('fc')
       v = @il_vari('v')
       if not result?
-        il.let_([fc, il.failcont],
+        il.begin(il.assign(fc, il.failcont),
                 il.setfailcont(il.clamda(v, il.setfailcont(fc), cont.call(v))),
                 @cont(goal, il.failcont))
       else
         result1 = @il_vari('result')
-        il.let_([result1, [],
-                fc, il.failcont],
+        il.begin(
+          il.assign(result1, []),
+          il.assign(fc, il.failcont),
           il.setfailcont(il.clamda(v,
             il.if_(il.unify(result, result1), fc.call(v),
                    il.begin(il.setfailcont(fc), cont.call(v))))),
@@ -436,21 +435,21 @@ exports.Compiler = class Compiler
     'once': (cont, goal) ->
       fc = @il_vari('fc')
       v = @il_vari('v')
-      il.let_([fc, il.failcont],
+      il.begin(il.assign(fc, il.failcont),
         @cont(goal, @clamda(v, il.setfailcont(fc), cont.call(v))))
 
     'parse': (cont, exp, state) ->
       v = @il_vari('v')
       oldState = @il_vari('state')
       @cont(state, @clamda(v,
-                             il.let_([oldState, il.state],
+                             il.begin(il.assign(oldState, il.state),
                                il.setstate(v),
                                @cont(exp, @clamda(v, il.setstate(oldState), cont.call(v))))) )
     'parsetext': (cont, exp, text) ->
       v = @il_vari('v')
       oldState = @il_vari('state')
       @cont(text, @clamda(v,
-                          il.let_([oldState, il.state],
+                          il.begin(il.assign(oldState, il.state),
                              il.setstate(il.array(v, 0)),
                              @cont(exp, @clamda(v, il.setstate(oldState), cont.call(v))))))
     'setstate': (cont, state) ->
@@ -467,39 +466,39 @@ exports.Compiler = class Compiler
     'getpos': (cont) -> cont.call(il.index(il.state, 1))
     'eoi': (cont) ->
       data = @il_vari('data'); pos = @il_vari('pos')
-      il.begin(il.listlet([data, pos, il.state],
-                 il.if_(il.ge(pos, il.length(data)), cont.call(true), il.failcont.call(false))))
+      il.begin(il.listassign(data, pos, il.state),
+               il.if_(il.ge(pos, il.length(data)), cont.call(true), il.failcont.call(false)))
     'boi': (cont) -> il.if_(il.eq(il.index(il.state, 1), 0), cont.call(true), il.failcont.call(false))
     # eol: end of line text[pos] in "\r\n"
     'eol': (cont) ->
       text = @il_vari('text'); pos = @il_vari('pos');  c = @il_vari('c')
       il.begin(
-                il.listlet([text, pos, il.state],
-                  il.if_(il.ge(pos, il.length(text)), cont.call(true),
-                       il.begin(
-                         il.assign(c, il.index(text, pos, 1)),
-                         il.if_(il.or_(il.eq(c, "\r"), il.eq(c, "\n")),
-                              cont.call(true),
-                              il.failcont.call(false))))))
+                il.listassign(text, pos, il.state),
+                il.if_(il.ge(pos, il.length(text)), cont.call(true),
+                     il.begin(
+                       il.assign(c, il.index(text, pos, 1)),
+                       il.if_(il.or_(il.eq(c, "\r"), il.eq(c, "\n")),
+                            cont.call(true),
+                            il.failcont.call(false)))))
     'bol': (cont) ->
       text = @il_vari('text'); pos = @il_vari('pos');  c = @il_vari('c')
       il.begin(
-                il.listlet([text, pos, il.state],
+                il.listassign(text, pos, il.state),
                 il.if_(il.eq(pos, 0), cont.call(true),
                          il.begin(
                              il.assign(c, il.index(text, il.sub(pos, 1))),
                              il.if_(il.or_(il.eq(c, "\r"), il.eq(c, "\n")),
                                     cont.call(true),
-                                    il.failcont.call(false))))))
+                                    il.failcont.call(false)))))
 
     'step': (cont, n) ->
       v = @il_vari('v'); text = @il_vari('text'); pos = @il_vari('pos');
       @cont(n, @clamda(v,
-        il.listlet([text, pos, il.state],
+        il.listassign(text, pos, il.state),
 #          il.assign(pos, pos),
-          il.addassign(pos, v),
-          il.setstate(il.array(text, pos)),
-          cont.call(pos))))
+        il.addassign(pos, v),
+        il.setstate(il.array(text, pos)),
+        cont.call(pos)))
     # lefttext: return left text
     'lefttext': (cont) -> cont.call(il.slice(il.index(il.state, 0), il.index(il.state, 1)))
     # subtext: return text[start...start+length]
@@ -507,18 +506,18 @@ exports.Compiler = class Compiler
        text = @il_vari('text'); pos = @il_vari('pos')
        start1 = @il_vari('start'); length1 = @il_vari('length')
        il.begin(
-        il.listlet([text, pos, il.state],
-        il.let_([start1, il.if_(il.ne(start, null), start, pos),
-                 length1, il.if_(il.ne(length, null), length, il.length(text))],
-        cont.call(il.slice(text, start1, il.add(start1, length1))))))
+        il.listassign(text, pos, il.state),
+        il.begin(il.assign(start1, il.if_(il.ne(start, null), start, pos)),
+                           il.assign(length1, il.if_(il.ne(length, null), length, il.length(text))),
+        cont.call(il.slice(text, start1, il.add(start1, length1)))))
 
     # nextchar: text[pos]
     'nextchar': (cont) ->
       text = @il_vari('text')
       pos = @il_vari('pos')
       il.begin(
-          il.listlet([text, pos, il.state],
-          cont.call(il.index(text, pos))))
+          il.listassign(text, pos, il.state),
+          cont.call(il.index(text, pos)))
     # ##### may, lazymay, greedymay
     # may: aka optional
     'may': (cont, exp) ->
@@ -529,7 +528,7 @@ exports.Compiler = class Compiler
     'lazymay': (cont, exp) ->
       fc = @il_vari('fc')
       v = @il_vari('v')
-      il.let_([fc, il.failcont],
+      il.begin(il.assign(fc, il.failcont),
         il.setfailcont(il.clamda(v,
           il.setfailcont(fc),
           @cont(exp, cont))),
@@ -538,7 +537,7 @@ exports.Compiler = class Compiler
     'greedymay': (cont, exp) ->
       fc = @il_vari('fc')
       v = @il_vari('v')
-      il.let_([fc, il.failcont],
+      il.begin(il.assign(fc, il.failcont),
          il.setfailcont(il.clamda(v,
            il.setfailcont(fc),
            cont.call(v))),
@@ -553,18 +552,19 @@ exports.Compiler = class Compiler
       v = @il_vari('v')
       il.begin(
         il.assign(anyCont, il.clamda(v,
-        il.let_([fc, il.failcont,
-                 trail, il.trail,
-                 state, il.state],
-          il.settrail(il.newTrail),
-          il.setfailcont(il.clamda(v,
-            il.undotrail(il.trail),
-            il.settrail(trail),
-            il.setstate(state),
-            il.setfailcont(fc),
-            cont.call(v)))
-          @cont(exp, anyCont))))
-        anyCont.call(null))
+            il.begin(
+                 il.assign(fc, il.failcont),
+                 il.assign(trail, il.trail),
+                 il.assign(state, il.state),
+                 il.settrail(il.newTrail),
+                 il.setfailcont(il.clamda(v,
+                   il.undotrail(il.trail),
+                   il.settrail(trail),
+                   il.setstate(state),
+                   il.setfailcont(fc),
+                   cont.call(v)))
+                 @cont(exp, anyCont))))
+         anyCont.call(null))
     'lazyany': (cont, exp) ->
       fc = @il_vari('fc')
       trail = @il_vari('trail')
@@ -597,7 +597,7 @@ exports.Compiler = class Compiler
       state = @il_vari('state')
       right = @il_vari('right')
       v = @il_vari('v')
-      il.let_([state, il.state],
+      il.begin(il.assign(state, il.state),
         @cont(x,  @clamda(v,
         il.assign(right, il.state),
         il.setstate(state),
@@ -609,8 +609,8 @@ exports.Compiler = class Compiler
       state = @il_vari('state')
       v = @il_vari('v')
       state = @il_vari('state')
-      il.let_(
-               [state, il.state],
+      il.begin(
+               il.assign(state, il.state),
                @cont(item, @clamda(v,
                                      il.setstate(state),
                                      cont.call(v))))
@@ -620,11 +620,11 @@ exports.Compiler = class Compiler
       state = @il_vari('state')
       fc = @il_vari('fc')
       v = @il_vari('v')
-      il.let_(
-               [fc, il.failcont,
-                state, il.state],
-               il.setfailcont(cont),
-               @cont(item, @clamda(v,
+      il.begin(
+              il.assign(fc, il.failcont),
+              il.assign(state, il.state),
+              il.setfailcont(cont),
+              @cont(item, @clamda(v,
                                      il.setstate(state),
                                      fc.call(v))))
 
@@ -638,23 +638,23 @@ exports.Compiler = class Compiler
       c = @il_vari('c')
       v = @il_vari('v')
       @cont(item, @clamda(v,
-          il.listlet([data, pos, il.state],
-            il.if_(il.gt(pos, il.length(data)), il.return(il.failcont.call(v))),
-            il.let_([x, il.deref(v),
-                     c, il.index(data, pos)],
-            il.iff(il.instanceof(x, il.symbol('Var')),
-                 il.begin(
-                   il.bind(x, c),
-                   il.setstate(il.array(data, il.add(pos,1))),
-                   cont.call(il.add(pos,1))),
-                 il.eq(x,c),
-                 il.begin(
-                   il.setstate(il.array(data, il.add(pos,1))),
-                   cont.call(il.add(pos,1))),
-                   il.attr(il.symbol('_'), il.symbol('isString')).call(x),
-                 il.if_(il.eq(il.length(x), 1),il.failcont.call(v),
-                        il.throw(il.new(il.symbol('ExpressionError').call(x)))),
-                 il.throw(il.new(il.symbol('TypeError').call(x))))))))
+          il.listassign(data, pos, il.state),
+          il.if_(il.gt(pos, il.length(data)), il.return(il.failcont.call(v))),
+          il.begin(il.assign(x, il.deref(v)),
+                   il.assign(c, il.index(data, pos)),
+          il.iff(il.instanceof(x, il.symbol('Var')),
+               il.begin(
+                 il.bind(x, c),
+                 il.setstate(il.array(data, il.add(pos,1))),
+                 cont.call(il.add(pos,1))),
+               il.eq(x,c),
+               il.begin(
+                 il.setstate(il.array(data, il.add(pos,1))),
+                 cont.call(il.add(pos,1))),
+                 il.attr(il.symbol('_'), il.symbol('isString')).call(x),
+               il.if_(il.eq(il.length(x), 1),il.failcont.call(v),
+                      il.throw(il.new(il.symbol('ExpressionError').call(x)))),
+               il.throw(il.new(il.symbol('TypeError').call(x)))))))
 
     'spaces': (cont, item) -> cont.call(il.spaces(il.solver))
     'spaces0': (cont, item) -> cont.call(il.spaces0(il.solver))

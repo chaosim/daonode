@@ -5,8 +5,8 @@ solvebase = require('../solve')
 {begin, assign, print_,
 funcall, lamda, macro,
 if_, add, eq, le, inc, not_,
-logicvar, unify, succeed, fail, andp, orp, notp
-cutable, cut, findall
+logicvar, unify, succeed, fail, andp, orp, notp, getvalue
+cutable, cut, findall, once
 } = require('../util')
 
 vari = (name) -> name
@@ -63,14 +63,14 @@ exports.Test =
     test.equal  solve(orp(cutable(orp(andp(print_(1), cut, fail), print_(2))), print_(3))), null
     test.done()
 
-xexports.Test =
+#xexports.Test =
   "test findall once": (test) ->
     x = vari('x')
     result = vari('result')
-#    test.equal  solve(findall(orp(print_(1), print_(2)))), null
-#    test.equal  solve(findall(orp(print_(1), print_(2), print_(3)))), null
-    test.deepEqual solve(andp(assign(x, logicvar('x')), assign(result, logicvar('result')),
-                        findall(orp(unify(x, 1), unify(x, 2)), result, x), result)), [1,2]
+    test.equal  solve(findall(orp(print_(1), print_(2)))), null
+    test.equal  solve(findall(orp(print_(1), print_(2), print_(3)))), null
+#    test.deepEqual solve(andp(assign(x, logicvar('x')), assign(result, logicvar('result')),
+#                        findall(orp(unify(x, 1), unify(x, 2)), result, x), getvalue(result))), [1,2]
 #    test.deepEqual  solve(andp(findall(fail, result, x), result)), []
 #    test.deepEqual  solve(andp(findall(succeed, result, 1), result)), [1]
 #    test.deepEqual  solve(andp(findall(once(orp(print_(1), print_(2))), result, 1), result)), [1]

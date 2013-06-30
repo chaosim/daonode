@@ -8,18 +8,18 @@ vari = (name) -> name
 
 xexports = {}
 
-exports.Test =
+xexports.Test =
   "test vari assign": (test) ->
     x = 'x'
     test.equal  solve(begin(assign(x, 1), addassign(x, 2), x)), 3
     test.done()
 
-#exports.Test =
+exports.Test =
   "test 1": (test) ->
     test.equal  solve(1), 1
     test.done()
 
-#xexports.Test =
+xexports.Test =
   "test begin": (test) ->
     test.equal  solve(begin(1, 2)), 2
     test.done()
