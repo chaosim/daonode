@@ -4,6 +4,8 @@ fs = require("fs")
 beautify = require('js-beautify').js_beautify
 il = require("./interlang")
 
+hasOwnProperty = Object::hasOwnProperty
+
 exports.solve = (exp, path) ->
   path = compile(exp, path)
   delete require.cache[require.resolve(path)]
@@ -494,6 +496,7 @@ exports.Compiler = class Compiler
       v = @il_vari('v'); text = @il_vari('text'); pos = @il_vari('pos');
       @cont(n, @clamda(v,
         il.listlet([text, pos, il.state],
+#          il.assign(pos, pos),
           il.addassign(pos, v),
           il.setstate(il.array(text, pos)),
           cont.call(pos))))
@@ -767,12 +770,21 @@ lshift: il.lshiftassign, rshift: il.rshiftassign
 }
 
 exports.Env = class Env
-  constructor: (@outer, @data={}) ->
-  extend: (vari, value) -> data = {}; data[vari.name] = value; new Env(@, data)
+  constructor: (@outer, @bindings={}) ->
+    @variables = variables = {}
+    for k of bindings
+      if hasOwnProperty.call(bindings, k)
+        variables[k] = true
+    if @outer
+      outerVariables = @outer.variables
+      for k of outerVariables
+        if hasOwnProperty.call(outerVariables, k)
+          variables[k] = true
+  extend: (vari, value) -> bindings = {}; bindings[vari.name] = value; new Env(@, bindings)
   extendBindings: (bindings) -> new Env(@, bindings)
   lookup: (vari) ->
-    data = @data; name = vari.name;
-    if data.hasOwnProperty(name) then return data[name]
+    bindings = @bindings; name = vari.name;
+    if bindings.hasOwnProperty(name) then return bindings[name]
     else
       outer = @outer
       if outer then outer.lookup(vari) else vari

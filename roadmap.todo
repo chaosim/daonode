@@ -1,8 +1,9 @@
 just javascript:
   ✔ function without cont as parameter @done (13-06-28 07:57)
   ✔ augment assign @done (13-06-17 15:32)
-  ☐ while
-  ☐ javascript's try/catch/throw
+  ☐ javascript while, javascript for
+  ☐ javascript try/catch
+  ✔ throw @done (13-06-29 15:03)
   ✔ javascript's new @done (13-06-22 21:27)
   ☐ toCode: remove unnecessary parenthesis by using precedence of operator
 optimization:

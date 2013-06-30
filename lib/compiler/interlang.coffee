@@ -27,7 +27,7 @@ class ListAssign extends Assign
   constructor: (@lefts, @exp) -> @name = @toString()
   toString: () -> "#{toString(@lefts)} = #{toString(@exp)}"
 class AugmentAssign extends Assign
-  toString: () -> "#{toString(@left)} #{@constructor.operator}= #{toString(@exp)}"
+  toString: () -> "#{toString(@left)} #{@operator} #{toString(@exp)}"
 class Return extends Element
   constructor: (@value) -> super
   toString: () -> "return(#{toString(@value)})"
@@ -43,6 +43,7 @@ class Lamda extends Element
   toString: () -> "(#{(toString(e) for e in @params).join(', ')} -> #{toString(@body)})"
   call: (args...) -> new Apply(@, args)
   apply: (args) -> new Apply(@, args)
+class LetLamda extends Lamda
 class Clamda extends Lamda
   constructor: (@v, @body) -> @name = @toString()
   toString: () -> "(#{toString(@v)} -> #{toString(@body)})"
@@ -126,12 +127,22 @@ If::optimize = (env, compiler) ->
 Return::optimize = (env, compiler) -> new Return(compiler.optimize(@value, env))
 Throw::optimize = (env, compiler) -> new Throw(compiler.optimize(@value, env))
 Lamda::optimize = (env, compiler) ->
-  result = new Lamda(@params, compiler.optimize(@body, env))
+  bindings = {}
+  for p in @params then bindings[p] = p
+  env = env.extendBindings(bindings)
+  body = compiler.optimize(@body, env)
+  locals = (k for k in bindings when hasOwnProperty.call(bindings, k) and k not in @params)
+  if locals.length isnt 0 then body = il.begin(il.vardecl(locals...), body)
+  result = new Lamda(@params,body)
   result.refMap = {}
   result.analyze(compiler,  result.refMap)
   return result
 Clamda::optimize = (env, compiler) ->
-  result = new Clamda(@v, compiler.optimize(@body, env.extend(@v, @v)))
+  body = compiler.optimize(@body, env.extend(@v, @v))
+  bindings = env.bindings
+  locals = (k for k in bindings when hasOwnProperty.call(bindings, k) and k isnt @v)
+  if locals.length isnt 0 then body = il.begin(il.vardecl(locals...), body)
+  result = new Clamda(@v, body)
   result.refMap = {}
   result.analyze(compiler,  result.refMap)
   return result
@@ -172,33 +183,54 @@ Var::optimizeApply = (args, env, compiler) ->  new Apply(@, args)
 Apply::optimizeApply = (args, env, compiler) ->  new Apply(@, args)
 
 Lamda::optimizeApply = (args, env, compiler) ->
-    params = @params
-    body = @body
-    paramsLength = params.length
-    if paramsLength is 0 then return compiler.optimize(body, env)
-    newParams = []; newArgs = []; bindings = {}
-    refMap = @refMap
-    for p, i in params
-      arg = args[i]
-      if sideEffect(arg)
-        newParams.push(p)
-        newArgs.push(arg)
-        continue
-      else
-        refCount = refMap[p]
-        switch refCount
-          when 1 then bindings[p] = arg
-          else
-            if codeSize(arg)*refCount>MAX_EXTEND_CODE_SIZE
-              newParams.push(p)
-              newArgs.push(arg)
-            else bindings[p] = arg
-    if newParams.length isnt 0
-      if not isEmpty(bindings) then env = env.extendBindings(bindings)
-      new Apply(new Lamda(newParams, compiler.optimize(body, env)), newArgs)
+  params = @params
+  body = @body
+  paramsLength = params.length
+  if paramsLength is 0 then return compiler.optimize(body, env)
+  newParams = []; newArgs = []; bindings = {}
+  refMap = @refMap
+  for p, i in params
+    arg = args[i]
+    if sideEffect(arg)
+      newParams.push(p)
+      newArgs.push(arg)
+      continue
     else
-      if bindings then compiler.optimize(body, env.extendBindings(bindings))
-      else  compiler.optimize(body, env)
+      refCount = refMap[p]
+      switch refCount
+        when 1 then bindings[p] = arg
+        else
+          if codeSize(arg)*refCount>MAX_EXTEND_CODE_SIZE
+            newParams.push(p)
+            newArgs.push(arg)
+          else bindings[p] = arg
+  if newParams.length isnt 0
+    if not isEmpty(bindings) then env = env.extendBindings(bindings)
+    new Apply(new Lamda(newParams, compiler.optimize(body, env)), newArgs)
+  else
+    if bindings then compiler.optimize(body, env.extendBindings(bindings))
+    else  compiler.optimize(body, env)
+
+LetLamda::optimizeApply = (args, env, compiler) ->
+  params = @params
+  body = @body
+  paramsLength = params.length
+  if paramsLength is 0 then return compiler.optimize(body, env)
+  exps = []
+  temps = []
+  bindings = env.bindings
+  for p, i in params
+    if hasOwnProperty.call(env.variables, p)
+      pi = compiler.il_vari(p.name)
+      temps.push([p, pi])
+      exps.push(il.assign(pi, p))
+  for p, i in params
+    exps.push(il.assign(p, args[i]))
+  exps.push(body)
+  for pair, i in temps
+    [p, pi] = temps[i]
+    exps.push(il.assign(p, pi))
+  il.begin(exps...).optimize(env, compiler)
 
 Clamda::optimizeApply = (args, env, compiler) ->
   cont = @; body = cont.body; v = cont.v; value = compiler.optimize(args[0], env)
@@ -206,11 +238,12 @@ Clamda::optimizeApply = (args, env, compiler) ->
   if sideEffect(value)
     switch count
       when 0, undefined
-        if value instanceof Lamda
+        if value instanceof Lamda or value instanceof Clamda
           compiler.optimize(body, env)
         else
           il.begin(value, compiler.optimize(body, env))
-      else il.begin(il.assign(v, value), il.clamdabody(v, compiler.optimize(body, env.extend(v, v))))
+#      else il.begin(il.assign(v, value), il.clamdabody(v, compiler.optimize(body, env.extend(v, v))))
+      else il.begin(il.assign(v, value), compiler.optimize(body, env.extend(v, v)))
   else compiler.optimize(body, env.extend(v, value))
 
 IdCont::optimizeApply = (args, env, compiler) -> compiler.optimize(args[0], env)
@@ -322,10 +355,11 @@ expsEffect = (exps) ->
     if eff == il.EFFECT then effect = eff
   effect
 
-Var::sideEffect = () -> il.EFFECT
+Var::sideEffect = () -> il.PURE
 Return::sideEffect = () -> sideEffect(@value)
 If::sideEffect = () -> expsEffect [@test, @then_, @else_]
 Begin::sideEffect = () -> expsEffect(@exps)
+Lamda::sideEffect = () ->  il.PURE
 Apply::sideEffect = () ->  Math.max(applySideEffect(@caller), expsEffect(@args))
 VirtualOperation::sideEffect = () ->  Math.max(@_effect, expsEffect(@args))
 CApply::sideEffect = () -> Math.max(applySideEffect(@caller), sideEffect(@args[0]))
@@ -360,12 +394,13 @@ Assign::jsify = () ->
     exps = exp.exps
     length = exps.length
     assign = new @constructor(@left, jsify(exps[length-1])).jsify()
-    il.begin((exps[0...length-1].concat([assign]))...)
-  if exp instanceof ClamdaBody
+    exps = (jsify(e) for e in exps[0...length-1])
+    il.begin((exps.concat([assign]))...)
+  else if exp instanceof ClamdaBody
     new @constructor(@left, exp.body).jsify()
   else if exp instanceof If
-    new If(exp.test, new @constructor(@left, exp.then_).jsify,
-           new @constructor(@left, exp.else_).jsify)
+    new If(exp.test, new @constructor(@left, exp.then_).jsify(),
+           new @constructor(@left, exp.else_).jsify())
   else new @constructor(@left, jsify(exp))
 ListAssign::jsify = () ->
   lefts = @lefts; exp =  @exp
@@ -559,6 +594,7 @@ vop2 = (name, toCode, _effect=il.EFFECT) ->
     isStatement: () -> true
   (args...) -> new Vop(args)
 
+il.vardecl = vop('vardecl', (compiler)->args = @args; "var #{(compiler.toCode(e) for e in args).join(', ')}")
 il.solver = new Var('solver')
 il.array = vop('array', (compiler)->args = @args; "[#{(compiler.toCode(e) for e in args).join(', ')}]")
 il.suffixinc = vop('suffixdec', (compiler)->args = @args; "#{compiler.toCode(args[0])}++")
@@ -638,5 +674,7 @@ il.iff = (clauses..., else_) ->
   if length is 2 then il.if_(clauses[0], clauses[1], else_)
   else il.if_(clauses[0], clauses[1], il.iff(clauses[2...length]..., else_))
 
-il.excludes = ['evalexpr', 'failcont', 'run', 'getvalue', 'fake', 'findCatch', 'popCatch', 'pushCatch', 'protect', 'suffixinc', 'suffixdec', 'dec', 'inc', 'unify', 'bind', 'undotrail', 'newTrail', 'newLogicVar',
- 'char', 'followChars', 'notFollowChars', 'charWhen', 'stringWhile', 'stringWhile0', 'number', 'literal', 'followLiteral', 'quoteString']
+il.excludes = ['evalexpr', 'failcont', 'run', 'getvalue', 'fake', 'findCatch', 'popCatch', 'pushCatch',
+               'protect', 'suffixinc', 'suffixdec', 'dec', 'inc', 'unify', 'bind', 'undotrail',
+               'newTrail', 'newLogicVar', 'char', 'followChars', 'notFollowChars', 'charWhen',
+               'stringWhile', 'stringWhile0', 'number', 'literal', 'followLiteral', 'quoteString']

@@ -18,24 +18,24 @@ xexports = {}
 exports.Test =
   "test low level primitives": (test) ->
     x = logicvar('x')
-    test.deepEqual  solve(parsetext(getstate, string(''))), ['', 0]
-    test.equal  solve(parsetext(gettext, string(''))), ''
-    test.equal  solve(parsetext(getpos, string(''))), 0
-    test.equal  solve(parsetext(eoi, string(''))), true
+#    test.deepEqual  solve(parsetext(getstate, string(''))), ['', 0]
+#    test.equal  solve(parsetext(gettext, string(''))), ''
+#    test.equal  solve(parsetext(getpos, string(''))), 0
+#    test.equal  solve(parsetext(eoi, string(''))), true
     test.equal  solve(parsetext(andp(step(2), eoi), string('we'))), true
-    test.equal  solve(parsetext(andp(step(2), boi), string(''))), false
-    test.equal  solve(parsetext(boi, string(''))), true
-    test.equal  solve(parsetext(eol, string(''))), true
-    test.equal  solve(parsetext(bol, string(''))), true
-    test.equal  solve(parsetext(bol, string('\r'))), true
-    test.equal  solve(parsetext(andp(step(1), bol), string('\r'))), true
-    test.equal  solve(parsetext(andp(step(1), eol), string('\rasdf'))), false
-    test.equal  solve(parsetext(andp(step(3), eol), string('\ras\ndf'))), true
-    test.deepEqual  solve(parsetext(lefttext, string('\ras\ndf'))), '\ras\ndf'
-    test.deepEqual  solve(parsetext(subtext(1, 3), string('\ras\ndf'))), '\n'
+#    test.equal  solve(parsetext(andp(step(2), boi), string(''))), false
+#    test.equal  solve(parsetext(boi, string(''))), true
+#    test.equal  solve(parsetext(eol, string(''))), true
+#    test.equal  solve(parsetext(bol, string(''))), true
+#    test.equal  solve(parsetext(bol, string('\r'))), true
+#    test.equal  solve(parsetext(andp(step(1), bol), string('\r'))), true
+#    test.equal  solve(parsetext(andp(step(1), eol), string('\rasdf'))), false
+#    test.equal  solve(parsetext(andp(step(3), eol), string('\ras\ndf'))), true
+#    test.deepEqual  solve(parsetext(lefttext, string('\ras\ndf'))), '\ras\ndf'
+#    test.deepEqual  solve(parsetext(subtext(1, 3), string('\ras\ndf'))), '\n'
     test.done()
 
-#exports.Test =
+xexports.Test =
   "test char": (test) ->
     x = logicvar('x')
     test.equal  solve(parsetext(1, string('a'))), 1

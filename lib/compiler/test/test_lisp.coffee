@@ -30,8 +30,8 @@ exports.Test =
     test.equal  solve(begin(assign(a, 1))), 1
     test.equal  solve(begin(assign(a, 1), a)), 1
     test.equal  solve(begin(assign(a, 1), inc(a))), 2
-    test.equal  solve(begin(assign(a, 1), inc(a), inc(a))), 3
-    test.equal  solve(begin(assign(a, 1), inc(a), inc(a), inc(a))), 4
+#    test.equal  solve(begin(assign(a, 1), inc(a), inc(a))), 3
+#    test.equal  solve(begin(assign(a, 1), inc(a), inc(a), inc(a))), 4
     test.done()
 
 #xexports.Test =
@@ -49,18 +49,6 @@ exports.Test =
   "test iff": (test) ->
     test.equal  solve(iff([[1, 2]], 3)), 2
     test.equal  solve(iff([[0, 2], [1, 3]], 5)), 3
-    test.done()
-
-#xexports.Test =
-  "test loop while until": (test) ->
-    x = vari('x')
-    a = makeLabel('x')
-    test.equal  solve(begin(assign(x, 1),  block(a, if_(eq(x, 5), break_(a, x)), print_(x), inc(x), continue_(a)))), 5
-    test.equal  solve(begin(assign(x, 1),  block(a, if_(eq(x, 5), break_(x)), print_(x), inc(x), continue_()))), 5
-    test.equal  solve(begin(assign(x, 1),  loop_(a, if_(eq(x, 5), break_(a, x)), print_(x), inc(x)))), 5
-    test.equal  solve(begin(assign(x, 1),  loop_(a, print_(x), if_(eq(x, 5), break_(x)), inc(x)))), 5
-    test.equal  solve(begin(assign(x, 1),  while_(a, le(x, 5), print_(x), inc(x)))), null
-    test.equal  solve(begin(assign(x, 1),  until_(a, print_(x), inc(x), eq(x, 5)))), null
     test.done()
 
 #exports.Test =
@@ -81,17 +69,7 @@ exports.Test =
     test.equal solve(begin(callcc(jsfun((k) -> k(null))), add(1, 2))), 3
     test.done()
 
-#xexports.Test =
-  "test block break continue": (test) ->
-    a = makeLabel('a')
-    b = makeLabel('b')
-    x = vari('x')
-    test.equal  solve(begin(assign(x, 1), block(a, print_(x), 1))), 1
-    test.equal  solve(block(a, break_(a, 2), 1)), 2
-    test.equal  solve(block(a, block(b, break_(b, 2), 1), 3)), 3
-    x = vari('x')
-    test.equal  solve(begin(assign(x, 1),  block(a, if_(eq(x, 5), break_(a, x)), inc(x), continue_(a)))), 5 #print_(x),
-    test.done()
+
 
 #exports.Test =
   "test block lamda": (test) ->
@@ -103,7 +81,7 @@ exports.Test =
     test.equal  solve(block(a, block(b, funcall(lamda([x], break_(a, 2)), 1), 1), 3)), 2
     test.done()
 
-xexports.Test =
+#exports.Test =
   "test block lamda 2": (test) ->
     a = makeLabel('a')
     b = makeLabel('b')
@@ -111,4 +89,28 @@ xexports.Test =
     test.equal  solve(block(a, block(b, assign(f, lamda([x], break_(b, 2))), funcall(f, 1), 1), 3)), 3  # optimization error
     test.equal  solve(block(a, block(b, assign(f, lamda([x], break_(a, 2))), funcall(f, 1), 1), 3)), 2  # optimization error
     test.equal  solve(block(a, assign(f, lamda([x], block(b, break_(a, 2), 1))), funcall(f, 1), 3)), 2  # optimization error
+    test.done()
+
+xexports.Test =
+  "test loop while until": (test) ->
+    x = vari('x')
+    a = makeLabel('x')
+    test.equal  solve(begin(assign(x, 1),  block(a, if_(eq(x, 5), break_(a, x)), print_(x), inc(x), continue_(a)))), 5
+    test.equal  solve(begin(assign(x, 1),  block(a, if_(eq(x, 5), break_(x)), print_(x), inc(x), continue_()))), 5
+    test.equal  solve(begin(assign(x, 1),  loop_(a, if_(eq(x, 5), break_(a, x)), print_(x), inc(x)))), 5
+    test.equal  solve(begin(assign(x, 1),  loop_(a, print_(x), if_(eq(x, 5), break_(x)), inc(x)))), 5
+    test.equal  solve(begin(assign(x, 1),  while_(a, le(x, 5), print_(x), inc(x)))), null
+    test.equal  solve(begin(assign(x, 1),  until_(a, print_(x), inc(x), eq(x, 5)))), null
+    test.done()
+
+#xexports.Test =
+  "test block break continue": (test) ->
+    a = makeLabel('a')
+    b = makeLabel('b')
+    x = vari('x')
+    test.equal  solve(begin(assign(x, 1), block(a, print_(x), 1))), 1
+    test.equal  solve(block(a, break_(a, 2), 1)), 2
+    test.equal  solve(block(a, block(b, break_(b, 2), 1), 3)), 3
+    x = vari('x')
+    test.equal  solve(begin(assign(x, 1),  block(a, if_(eq(x, 5), break_(a, x)), inc(x), continue_(a)))), 5 #print_(x),
     test.done()
