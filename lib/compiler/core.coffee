@@ -22,17 +22,6 @@ compile = (exp, path) ->
   fs.closeSync fd
   path
 
-prelude = [il.globalassign('_', il.require('underscore')),
-           il.globalassign('__slice', il.attr([], il.symbol('slice'))),
-           il.globalassign('solve', il.attr(il.require('f:/daonode/lib/compiler/core.js'), il.symbol('solve'))),
-           il.globalassign('parser', il.require('f:/daonode/lib/compiler/parser.js')),
-           il.globalassign('solvecore', il.require('f:/daonode/lib/compiler/solve.js')),
-           il.globalassign('SolverFinish', il.attr(il.vari('solvecore'), il.symbol('SolverFinish'))),
-           il.globalassign('Solver', il.attr(il.vari('solvecore'), il.symbol('Solver'))),
-           il.globalassign('Trail', il.attr(il.vari('solvecore'), il.symbol('Trail'))),
-           il.globalassign('Var', il.attr(il.vari('solvecore'), il.symbol('Var'))),
-           il.globalassign('DummyVar', il.attr(il.vari('solvecore'), il.symbol('DummyVar')))
-          ]
 # ####class Compiler
 # the compiler for dao expression
 exports.Compiler = class Compiler
@@ -47,16 +36,25 @@ exports.Compiler = class Compiler
   compile: (exp) ->
     v = @il_vari('v')
     exp = @cont(exp, @clamda(v, il.throw(il.new(il.symbol('SolverFinish').call(v)))))
-    exps = [prelude...]
-    exps.push(il.assign(il.attr(il.global('exports'), il.symbol('main')), il.lamda([],
-          il.assign(il.solver, il.new(il.symbol('Solver').call())),
-          il.assign(il.state, null),
-          il.assign(il.catches, {}),
-          il.assign(il.trail, il.newTrail),
-          il.assign(il.failcont, il.clamda(v, il.throw(il.new(il.symbol('SolverFinish').call(v))))),
-          il.assign(il.cutcont, il.failcont),
-          il.run(il.clamda(v, exp)))))
-    exp = il.topbegin(exps...).optimize(new Env(), @)
+    exps = [ il.globalassign('_', il.require('underscore')),
+             il.globalassign('__slice', il.attr([], il.symbol('slice'))),
+             il.globalassign('solve', il.attr(il.require('f:/daonode/lib/compiler/core.js'), il.symbol('solve'))),
+             il.globalassign('parser', il.require('f:/daonode/lib/compiler/parser.js')),
+             il.globalassign('solvecore', il.require('f:/daonode/lib/compiler/solve.js')),
+             il.globalassign('SolverFinish', il.attr(il.vari('solvecore'), il.symbol('SolverFinish'))),
+             il.globalassign('Solver', il.attr(il.vari('solvecore'), il.symbol('Solver'))),
+             il.globalassign('Trail', il.attr(il.vari('solvecore'), il.symbol('Trail'))),
+             il.globalassign('Var', il.attr(il.vari('solvecore'), il.symbol('Var'))),
+             il.globalassign('DummyVar', il.attr(il.vari('solvecore'), il.symbol('DummyVar'))),
+             il.globalassign(il.solver, il.new(il.symbol('Solver').call())),
+             il.assign(il.state, null),
+             il.assign(il.catches, {}),
+             il.assign(il.trail, il.newTrail),
+             il.assign(il.failcont, il.clamda(v, il.throw(il.new(il.symbol('SolverFinish').call(v))))),
+             il.assign(il.cutcont, il.failcont),
+             il.run(il.clamda(v, exp))]
+    exp = il.assign(il.attr(il.global('exports'), il.symbol('main')), il.lamda([], exps...))
+    exp = exp.optimize(new Env(null, {}, {}, {}), @)
     exp = exp.jsify()
     exp.toCode(@)
 
@@ -397,21 +395,22 @@ exports.Compiler = class Compiler
     #like in prolog, failure as negation.
     'notp': (cont, goal) ->
       v = @il_vari('v')
+      v1 = @il_vari('v')
       trail = @il_vari('trail')
       state = @il_vari('state')
       fc = @il_vari('fc')
       il.begin(il.assign(trail, il.trail),
                il.assign(fc, il.failcont),
                il.assign(state, il.state),
-            il.settrail(il.newTrail),
-            il.setfailcont(il.clamda(v,
-              v,
-              il.undotrail(il.trail),
-              il.settrail(trail),
-              il.setstate(state),
-              il.setfailcont(fc),
-              cont.call(null))),
-            @cont(goal, fc))
+               il.settrail(il.newTrail),
+               il.setfailcont(il.clamda(v,
+                  il.assign(v1, v),
+                  il.undotrail(il.trail),
+                  il.settrail(trail),
+                  il.setstate(state),
+                  il.setfailcont(fc),
+                  cont.call(v1))),
+               @cont(goal, fc))
     'repeat': (cont) -> il.begin(il.setfailcont(cont), cont.call(null))
     #  make the goal cutable
     'cutable': (cont, goal) ->
@@ -576,7 +575,6 @@ exports.Compiler = class Compiler
       v1 = @il_vari('v')
       il.begin(
         il.assign(anyCont, il.recclamda(v,
-            il.begin(
                  il.assign(fc, il.failcont),
                  il.assign(trail, il.trail),
                  il.assign(state, il.state),
@@ -588,7 +586,7 @@ exports.Compiler = class Compiler
                    il.setstate(state),
                    il.setfailcont(fc),
                    cont.call(v1)))
-                 @cont(exp, anyCont))))
+                 @cont(exp, anyCont)))
          anyCont.call(null))
     'lazyany': (cont, exp) ->
       fc = @il_vari('fc')
@@ -597,8 +595,9 @@ exports.Compiler = class Compiler
       anyCont = @il_vari('anyCont')
       anyFcont = @il_vari('anyFcont')
       il.begin(
+        il.local(trail),
         il.assign(anyCont, il.recclamda(v,
-          il.assign(trail, il.trail),
+          il.globalassign(trail, il.trail),
           il.settrail(il.newTrail),
           il.setfailcont(anyFcont),
           cont.call(null))),
@@ -799,7 +798,7 @@ lshift: il.lshiftassign, rshift: il.rshiftassign
 }
 
 exports.Env = class Env
-  constructor: (@outer, @bindings={}) ->
+  constructor: (@outer, @bindings, @_locals, @_globals) ->
     @variables = variables = {}
     for k of bindings
       if hasOwnProperty.call(bindings, k)
@@ -809,14 +808,16 @@ exports.Env = class Env
       for k of outerVariables
         if hasOwnProperty.call(outerVariables, k)
           variables[k] = true
-  extend: (vari, value) -> bindings = {}; bindings[vari.name] = value; new Env(@, bindings)
-  extendBindings: (bindings) -> new Env(@, bindings)
+  extend: (vari, value, locals, globals) -> bindings = {}; bindings[vari.name] = value; new Env(@, bindings, locals, globals)
+  extendBindings: (bindings, locals, globals) -> new Env(@, bindings, locals, globals)
   lookup: (vari) ->
     bindings = @bindings; name = vari.name;
     if bindings.hasOwnProperty(name) then return bindings[name]
     else
       outer = @outer
       if outer then outer.lookup(vari) else vari
+  locals: () -> @_locals or @outer.locals()
+  globals: () -> @_globals or @outer.globals()
 
 exports.Error = class Error
   constructor: (@exp, @message='', @stack = @) ->  # @stack: to make webstorm nodeunit happy.

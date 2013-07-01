@@ -37,7 +37,7 @@ exports.Test =
 #xexports.Test =
   "test not succeed fail": (test) ->
     test.equal  solve(notp(succeed)), true
-    test.equal  solve(notp(fail)), false
+    test.equal  solve(notp(fail)), null
     test.done()
 
   "test not print": (test) ->
