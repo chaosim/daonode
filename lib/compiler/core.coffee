@@ -302,10 +302,10 @@ exports.Compiler = class Compiler
       oldprotect = @protect
       v1 = @il_vari('v'); v2 = @il_vari('v'); temp = @il_vari('temp')
       compiler = @
-      @protect = (cont) -> compiler.clamda(v1, il.assign(temp, v),
+      @protect = (cont) -> compiler.clamda(v1, il.assign(temp, v1),
                                      compiler.expsCont(cleanup, compiler.clamda(v2,
                                           oldprotect(cont).call(temp))))
-      result = @cont(form,  compiler.clamda(v1, il.assign(temp, v),
+      result = @cont(form,  compiler.clamda(v1, il.assign(temp, v1),
                               @expsCont(cleanup, @clamda(v2,
                                     cont.call(temp)))))
       @protect = oldprotect
@@ -721,7 +721,7 @@ exports.Compiler = class Compiler
     else if length is 1 then @cont(exps[0], cont)
     else
       v = @il_vari('v')
-      @cont(exps[0], @clamda(v, @expsCont(exps[1...], cont)))
+      @cont(exps[0], @clamda(v, v, @expsCont(exps[1...], cont)))
 
   quasiquote: (exp, cont) ->
     if not _.isArray(exp) then return cont.call(exp)

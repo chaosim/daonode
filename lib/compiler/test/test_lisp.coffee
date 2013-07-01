@@ -51,7 +51,7 @@ exports.Test =
     test.equal  solve(iff([[0, 2], [1, 3]], 5)), 3
     test.done()
 
-#exports.Test =
+#xexports.Test =
   "test catch throw": (test) ->
     a = vari('a')
     test.equal  solve(catch_(1, 2)), 2
@@ -65,13 +65,12 @@ exports.Test =
     test.equal(solve(block(foo, protect(break_(foo, 1),  print_(2), print_(3)))), 1)
     test.done()
 
+#xexports.Test =
   "test callcc": (test) ->
     test.equal solve(begin(callcc(jsfun((k) -> k(null))), add(1, 2))), 3
     test.done()
 
-
-
-#exports.Test =
+#xexports.Test =
   "test block lamda": (test) ->
     a = makeLabel('a')
     b = makeLabel('b')
@@ -103,7 +102,7 @@ exports.Test =
     test.equal  solve(begin(assign(x, 1),  until_(a, print_(x), inc(x), eq(x, 5)))), null
     test.done()
 
-#xexports.Test =
+#exports.Test =
   "test block break continue": (test) ->
     a = makeLabel('a')
     b = makeLabel('b')
@@ -111,6 +110,5 @@ exports.Test =
     test.equal  solve(begin(assign(x, 1), block(a, print_(x), 1))), 1
     test.equal  solve(block(a, break_(a, 2), 1)), 2
     test.equal  solve(block(a, block(b, break_(b, 2), 1), 3)), 3
-    x = vari('x')
     test.equal  solve(begin(assign(x, 1),  block(a, if_(eq(x, 5), break_(a, x)), inc(x), continue_(a)))), 5 #print_(x),
     test.done()
