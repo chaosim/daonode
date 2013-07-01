@@ -38,6 +38,7 @@ class Begin extends Element
   constructor: (@exps) -> super
   toString: () -> "begin(#{(toString(e) for e in @exps).join(',')})"
 class TopBegin extends Begin
+  toString: () -> "topbegin(#{(toString(e) for e in @exps).join(',')})"
 class Print extends Begin
   toString: () -> "print(#{(toString(e) for e in @exps).join(',')})"
 class Lamda extends Element
@@ -49,7 +50,12 @@ class LetLamda extends Lamda
 class Clamda extends Lamda
   constructor: (@v, @body) -> @name = @toString()
   toString: () -> "(#{toString(@v)} -> #{toString(@body)})"
+#  call: (value) -> new CApply(@, value)
+  call: (value) -> replace(@body, @v.name, value)
+
+class RecursiveClamda extends Clamda
   call: (value) -> new CApply(@, value)
+
 class ClamdaBody extends Clamda
   toString: () -> "{#{@v}: #{toString(@body)}}"
   call: (value) -> new Error("How is it happened to call with ClamdaBody? #{@}")
@@ -76,6 +82,7 @@ class Apply extends Element
   toString: () -> "(#{toString(@caller)})(#{(toString(arg) for arg in @args).join(', ')})"
 class CApply extends Apply
   constructor: (cont, value) -> @caller = cont; @args = [value]; @name = @toString()
+
 class Deref extends Element
   constructor: (@exp) -> super
   toString: () -> "deref(#{toString(@exp)})"
@@ -85,6 +92,27 @@ class Code extends Element
 class If extends Element
   constructor: (@test, @then_, @else_) -> super
   toString: () -> "if_(#{toString(@test)}, #{toString(@then_)}, #{toString(@else_)})"
+
+replace = (exp, param, value) ->
+  exp_replace = exp?.replace
+  if exp_replace then exp_replace.call(exp, param, value)
+  else exp
+
+Var::replace = (param, value) -> if @name is param then value else @
+Assign::replace = (param, value) -> new @constructor(@left, replace(@exp, param, value))
+ListAssign::replace = (param, value) -> new @constructor(@lefts, replace(@exp, param, value))
+If::replace = (param, value) ->  new If(replace(@test, param, value), replace(@then_, param, value), replace(@else_, param, value))
+Return::replace = (param, value) -> new @constructor(replace(@value, param, value))
+Lamda::replace = (param, value) -> @ #param should not occure in Lamda
+Clamda::replace = (param, value) -> @  #param should not occure in Lamda
+ClamdaBody::replace = (param, value) -> throw Error("#replace param with value in clamda should do before optimize Clamda")
+IdCont::replace = (param, value) -> @
+Apply::replace = (param, value) -> new Apply(replace(@caller, param, value), (replace(a, param, value) for a in @args))
+VirtualOperation::replace = (param, value) -> new @constructor((replace(a, param, value) for a in @args))
+Begin::replace = (param, value) -> new @constructor((replace(exp, param, value) for exp in @exps))
+Deref::replace = (param, value) -> new Deref(value.replace(@exp, param))
+Code::replace = (param, value) -> @
+JSFun::replace = (param, value) ->  new JSFun(replace(@fun, param, value))
 
 optimize = (exp, env, compiler) ->
   exp_optimize = exp?.optimize
@@ -190,9 +218,11 @@ Lamda::optimizeApply = (args, env, compiler) ->
   if paramsLength is 0 then return compiler.optimize(body, env)
   exps = (il.assign(p, args[i]) for p, i in params)
   exps.push @body
-  new Apply(new Lamda([], compiler.optimize(il.begin(exps...), env)), [])
+  new Apply(new Lamda([], compiler.optimize(il.topbegin(exps...), env)), [])
 
 Clamda::optimizeApply = (args, env, compiler) ->
+  il.begin(il.assign(@v, compiler.optimize(args[0], env)), @body).optimize(env, compiler)
+RecursiveClamda::optimizeApply = (args, env, compiler) ->
   il.begin(il.assign(@v, compiler.optimize(args[0], env)), @body).optimize(env, compiler)
 
 IdCont::optimizeApply = (args, env, compiler) -> compiler.optimize(args[0], env)
@@ -355,6 +385,7 @@ ListAssign::jsify = () ->
   lefts = @lefts; exp =  @exp
   il.begin((new Assign(lefts[i], il.index(exp, i)) for i in [0...lefts.length])...)
 
+Return::jsify = () -> new @constructor(jsify(@value))
 If::jsify = () -> new If(@test, jsify(@then_), jsify(@else_))
 Begin::jsify = () ->
   exps = @exps
@@ -464,6 +495,7 @@ il.return = (value) -> new Return(value)
 il.throw = (value) -> new Throw(value)
 il.lamda = (params, body...) -> new Lamda(params, il.topbegin(body...))
 il.clamda = (v, body...) -> new Clamda(v, il.topbegin(body...))
+il.recclamda = (v, body...) -> new RecursiveClamda(v, il.topbegin(body...))
 il.clamdabody = (v, body) -> new ClamdaBody(v, body)
 il.idcont = do -> v = il.vari('v'); new IdCont(v, v)
 il.code = (string) -> new Code(string)
