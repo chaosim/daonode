@@ -72,37 +72,66 @@ exports.Test =
     test.equal  solve(parsetext(may(char(string('a'))), string('b'))), 0
     test.done()
 
+#xexports.Test =
+  "test parallel": (test) ->
+    test.equal  solve(begin(settext(string('1')), parallel(char(string('1')), number(1)))), 1
+    test.equal  solve(begin(settext(string('12')), parallel(char(string('1')), number(12)))), 2
+    test.equal  solve(begin(settext(string('1')), parallel(char(string('1')),char(string('a'))))), false
+    test.done()
+
+#exports.Test =
+  "test follow": (test) ->
+    test.equal  solve(begin(settext(string('1')), follow(char(string('1'))))), 1
+    test.equal  solve(begin(settext(string('1')), notfollow(char(string('1'))))), 1
+    test.done()
+
 #exports.Test =
   "test greedyany": (test) ->
     _ = vari('__')
     result = vari('result')
-#    test.equal  solve(begin(assign(_, dummy('__')), parsetext(greedyany(char(_)), string('abc')))), 3
-#    test.equal  solve(parsetext(begin(assign(_, dummy('__')), greedyany(char(_)), eoi), string('a'))), true
-#    test.equal  solve(parsetext(begin(assign(_, dummy('__')), greedyany(char(_)), char(string('c')), eoi), string('ac'))), 2
-#    test.equal  solve(parsetext(findall(begin(assign(_, dummy('__')), greedyany(char(_)), char(string('c')), eoi)), string('abc'))), 3
-#    test.deepEqual  solve(begin(assign(_, dummy('__')), assign(result, logicvar('result')),
-#                                parsetext(greedyany(char(_), result, _), string('a')), getvalue(result))), ['a']
-#    test.deepEqual  solve(begin(assign(_, dummy('__')), assign(result, logicvar('result')),
-#                                settext(string('ab')), greedyany(char(_), result, _), eoi, getvalue(result))), ['a', 'b']
+    test.equal  solve(begin(assign(_, dummy('__')), parsetext(greedyany(char(_)), string('abc')))), 3
+    test.equal  solve(parsetext(begin(assign(_, dummy('__')), greedyany(char(_)), eoi), string('a'))), true
+    test.equal  solve(parsetext(begin(assign(_, dummy('__')), greedyany(char(_)), char(string('c')), eoi), string('ac'))), 2
+    test.equal  solve(parsetext(findall(begin(assign(_, dummy('__')), greedyany(char(_)), char(string('c')), eoi)), string('abc'))), 3
+    test.deepEqual  solve(begin(assign(_, dummy('__')), assign(result, logicvar('result')),
+                                parsetext(greedyany(char(_), result, _), string('a')), getvalue(result))), ['a']
+    test.deepEqual  solve(begin(assign(_, dummy('__')), assign(result, logicvar('result')),
+                                settext(string('ab')), greedyany(char(_), result, _), eoi, getvalue(result))), ['a', 'b']
     test.done()
 
-#xexports.Test =
+#exports.Test =
+  "test lazysome": (test) ->
+    _ = vari('__')
+    result = vari('result')
+    test.equal  solve(begin(assign(_, dummy('__')), parsetext(lazysome(char(_)), string('a')))), null
+    test.deepEqual  solve(begin(assign(_, dummy('__')), assign(result, logicvar('result')),
+                                parsetext(lazysome(char(_), result, _), string('a')), getvalue(result))), ['a']
+    test.deepEqual  solve(begin(assign(_, dummy('__')), assign(result, logicvar('result')),
+                                settext(string('ab')), lazysome(char(_), result, _), eoi, getvalue(result))), ['a', 'b']
+    test.equal  solve(parsetext(begin(assign(_, dummy('__')), lazysome(char(_)), char(string('c')), eoi), string('abc'))), true
+    test.equal  solve(parsetext(begin(lazysome(char(string('a'))), nextchar), string('b'))), false
+    test.equal  solve(parsetext(begin(lazysome(char(string('a'))), eoi), string('b'))), false
+    test.equal  solve(begin(assign(_, dummy('__')), parsetext(lazysome(begin(char(_), print_(getvalue(_)))), string('abc')))), null
+    test.equal  solve(begin(assign(_, dummy('__')), parsetext(findall(lazysome(begin(char(_), print_(getvalue(_))))), string('abc')))), 3
+    test.done()
+
+xexports.Test =
   "test any": (test) ->
     _ = vari('__')
     result = vari('result')
-#    test.equal  solve(begin(assign(_, dummy('__')), parsetext(any(char(_)), string('a')))), 1
-#    test.equal  solve(begin(assign(_, dummy('__')), parsetext(any(char(_)), string('ab')))), 2
-#    test.equal  solve(parsetext(begin(assign(_, dummy('__')), any(char(_)), eoi), string('abc'))), true
-#    test.deepEqual  solve(begin(assign(_, dummy('__')), assign(result, logicvar('result')),
-#                                parsetext(any(char(_), result, _), string('a')), getvalue(result))), ['a']
-#    test.deepEqual  solve(begin(assign(_, dummy('__')), assign(result, logicvar('result')),
-#                                settext(string('ab')), any(char(_), result, _), eoi, getvalue(result))), ['a', 'b']
-#    test.equal  solve(parsetext(begin(assign(_, dummy('__')), any(char(_)), char(string('c')), eoi), string('abc'))), true
-#    test.equal  solve(parsetext(begin(assign(_, dummy('__')), any(char(string('a')))), string('b'))), 0
-#    test.equal  solve(parsetext(begin(assign(_, dummy('__')), any(char(string('a'))), eoi), string('b'))), false
+    test.equal  solve(begin(assign(_, dummy('__')), parsetext(any(char(_)), string('a')))), 1
+    test.equal  solve(begin(assign(_, dummy('__')), parsetext(any(char(_)), string('ab')))), 2
+    test.equal  solve(parsetext(begin(assign(_, dummy('__')), any(char(_)), eoi), string('abc'))), true
+    test.deepEqual  solve(begin(assign(_, dummy('__')), assign(result, logicvar('result')),
+                                parsetext(any(char(_), result, _), string('a')), getvalue(result))), ['a']
+    test.deepEqual  solve(begin(assign(_, dummy('__')), assign(result, logicvar('result')),
+                                settext(string('ab')), any(char(_), result, _), eoi, getvalue(result))), ['a', 'b']
+    test.equal  solve(parsetext(begin(assign(_, dummy('__')), any(char(_)), char(string('c')), eoi), string('abc'))), true
+    test.equal  solve(parsetext(begin(assign(_, dummy('__')), any(char(string('a')))), string('b'))), 0
+    test.equal  solve(parsetext(begin(assign(_, dummy('__')), any(char(string('a'))), eoi), string('b'))), false
     test.done()
 
-#xexports.Test =
+xexports.Test =
   "test lazyany": (test) ->
     _ = vari('__')
 #    result = vari('result')
@@ -118,106 +147,77 @@ exports.Test =
 #    test.equal  solve(begin(assign(_, dummy('__')), parsetext(findall(lazyany(begin(char(_), print_(getvalue(_))))), string('abc')))), 3
     test.done()
 
-#exports.Test =
+xexports.Test =
   "test greedysome": (test) ->
     _ = vari('__')
     result = vari('result')
-#    test.equal  solve(begin(assign(_, dummy('__')), parsetext(greedysome(char(_)), string('abc')))), 3
-#    test.equal  solve(parsetext(begin(assign(_, dummy('__')), greedysome(char(_)), eoi), string('a'))), true
-#    test.equal  solve(parsetext(begin(assign(_, dummy('__')), greedysome(char(_)), char(string('c')), eoi), string('ac'))), 2
-#    test.equal  solve(parsetext(findall(begin(assign(_, dummy('__')), greedysome(char(_)), char(string('c')), eoi)), string('abc'))), 3
-#    test.deepEqual  solve(begin(assign(_, dummy('__')), assign(result, logicvar('result')),
-#                                parsetext(greedysome(char(_), result, _), string('a')), getvalue(result))), ['a']
-#    test.deepEqual  solve(begin(assign(_, dummy('__')), assign(result, logicvar('result')),
-#                                settext(string('ab')), greedysome(char(_), result, _), eoi, getvalue(result))), ['a', 'b']
-#    test.equal  solve(parsetext(orp(begin(greedysome(char(_)), char(string('c')), eoi), 1), string('abc'))), 1
+    test.equal  solve(begin(assign(_, dummy('__')), parsetext(greedysome(char(_)), string('abc')))), 3
+    test.equal  solve(parsetext(begin(assign(_, dummy('__')), greedysome(char(_)), eoi), string('a'))), true
+    test.equal  solve(parsetext(begin(assign(_, dummy('__')), greedysome(char(_)), char(string('c')), eoi), string('ac'))), 2
+    test.equal  solve(parsetext(findall(begin(assign(_, dummy('__')), greedysome(char(_)), char(string('c')), eoi)), string('abc'))), 3
+    test.deepEqual  solve(begin(assign(_, dummy('__')), assign(result, logicvar('result')),
+                                parsetext(greedysome(char(_), result, _), string('a')), getvalue(result))), ['a']
+    test.deepEqual  solve(begin(assign(_, dummy('__')), assign(result, logicvar('result')),
+                                settext(string('ab')), greedysome(char(_), result, _), eoi, getvalue(result))), ['a', 'b']
+    test.equal  solve(parsetext(orp(begin(greedysome(char(_)), char(string('c')), eoi), 1), string('abc'))), 1
     test.done()
 
-#xexports.Test =
+xexports.Test =
   "test some": (test) ->
     _ = vari('__')
     result = vari('result')
-#    test.equal  solve(begin(assign(_, dummy('__')), parsetext(some(char(_)), string('a')))), 1
-#    test.equal  solve(begin(assign(_, dummy('__')), parsetext(some(char(_)), string('ab')))), 2
-#    test.equal  solve(parsetext(begin(assign(_, dummy('__')), some(char(_)), eoi), string('abc'))), true
-#    test.equal core.status, core.SUCCESS
-#    test.deepEqual  solve(begin(assign(_, dummy('__')), assign(result, logicvar('result')),
-#                                parsetext(some(char(_), result, _), string('a')), getvalue(result))), ['a']
-#    test.equal core.status, core.SUCCESS
-#    test.deepEqual  solve(begin(assign(_, dummy('__')), assign(result, logicvar('result')),
-#                                settext(string('ab')), some(char(_), result, _), eoi, getvalue(result))), ['a', 'b']
-#    test.equal core.status, core.SUCCESS
-#    test.equal  solve(parsetext(begin(assign(_, dummy('__')), some(char(_)), char(string('c')), eoi), string('abc'))), true
-#    test.equal  solve(parsetext(begin(assign(_, dummy('__')), some(char(string('a')))), string('b'))), 0
-#    test.equal  solve(parsetext(begin(assign(_, dummy('__')), some(char(string('a'))), eoi), string('b'))), false
+    test.equal  solve(begin(assign(_, dummy('__')), parsetext(some(char(_)), string('a')))), 1
+    test.equal  solve(begin(assign(_, dummy('__')), parsetext(some(char(_)), string('ab')))), 2
+    test.equal  solve(parsetext(begin(assign(_, dummy('__')), some(char(_)), eoi), string('abc'))), true
+    test.equal core.status, core.SUCCESS
+    test.deepEqual  solve(begin(assign(_, dummy('__')), assign(result, logicvar('result')),
+                                parsetext(some(char(_), result, _), string('a')), getvalue(result))), ['a']
+    test.equal core.status, core.SUCCESS
+    test.deepEqual  solve(begin(assign(_, dummy('__')), assign(result, logicvar('result')),
+                                settext(string('ab')), some(char(_), result, _), eoi, getvalue(result))), ['a', 'b']
+    test.equal core.status, core.SUCCESS
+    test.equal  solve(parsetext(begin(assign(_, dummy('__')), some(char(_)), char(string('c')), eoi), string('abc'))), true
+    test.equal  solve(parsetext(begin(assign(_, dummy('__')), some(char(string('a')))), string('b'))), 0
+    test.equal  solve(parsetext(begin(assign(_, dummy('__')), some(char(string('a'))), eoi), string('b'))), false
     test.done()
 
-#exports.Test =
-  "test lazysome": (test) ->
-    _ = vari('__')
-    result = vari('result')
-#    test.equal  solve(begin(assign(_, dummy('__')), parsetext(lazysome(char(_)), string('a')))), null
-#    test.deepEqual  solve(begin(assign(_, dummy('__')), assign(result, logicvar('result')),
-#                                parsetext(lazysome(char(_), result, _), string('a')), getvalue(result))), ['a']
-#    test.deepEqual  solve(begin(assign(_, dummy('__')), assign(result, logicvar('result')),
-#                                settext(string('ab')), lazysome(char(_), result, _), eoi, getvalue(result))), ['a', 'b']
-#    test.equal  solve(parsetext(begin(assign(_, dummy('__')), lazysome(char(_)), char(string('c')), eoi), string('abc'))), true
-#    test.equal  solve(parsetext(begin(lazysome(char(string('a'))), nextchar), string('b'))), false
-#    test.equal  solve(parsetext(begin(lazysome(char(string('a'))), eoi), string('b'))), false
-#    test.equal  solve(begin(assign(_, dummy('__')), parsetext(lazysome(begin(char(_), print_(getvalue(_)))), string('abc')))), null
-#    test.equal  solve(begin(assign(_, dummy('__')), parsetext(findall(lazysome(begin(char(_), print_(getvalue(_))))), string('abc')))), 3
-    test.done()
-
-#xexports.Test =
+xexports.Test =
   "test times": (test) ->
     _ = vari('__')
     result = vari('result')
     n = vari('n')
-#    test.equal  solve(begin(assign(_, dummy('__')), parsetext(times(char(_), 1), string('a')))), true
-#    test.equal  solve(begin(assign(_, dummy('__')), parsetext(times(char(_), 2), string('ab')))), true
-#    test.equal  solve(begin(assign(_, dummy('__')), parsetext(times(char(_), 3), string('abc')))), true
-#    test.deepEqual  solve(begin(assign(_, dummy('__')), assign(n, logicvar('n')),\
-#                                settext(string('ab')), times(char(_), n), eoi)), true
-#    test.deepEqual  solve(begin(assign(_, dummy('__')), assign(result, logicvar('result')),\
-#                                parsetext(times(char(_), 2, result, _), string('ab')), getvalue(result))), ['a', 'b']
-#    test.deepEqual  solve(begin(assign(_, dummy('__')), assign(result, logicvar('result')),\
-#                                parsetext(times(char(_), 3, result, _), string('abc')), getvalue(result))), ['a', 'b', 'c']
-#    test.deepEqual  solve(begin(assign(_, dummy('__')), assign(n, logicvar('n')), assign(result, logicvar('result')),\
-#                                settext(string('ab')), times(char(_), n, result, _), eoi, getvalue(result))), ['a', 'b']
-#    test.deepEqual  solve(begin(assign(_, dummy('__')), assign(n, logicvar('n')),\
-#                                settext(string('aabb')), times(char(string('a')), n), times(char(string('b')), n), eoi, getvalue(n))), 2
-#    test.deepEqual  solve(begin(assign(_, dummy('__')), assign(n, logicvar('n')), assign(result, logicvar('result')),
-#                                settext(string('ab')), times(char(_), n, result, _), eoi, getvalue(n))), 2
-#    test.deepEqual  solve(begin(settext(string('aaabbb')), assign(n, logicvar('n')), assign(result, logicvar('result')),\
-#                                 times(char(string('a')), n, result, string('a')), times(char(string('b')), n), eoi, getvalue(n))), 3
-#    test.deepEqual  solve(begin(assign(_, dummy('__')), assign(n, logicvar('n')), assign(result, logicvar('result')),\
-#                                settext(string('abc')), times(char(_), n, result, _), char(string('c')), eoi, getvalue(result))), ['a', 'b']
-#    test.deepEqual  solve(begin(assign(_, dummy('__')), assign(n, logicvar('n')), assign(result, logicvar('result')),\
-#                                settext(string('abc')), times(char(_), n, result, _), char(string('b')), char(string('c')), eoi, getvalue(result))), ['a']
-#    test.deepEqual  solve(begin(assign(_, dummy('__')), assign(n, logicvar('n')),\
-#                                settext(string('aaabbb')), times(char(string('a')), n), times(char(string('b')), n), eoi, getvalue(n))), 3
-#    test.deepEqual(solve(begin(assign(_, dummy('__')), assign(n, logicvar('n')), assign(result, logicvar('result')),\
-#                               settext(string('a')), times(char(_), n, result, _),\
-#                               char(string('a')), eoi, getvalue(result))), []);
-#    test.deepEqual  solve(begin(settext(string('aaabbb')), assign(n, logicvar('n')), assign(result, logicvar('result')),
-#                                times(char(string('a')), n, result, string('a')),
-#                                times(char(string('b')), n, result, string('b')), eoi, getvalue(result))), false
-#    test.deepEqual  solve(begin(settext(string('aaabbb')), assign(n, logicvar('n')), assign(result, dummy('result')),
-#                                times(char(string('a')), n, result, string('a')),
-#                                times(char(string('b')), n, result, string('b')), eoi, getvalue(result))), ['b', 'b', 'b']
-    test.done()
-
-#xexports.Test =
-  "test parallel": (test) ->
-    test.equal  solve(begin(settext(string('1')), parallel(char(string('1')), number(1)))), 1
-    test.equal  solve(begin(settext(string('12')), parallel(char(string('1')), number(12)))), false
-    test.equal  solve(begin(settext(string('1')), parallel(char(string('1')),char(string('a'))))), false
-    test.done()
-
-#exports.Test =
-  "test follow": (test) ->
-    test.equal  solve(begin(settext(string('1')), follow(char(string('1'))))), 1
-    test.equal  solve(begin(settext(string('1')), notfollow(char(string('1'))))), 1
+    test.equal  solve(begin(assign(_, dummy('__')), parsetext(times(char(_), 1), string('a')))), true
+    test.equal  solve(begin(assign(_, dummy('__')), parsetext(times(char(_), 2), string('ab')))), true
+    test.equal  solve(begin(assign(_, dummy('__')), parsetext(times(char(_), 3), string('abc')))), true
+    test.deepEqual  solve(begin(assign(_, dummy('__')), assign(n, logicvar('n')),\
+                                settext(string('ab')), times(char(_), n), eoi)), true
+    test.deepEqual  solve(begin(assign(_, dummy('__')), assign(result, logicvar('result')),\
+                                parsetext(times(char(_), 2, result, _), string('ab')), getvalue(result))), ['a', 'b']
+    test.deepEqual  solve(begin(assign(_, dummy('__')), assign(result, logicvar('result')),\
+                                parsetext(times(char(_), 3, result, _), string('abc')), getvalue(result))), ['a', 'b', 'c']
+    test.deepEqual  solve(begin(assign(_, dummy('__')), assign(n, logicvar('n')), assign(result, logicvar('result')),\
+                                settext(string('ab')), times(char(_), n, result, _), eoi, getvalue(result))), ['a', 'b']
+    test.deepEqual  solve(begin(assign(_, dummy('__')), assign(n, logicvar('n')),\
+                                settext(string('aabb')), times(char(string('a')), n), times(char(string('b')), n), eoi, getvalue(n))), 2
+    test.deepEqual  solve(begin(assign(_, dummy('__')), assign(n, logicvar('n')), assign(result, logicvar('result')),
+                                settext(string('ab')), times(char(_), n, result, _), eoi, getvalue(n))), 2
+    test.deepEqual  solve(begin(settext(string('aaabbb')), assign(n, logicvar('n')), assign(result, logicvar('result')),\
+                                 times(char(string('a')), n, result, string('a')), times(char(string('b')), n), eoi, getvalue(n))), 3
+    test.deepEqual  solve(begin(assign(_, dummy('__')), assign(n, logicvar('n')), assign(result, logicvar('result')),\
+                                settext(string('abc')), times(char(_), n, result, _), char(string('c')), eoi, getvalue(result))), ['a', 'b']
+    test.deepEqual  solve(begin(assign(_, dummy('__')), assign(n, logicvar('n')), assign(result, logicvar('result')),\
+                                settext(string('abc')), times(char(_), n, result, _), char(string('b')), char(string('c')), eoi, getvalue(result))), ['a']
+    test.deepEqual  solve(begin(assign(_, dummy('__')), assign(n, logicvar('n')),\
+                                settext(string('aaabbb')), times(char(string('a')), n), times(char(string('b')), n), eoi, getvalue(n))), 3
+    test.deepEqual(solve(begin(assign(_, dummy('__')), assign(n, logicvar('n')), assign(result, logicvar('result')),\
+                               settext(string('a')), times(char(_), n, result, _),\
+                               char(string('a')), eoi, getvalue(result))), []);
+    test.deepEqual  solve(begin(settext(string('aaabbb')), assign(n, logicvar('n')), assign(result, logicvar('result')),
+                                times(char(string('a')), n, result, string('a')),
+                                times(char(string('b')), n, result, string('b')), eoi, getvalue(result))), false
+    test.deepEqual  solve(begin(settext(string('aaabbb')), assign(n, logicvar('n')), assign(result, dummy('result')),
+                                times(char(string('a')), n, result, string('a')),
+                                times(char(string('b')), n, result, string('b')), eoi, getvalue(result))), ['b', 'b', 'b']
     test.done()
 
 #exports.Test =

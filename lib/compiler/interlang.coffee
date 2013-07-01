@@ -51,7 +51,10 @@ class Clamda extends Lamda
   constructor: (@v, @body) -> @name = @toString()
   toString: () -> "(#{toString(@v)} -> #{toString(@body)})"
 #  call: (value) -> new CApply(@, value)
-  call: (value) -> replace(@body, @v.name, value)
+  call: (value) ->
+    result = replace(@body, @v.name, value)
+    if result.constructor is TopBegin then result.constructor = Begin
+    result
 
 class RecursiveClamda extends Clamda
   call: (value) -> new CApply(@, value)
