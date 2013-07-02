@@ -1,22 +1,24 @@
 _ = require('underscore')
 
 vari = (name) -> name
-exports.string = string = (s) -> ["string", s]
 exports.vars = (names) -> vari(name) for name in split names,  reElements
+exports.nonlocal = (names...) -> ['nonlocal', names...]
+
+exports.string = string = (s) -> ["string", s]
 
 exports.quote = (exp) -> ["quote", exp]
 exports.eval_ = (exp, path) -> ["eval", exp, path]
+
 exports.begin = begin = (exps...) -> ["begin"].concat(exps)
 
 exports.assign = assign = (left, exp) -> ["assign", left, exp]
-exports.augassign = (left, exp) -> ["augment-assign", op, left, exp]
 exports.addassign = (left, exp) -> ["augment-assign", 'add', left, exp]
 exports.subassign = (left, exp) -> ["augment-assign", 'sub', left, exp]
 exports.mulassign = (left, exp) -> ["augment-assign", 'mul', left, exp]
 exports.divassign = (left, exp) -> ["augment-assign", 'div', left, exp]
 exports.modassign = (left, exp) -> ["augment-assign", 'mod', left, exp]
-exports.andassign = (left, exp) -> ["augment-assign", 'and', left, exp]
-exports.orassign = (left, exp) -> ["augment-assign", 'or', left, exp]
+exports.andassign = (left, exp) -> ["augment-assign", 'and_', left, exp]
+exports.orassign = (left, exp) -> ["augment-assign", 'or_', left, exp]
 exports.bitandassign = (left, exp) -> ["augment-assign", 'bitand', left, exp]
 exports.bitorassign = (left, exp) -> ["augment-assign", 'bitor', left, exp]
 exports.bitxorassign = (left, exp) -> ["augment-assign", 'bitxor', left, exp]

@@ -11,7 +11,7 @@ optimization:
   ☐ v = v, unnessary pure expression statement
   ☐ loop optimization: assign, extract computation
   ☐ tail recursive
-  ☐ il.let_, il.listlet, il.clamda, il.rclamda(can replace parmenter v directly)
+  ✔ il.clamda can replace parmenter v directly @done (13-07-02 16:09)
   ☐ optimize parser terminal's interlang vop
   ✔ il.equalcont @done (13-06-23 21:03)
 lisp features:

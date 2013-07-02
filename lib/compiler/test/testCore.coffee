@@ -29,12 +29,12 @@ exports.Test =
     test.equal  solve(quote(1)), 1
     test.done()
 
-#xexports.Test =
+#exports.Test =
   "test vari assign": (test) ->
     x = 'x'
     test.equal  solve(begin(assign(x, 1), x)), 1
     test.equal  solve(begin(assign(x, 1), inc(x))), 2
-#    test.equal  solve(begin(inc(x))), 2
+##    test.equal  solve(begin(inc(x))), 2
     test.equal  solve(begin(assign(x, 1), suffixinc(x))), 1
     test.done()
 

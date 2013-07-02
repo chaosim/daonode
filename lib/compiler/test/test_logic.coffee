@@ -16,9 +16,7 @@ xexports = {}
 exports.Test =
   "test succeed fail": (test) ->
     test.equal solve(succeed), true
-#    test.equal(solvebase.status, solvebase.SUCCESS);
     test.equal solve(fail), false
-#    test.equal(solvebase.status, solvebase.FAIL);
     test.done()
 
   "test and print": (test) ->
@@ -27,17 +25,17 @@ exports.Test =
 
 #exports.Test =
   "test or print": (test) ->
-#    test.equal  solve(orp(print_(1))), null
-#    test.equal  solve(orp(print_(1), print_(2))), null
-#    test.equal  solve(orp(fail, print_(2))), null
+    test.equal  solve(orp(print_(1))), null
+    test.equal  solve(orp(print_(1), print_(2))), null
+    test.equal  solve(orp(fail, print_(2))), null
     test.equal  solve(orp(fail, print_(2), print_(3))), null
-#    test.equal  solve(orp(fail, fail, print_(3))), null
+    test.equal  solve(orp(fail, fail, print_(3))), null
     test.done()
 
 #xexports.Test =
   "test not succeed fail": (test) ->
     test.equal  solve(notp(succeed)), true
-    test.equal  solve(notp(fail)), null
+    test.equal  solve(notp(fail)), false
     test.done()
 
   "test not print": (test) ->

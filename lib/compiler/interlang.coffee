@@ -19,11 +19,22 @@ class Element
 class Var extends Element
   constructor: (@name) ->
   toString: () -> @name
-class GlobalVar extends Var
-class LocalDecl extends Var
-  constructor: (@name) ->
-  toString: () -> @name
+class UseVar extends Var
+class UserLocalVar extends UseVar
+class UserNonlocalVar extends UseVar
+class InternalVar extends Var
+class InternalLocalVar extends InternalVar
+class InternalNonlocalVar extends InternalVar
 class Symbol extends Var
+
+class LocalDecl extends Element
+  constructor: (@vars) -> super
+  toString: () -> "localDecl(#{@vars}"
+  isDeclaration: () -> true
+
+class NonlocalDecl extends LocalDecl
+  toString: () -> "nonlocalDecl(#{@vars}"
+
 class Assign extends Element
   constructor: (@left, @exp) -> super
   toString: () -> "#{toString(@left)} = #{toString(@exp)}"
@@ -49,7 +60,7 @@ class Lamda extends Element
   toString: () -> "(#{(toString(e) for e in @params).join(', ')} -> #{toString(@body)})"
   call: (args...) -> new Apply(@, args)
   apply: (args) -> new Apply(@, args)
-class LetLamda extends Lamda
+class UserLamda extends Lamda
 class Clamda extends Lamda
   constructor: (@v, @body) -> @name = @toString()
   toString: () -> "(#{toString(@v)} -> #{toString(@body)})"
@@ -130,15 +141,28 @@ Assign::optimize = (env, compiler) ->
   left = @left
   if left instanceof VirtualOperation
     left = new left.constructor(compiler.optimize(a, env) for a in left.args)
-  if left instanceof GlobalVar then env.globals()[left] = true
-  else if left instanceof Var then env.locals()[left] = true
+  if left instanceof UserLocalVar then env.usernonlocals()[left] = left
+  else if left instanceof UserNonlocalVar then env.usernonlocals()[left] = left
+  else if left instanceof InternalLocalVar then env.locals()[left] = left
+  else if left instanceof InternalNonlocalVar then env.nonlocals()[left] = left
   new @constructor(left, compiler.optimize(@exp, env))
-LocalDecl::optimize = (env, compiler) -> env.locals()[@name] = true
+LocalDecl::optimize = (env, compiler) ->
+  for vari in @vars
+    if vari instanceof UserVar then env.userlocals()[vari] = vari
+    else env.locals()[vari] = vari
+  null
+NonlocalDecl::optimize = (env, compiler) ->
+  for vari in @vars
+    if vari instanceof UserVar then env.usernonlocals()[vari] = vari
+    else env.nonlocals()[vari] = vari
+  null
 ListAssign::optimize = (env, compiler) ->
   lefts = []
   for left in @lefts
-    if left instanceof GlobalVar then env.globals()[left] = true
-    else if left instanceof Var then env.locals()[left] = true
+    if left instanceof UserNonlocalVar then env.usernonlocals()[left] = left
+    else if left instanceof UserLocalVar then env.userlocals()[left] = left
+    else if left instanceof InternalNonlocalVar then env.nonlocals()[left] = left
+    else  env.locals()[left] = left
     if left instanceof VirtualOperation
       lefts.push new left.constructor(compiler.optimize(a, env) for a in left.args)
     else lefts.push left
@@ -170,19 +194,27 @@ Throw::optimize = (env, compiler) -> new Throw(compiler.optimize(@value, env))
 Lamda::optimize = (env, compiler) ->
   bindings = {}
   for p in @params then bindings[p] = p
-  locals = {}; globals = {}
-  env = env.extendBindings(bindings, locals, globals)
+  locals = {}; nonlocals = {}
+  env = env.extendBindings(bindings, {_locals:locals, _nonlocals:nonlocals})
   result = new Lamda(@params,compiler.optimize(@body, env))
-  result.locals = locals; result.globals = globals
+  result.locals = locals; result.nonlocals = nonlocals
+  return result
+UserLamda::optimize = (env, compiler) ->
+  bindings = {}
+  for p in @params then bindings[p] = p
+  locals = {}; nonlocals = {}
+  env = env.extendBindings(bindings, {_userlocals:locals, _usernonlocals:nonlocals})
+  result = new UserLamda(@params,compiler.optimize(@body, env))
+  result.locals = locals; result.nonlocals = nonlocals
   return result
 Clamda::optimize = (env, compiler) ->
   env = env.extend(@v, @v)
-  env._locals = locals = {}
-  env._globals = globals = {}
+#  env._locals = locals = {}
+#  env._nonlocals = nonlocals = {}
   body = compiler.optimize(@body, env)
   bindings = env.bindings
   result = il.clamda(@v, body)
-  result.locals = locals; result.globals = globals
+#  result.locals = locals; result.nonlocals = nonlocals
   result
 ClamdaBody::optimize = (env, compiler) ->new ClamdaBody(@v, compiler.optimize(@body, env.extend(@v, @v)))
 IdCont::optimize = (env, compiler) -> @
@@ -204,11 +236,20 @@ VirtualOperation::optimize = (env, compiler) ->
 
 Begin::optimize = (env, compiler) ->
   result = []
+  waitPop = false
   for exp in @exps
     e = compiler.optimize(exp, env)
-    if e instanceof Begin then result = result.concat(e.exps)
-    else result.push e
-  return new @constructor(result)
+    if isDeclaration(e) then continue
+    if waitPop then result.pop()
+    if e instanceof Begin
+      exps = e.exps
+      result = result.concat(exps)
+      waitPop = sideEffect(result[-1]) is il.PURE
+    else
+      result.push e
+      waitPop = sideEffect(e) is il.PURE
+  if result.length>1 then  new @constructor(result)
+  else result[0]
 Deref::optimize = (env, compiler) ->
   exp = @exp
   if _.isString(exp) then exp
@@ -324,6 +365,11 @@ Apply::boolize = () ->
   !!(caller.func?.apply(null, @args)) or undefined
 CApply::boolize = () -> boolize(@caller.body)
 
+isDeclaration  = (exp) ->
+  exp_isDeclaration = exp?.isDeclaration
+  if exp_isDeclaration then exp_isDeclaration.call(exp)
+  else false
+
 il.PURE = 0; il.EFFECT = 1; il.IO = 2
 il.pure = pure = (exp) -> exp._effect = il.PURE; exp
 il.effect = (exp) -> exp._effect = il.EFFECT; exp
@@ -332,7 +378,7 @@ il.io = (exp) -> exp._effect = il.IO; exp
 sideEffect = (exp) ->
   exp_effect = exp?.sideEffect
   if exp_effect then exp_effect.call(exp)
-  else il.PURE
+  else il.EFFECT
 
 expsEffect = (exps) ->
   effect = il.PURE
@@ -343,6 +389,7 @@ expsEffect = (exps) ->
   effect
 
 Var::sideEffect = () -> il.PURE
+NonlocalDecl::sideEffect = () -> il.PURE
 Return::sideEffect = () -> sideEffect(@value)
 If::sideEffect = () -> expsEffect [@test, @then_, @else_]
 Begin::sideEffect = () -> expsEffect(@exps)
@@ -354,7 +401,7 @@ CApply::sideEffect = () -> Math.max(applySideEffect(@caller), sideEffect(@args[0
 applySideEffect = (exp) ->
   exp_applySideEffect = exp?.applySideEffect
   if exp_applySideEffect then exp_applySideEffect.call(exp)
-  else  throw new Error(exp)
+  else il.IO
 
 Element::applySideEffect = () -> throw new NotImplement(@, 'applySideEffect')
 Var::applySideEffect = () -> il.IO
@@ -406,24 +453,25 @@ Begin::jsify = () ->
   new @constructor(result)
 Lamda::jsify = () ->
   locals = []
-  globals = @globals
+  nonlocals = @nonlocals
   locals1 = @locals
   for k of locals1
-    if not hasOwnProperty.call(globals, k) and k not in @params then locals.push(il.symbol(k))
+    if not hasOwnProperty.call(nonlocals, k) and k not in @params then locals.push(il.symbol(k))
   body = jsify(@body)
   body = insertReturn(body)
   if locals.length>0 then new Lamda(@params, il.topbegin(il.vardecl(locals...), body))
   else new Lamda(@params, body)
 Clamda::jsify = () ->
-  locals = []
-  globals = @globals
-  locals1 = @locals
-  for k of locals1
-    if not hasOwnProperty.call(globals, k) and k.name isnt @v.name then locals.push(il.symbol(k))
+#  locals = []
+#  nonlocals = @nonlocals
+#  locals1 = @locals
+#  for k of locals1
+#    if not hasOwnProperty.call(nonlocals, k) and k.name isnt @v.name then locals.push(il.symbol(k))
   body = jsify(@body)
   body = insertReturn(body)
-  if locals.length>0 then il.clamda(@v,il.vardecl(locals...), body)
-  else  il.clamda(@v, body)
+#  if locals.length>0 then il.clamda(@v,il.vardecl(locals...), body)
+#  else  il.clamda(@v, body)
+  il.clamda(@v, body)
 
 ClamdaBody::jsify = () -> jsify(@body)
 Apply::jsify = () ->
@@ -460,7 +508,7 @@ Fun::toCode = (compiler) -> @func.toString()
 Return::toCode = (compiler) -> "return #{compiler.toCode(@value)};"
 Throw::toCode = (compiler) -> "throw #{compiler.toCode(@value)};"
 Var::toCode = (compiler) -> @name
-LocalDecl::toCode = (compiler) -> ''
+NonlocalDecl::toCode = (compiler) -> ''
 Assign::toCode = (compiler) -> "#{compiler.toCode(@left)} = #{compiler.toCode(@exp)}"
 AugmentAssign::toCode = (compiler) -> "#{compiler.toCode(@left)} #{@operator} #{compiler.toCode(@exp)}"
 If::toCode = (compiler) ->
@@ -493,7 +541,14 @@ Begin::isStatement = () -> true
 Return::isStatement = () -> true
 Assign::isStatement = () -> true
 
-vari = (klass, name) ->
+vari = (klass, name) -> new klass(name)
+il.userlocal = (name) -> new UserLocalVar(name)
+il.usernonlocal = (name) -> new UserNonlocalVar(name)
+il.internallocal = (name) -> new InternalLocalVar( name)
+il.internalnonlocal = (name) -> new InternalNonlocalVar(name)
+il.symbol = (name) -> new Symbol(name)
+
+varattr = (klass, name) ->
   if not name? then return new klass(name)
   if name instanceof Var then name = name.name
   names = name.split('.');
@@ -501,13 +556,21 @@ vari = (klass, name) ->
   result = new klass(names[0])
   for i in [1...length] then result = il.attr(result, il.symbol(names[i]))
   result
-il.vari = (name) -> vari(Var, name)
-il.global = (name) -> vari(GlobalVar, name)
-il.symbol = (name) -> new Symbol(name)
+il.usernonlocalattr = (name) -> varattr(UserNonlocalVar, name)
+
 il.assign = (left, exp) -> new Assign(left, exp)
-il.globalassign = (left, exp) ->
+il.usernonlocalassign = (left, exp) ->
   if left instanceof Var then left = left.name
-  new Assign(il.global(left), exp)
+  new Assign(il.usernonlocal(left), exp)
+il.usernonlocalassign = (left, exp) ->
+  if left instanceof Var then left = left.name
+  new Assign(il.userlocal(left), exp)
+il.internallocalassign = (left, exp) ->
+  if left instanceof Var then left = left.name
+  new Assign(il.internalnonlocal(left), exp)
+il.internalnonlocalassign = (left, exp) ->
+  if left instanceof Var then left = left.name
+  new Assign(il.internallocal(left), exp)
 il.if_ = (test, then_, else_) -> new If(test, then_, else_)
 il.deref = (exp) -> new Deref(exp)
 
@@ -526,22 +589,25 @@ il.print = (exps...) -> new Print(exps)
 il.return = (value) -> new Return(value)
 il.throw = (value) -> new Throw(value)
 il.lamda = (params, body...) -> new Lamda(params, il.topbegin(body...))
+il.userlamda = (params, body...) -> new UserLamda(params, il.topbegin(body...))
 il.clamda = (v, body...) -> new Clamda(v, il.topbegin(body...))
 il.recclamda = (v, body...) -> new RecursiveClamda(v, il.topbegin(body...))
 il.clamdabody = (v, body) -> new ClamdaBody(v, body)
 il.code = (string) -> new Code(string)
 il.jsfun = (fun) -> new JSFun(fun)
 
-binary = (symbol, func) ->
+binary = (symbol, func, effect=il.PURE) ->
   class Binary extends BinaryOperation
     symbol: symbol
     toCode: (compiler) -> args = @args; "#{compiler.toCode(args[0])} #{symbol} #{compiler.toCode(args[1])}"
     func; func
+    _effect: effect
   (x, y) -> new Binary([x, y])
-unary = (symbol, func) ->
+unary = (symbol, func, effect=il.PURE) ->
   class Unary extends UnaryOperation
     symbol: symbol
     func; func
+    _effect: effect
     toCode: (compiler) -> "#{symbol}#{compiler.toCode(@args[0])}"
   (x) -> new Unary([x])
 
@@ -590,8 +656,8 @@ il.listassign = (lefts..., exp) -> new ListAssign(lefts, exp)
 il.not_ = unary("!", (x) -> !x)
 il.neg = unary("-", (x) -> -x)
 il.bitnot = unary("~", (x) -> ~x)
-il.inc = il.effect(unary("++"))
-il.dec = il.effect(unary("--"))
+il.inc = il.effect(unary("++"), ((x) -> x+1), il.EFFECT)
+il.dec = il.effect(unary("--"), ((x) -> x-1), il.EFFECT)
 
 vop = (name, toCode, _effect=il.EFFECT) ->
   class Vop extends VirtualOperation
@@ -609,12 +675,13 @@ vop2 = (name, toCode, _effect=il.EFFECT) ->
   (args...) -> new Vop(args)
 
 il.attr = vop('attr', ((compiler)->args = @args; "(#{compiler.toCode(args[0])}).#{compiler.toCode(args[1])}"), il.PURE)
+il.nonlocal = (vari) -> new NonlocalDecl(vari.name)
 il.local = (vari) -> new LocalDecl(vari.name)
 il.vardecl = vop('vardecl', (compiler)->args = @args; "var #{(compiler.toCode(e) for e in args).join(', ')}")
 il.array = vop('array', (compiler)->args = @args; "[#{(compiler.toCode(e) for e in args).join(', ')}]")
 il.suffixinc = vop('suffixdec', (compiler)->args = @args; "#{compiler.toCode(args[0])}++")
 il.suffixdec = vop('suffixdec', (compiler)->args = @args; "#{compiler.toCode(args[0])}--")
-il.catches = il.global('solver.catches')
+il.catches = il.usernonlocalattr('solver.catches')
 il.pushCatch = vop('pushCatch', (compiler)->args = @args; "solver.pushCatch(#{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})")
 il.popCatch = vop('popCatch', (compiler)->args = @args; "solver.popCatch(#{compiler.toCode(args[0])})")
 il.findCatch = vop('findCatch', ((compiler)->args = @args; "solver.findCatch(#{compiler.toCode(args[0])})"), il.PURE)
@@ -639,16 +706,16 @@ il.newDummyVar = vop('newDummyVar', ((compiler)->args = @args; "new DummyVar(#{c
 il.unify = vop('unify', (compiler)->args = @args; "solver.trail.unify(#{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})")
 il.bind = vop('bind', (compiler)->args = @args; "#{compiler.toCode(args[0])}.bind(#{compiler.toCode(args[1])}, solver.trail)")
 
-il.solver = il.global('solver')
+il.solver = il.usernonlocal('solver')
 il.undotrail = vop('undotrail', (compiler)->args = @args; "#{compiler.toCode(args[0])}.undo()")
-il.failcont = il.global('solver.failcont')
+il.failcont = il.usernonlocalattr('solver.failcont')
 il.setfailcont = (cont) -> il.assign(il.failcont, cont)
 il.setcutcont = (cont) -> il.assign(il.cutcont, cont)
 il.appendFailcont = vop('appendFailcont', (compiler)->args = @args; "solver.appendFailcont(#{compiler.toCode(args[0])})")
-il.cutcont = il.global('solver.cutcont')
-il.state = il.global('solver.state')
+il.cutcont = il.usernonlocalattr('solver.cutcont')
+il.state = il.usernonlocalattr('solver.state')
 il.setstate = (state) -> il.assign(il.state, state)
-il.trail = il.global('solver.trail')
+il.trail = il.usernonlocalattr('solver.trail')
 il.newTrail = vop('newTrail', (compiler)->args = @args; "new Trail()")()
 il.settrail = (trail) -> il.assign(il.trail, trail)
 
@@ -681,9 +748,14 @@ il.iff = (clauses..., else_) ->
   if length is 2 then il.if_(clauses[0], clauses[1], else_)
   else il.if_(clauses[0], clauses[1], il.iff(clauses[2...length]..., else_))
 
-il.idcont = do -> v = il.vari('v'); new IdCont(v, v)
+il.idcont = do -> v = il.internallocal('v'); new IdCont(v, v)
 
 il.excludes = ['evalexpr', 'failcont', 'run', 'getvalue', 'fake', 'findCatch', 'popCatch', 'pushCatch',
                'protect', 'suffixinc', 'suffixdec', 'dec', 'inc', 'unify', 'bind', 'undotrail',
                'newTrail', 'newLogicVar', 'char', 'followChars', 'notFollowChars', 'charWhen',
                'stringWhile', 'stringWhile0', 'number', 'literal', 'followLiteral', 'quoteString']
+
+augmentOperators = {add: il.addassign, sub: il.subassign, mul: il.mulassign, div: il.divassign, mod: il.modassign,
+'and_': il.andassign, 'or_': il.orassign, bitand: il.bitandassign, bitor:il.bitorassign, bitxor: il.bitxorassign,
+lshift: il.lshiftassign, rshift: il.rshiftassign
+}
