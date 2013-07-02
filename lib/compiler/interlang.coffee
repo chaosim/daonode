@@ -19,9 +19,9 @@ class Element
 class Var extends Element
   constructor: (@name) ->
   toString: () -> @name
-class UseVar extends Var
-class UserLocalVar extends UseVar
-class UserNonlocalVar extends UseVar
+class UserVar extends Var
+class UserLocalVar extends UserVar
+class UserNonlocalVar extends UserVar
 class InternalVar extends Var
 class InternalLocalVar extends InternalVar
 class InternalNonlocalVar extends InternalVar
@@ -141,7 +141,7 @@ Assign::optimize = (env, compiler) ->
   left = @left
   if left instanceof VirtualOperation
     left = new left.constructor(compiler.optimize(a, env) for a in left.args)
-  if left instanceof UserLocalVar then env.usernonlocals()[left] = left
+  else if left instanceof UserLocalVar then env.userlocals()[left] = left
   else if left instanceof UserNonlocalVar then env.usernonlocals()[left] = left
   else if left instanceof InternalLocalVar then env.locals()[left] = left
   else if left instanceof InternalNonlocalVar then env.nonlocals()[left] = left
@@ -208,13 +208,10 @@ UserLamda::optimize = (env, compiler) ->
   result.locals = locals; result.nonlocals = nonlocals
   return result
 Clamda::optimize = (env, compiler) ->
-  env = env.extend(@v, @v)
-#  env._locals = locals = {}
-#  env._nonlocals = nonlocals = {}
-  body = compiler.optimize(@body, env)
-  bindings = env.bindings
+  locals = {}; nonlocals = {}
+  body = compiler.optimize(@body,  env.extend(@v, @v, {_locals:locals, _nonlocals:nonlocals}))
   result = il.clamda(@v, body)
-#  result.locals = locals; result.nonlocals = nonlocals
+  result.locals = locals; result.nonlocals = nonlocals
   result
 ClamdaBody::optimize = (env, compiler) ->new ClamdaBody(@v, compiler.optimize(@body, env.extend(@v, @v)))
 IdCont::optimize = (env, compiler) -> @
@@ -462,16 +459,15 @@ Lamda::jsify = () ->
   if locals.length>0 then new Lamda(@params, il.topbegin(il.vardecl(locals...), body))
   else new Lamda(@params, body)
 Clamda::jsify = () ->
-#  locals = []
-#  nonlocals = @nonlocals
-#  locals1 = @locals
-#  for k of locals1
-#    if not hasOwnProperty.call(nonlocals, k) and k.name isnt @v.name then locals.push(il.symbol(k))
+  locals = []
+  nonlocals = @nonlocals
+  locals1 = @locals
+  for k of locals1
+    if not hasOwnProperty.call(nonlocals, k) and k.name isnt @v.name then locals.push(il.symbol(k))
   body = jsify(@body)
   body = insertReturn(body)
-#  if locals.length>0 then il.clamda(@v,il.vardecl(locals...), body)
-#  else  il.clamda(@v, body)
-  il.clamda(@v, body)
+  if locals.length>0 then il.clamda(@v,il.vardecl(locals...), body)
+  else  il.clamda(@v, body)
 
 ClamdaBody::jsify = () -> jsify(@body)
 Apply::jsify = () ->
@@ -559,9 +555,9 @@ varattr = (klass, name) ->
 il.usernonlocalattr = (name) -> varattr(UserNonlocalVar, name)
 
 il.assign = (left, exp) -> new Assign(left, exp)
-il.usernonlocalassign = (left, exp) ->
+il.userlocalassign = (left, exp) ->
   if left instanceof Var then left = left.name
-  new Assign(il.usernonlocal(left), exp)
+  new Assign(il.userlocal(left), exp)
 il.usernonlocalassign = (left, exp) ->
   if left instanceof Var then left = left.name
   new Assign(il.userlocal(left), exp)

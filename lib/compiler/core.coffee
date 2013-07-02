@@ -36,24 +36,24 @@ exports.Compiler = class Compiler
   compile: (exp) ->
     v = @il_var('v')
     exp = @cont(exp, @clamda(v, il.throw(il.new(il.symbol('SolverFinish').call(v)))))
-    exps = [ il.usernonlocalassign('_', il.require('underscore')),
-             il.usernonlocalassign('__slice', il.attr([], il.symbol('slice'))),
-             il.usernonlocalassign('solve', il.attr(il.require('f:/daonode/lib/compiler/core.js'), il.symbol('solve'))),
-             il.usernonlocalassign('parser', il.require('f:/daonode/lib/compiler/parser.js')),
-             il.usernonlocalassign('solvecore', il.require('f:/daonode/lib/compiler/solve.js')),
-             il.usernonlocalassign('SolverFinish', il.attr(il.usernonlocal('solvecore'), il.symbol('SolverFinish'))),
-             il.usernonlocalassign('Solver', il.attr(il.usernonlocal('solvecore'), il.symbol('Solver'))),
-             il.usernonlocalassign('Trail', il.attr(il.usernonlocal('solvecore'), il.symbol('Trail'))),
-             il.usernonlocalassign('Var', il.attr(il.usernonlocal('solvecore'), il.symbol('Var'))),
-             il.usernonlocalassign('DummyVar', il.attr(il.usernonlocal('solvecore'), il.symbol('DummyVar'))),
-             il.usernonlocalassign(il.solver, il.new(il.symbol('Solver').call())),
+    exps = [ il.userlocalassign('_', il.require('underscore')),
+             il.userlocalassign('__slice', il.attr([], il.symbol('slice'))),
+             il.userlocalassign('solve', il.attr(il.require('f:/daonode/lib/compiler/core.js'), il.symbol('solve'))),
+             il.userlocalassign('parser', il.require('f:/daonode/lib/compiler/parser.js')),
+             il.userlocalassign('solvecore', il.require('f:/daonode/lib/compiler/solve.js')),
+             il.userlocalassign('SolverFinish', il.attr(il.userlocal('solvecore'), il.symbol('SolverFinish'))),
+             il.userlocalassign('Solver', il.attr(il.userlocal('solvecore'), il.symbol('Solver'))),
+             il.userlocalassign('Trail', il.attr(il.userlocal('solvecore'), il.symbol('Trail'))),
+             il.userlocalassign('Var', il.attr(il.userlocal('solvecore'), il.symbol('Var'))),
+             il.userlocalassign('DummyVar', il.attr(il.userlocal('solvecore'), il.symbol('DummyVar'))),
+             il.userlocalassign('solver', il.new(il.symbol('Solver').call())),
              il.assign(il.state, null),
              il.assign(il.catches, {}),
              il.assign(il.trail, il.newTrail),
              il.assign(il.failcont, il.clamda(v, il.throw(il.new(il.symbol('SolverFinish').call(v))))),
              il.assign(il.cutcont, il.failcont),
              il.run(il.clamda(v, exp))]
-    lamda = il.lamda([], exps...)
+    lamda = il.userlamda([], exps...)
     exp = il.assign(il.attr(il.usernonlocal('exports'), il.symbol('main')), lamda)
     lamda.locals = locals = {}; lamda.nonlocals = nonlocals = {}
     lamdaVars = {_userlocals:locals, _usernonlocals: nonlocals, _locals:locals, _nonlocals: nonlocals}
@@ -118,7 +118,7 @@ exports.Compiler = class Compiler
                           il.setfailcont(il.clamda(v, il.assign(item, il.add(item, 1)),fc.call(temp))),
                           il.assign(item, il.sub(item, 1)),
                           cont.call(temp))
-    if  _.isString(item) then return assignExpCont(il.uservar(item))
+    if  _.isString(item) then return assignExpCont(il.userlocal(item))
     if not _.isArray(item) then throw new Error "Left value should be an sexpression."
     length = item.length
     if length is 0 then throw new Error "Left value side should not be empty list."
@@ -599,7 +599,7 @@ exports.Compiler = class Compiler
       il.begin(
         il.local(trail),
         il.assign(anyCont, il.recclamda(v,
-          il.globalassign(trail, il.trail),
+          il.internalnonlocalassign(trail, il.trail),
           il.settrail(il.newTrail),
           il.setfailcont(anyFcont),
           cont.call(null))),

@@ -1,6 +1,6 @@
 _ = require('underscore')
 
-class exports.SolverFinish
+exports.SolverFinish = class SolverFinish
   constructor: (@value) ->
 
 # ####class Solver
