@@ -262,7 +262,12 @@ Lamda::optimizeApply = (args, env, compiler) ->
   params = @params
   exps = (il.assign(p, args[i]) for p, i in params)
   exps.push @body
-  new Apply(new Lamda([], compiler.optimize(il.topbegin(exps...), env)), [])
+  locals = {}; nonlocals = {}
+  env = env.extendBindings({}, {_locals:locals, _nonlocals:nonlocals})
+  lamda = new Lamda([], null)
+  lamda.body = compiler.optimize(il.topbegin(exps...), env)
+  lamda.locals = locals; lamda.nonlocals = nonlocals
+  new Apply(lamda, [])
 
 Clamda::optimizeApply = (args, env, compiler) ->
   il.begin(il.assign(@v, compiler.optimize(args[0], env)), @body).optimize(env, compiler)
