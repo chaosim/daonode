@@ -260,8 +260,6 @@ Apply::optimizeApply = (args, env, compiler) ->  new Apply(@, args)
 
 Lamda::optimizeApply = (args, env, compiler) ->
   params = @params
-  paramsLength = params.length
-  if paramsLength is 0 then return compiler.optimize(body, env)
   exps = (il.assign(p, args[i]) for p, i in params)
   exps.push @body
   new Apply(new Lamda([], compiler.optimize(il.topbegin(exps...), env)), [])
@@ -375,7 +373,7 @@ il.io = (exp) -> exp._effect = il.IO; exp
 sideEffect = (exp) ->
   exp_effect = exp?.sideEffect
   if exp_effect then exp_effect.call(exp)
-  else il.EFFECT
+  else il.PURE
 
 expsEffect = (exps) ->
   effect = il.PURE
@@ -385,12 +383,18 @@ expsEffect = (exps) ->
     if eff == il.EFFECT then effect = eff
   effect
 
+
+Element::sideEffect = () -> il.IO
 Var::sideEffect = () -> il.PURE
 NonlocalDecl::sideEffect = () -> il.PURE
+Assign::sideEffect = () -> il.EFFECT
 Return::sideEffect = () -> sideEffect(@value)
+Throw::sideEffect = () -> il.PURE
 If::sideEffect = () -> expsEffect [@test, @then_, @else_]
 Begin::sideEffect = () -> expsEffect(@exps)
 Lamda::sideEffect = () ->  il.PURE
+JSFun::sideEffect = () ->  il.PURE
+Fun::sideEffect = () ->  il.PURE
 Apply::sideEffect = () ->  Math.max(applySideEffect(@caller), expsEffect(@args))
 VirtualOperation::sideEffect = () ->  Math.max(@_effect, expsEffect(@args))
 CApply::sideEffect = () -> Math.max(applySideEffect(@caller), sideEffect(@args[0]))
@@ -560,13 +564,13 @@ il.userlocalassign = (left, exp) ->
   new Assign(il.userlocal(left), exp)
 il.usernonlocalassign = (left, exp) ->
   if left instanceof Var then left = left.name
-  new Assign(il.userlocal(left), exp)
+  new Assign(il.usernonlocal(left), exp)
 il.internallocalassign = (left, exp) ->
   if left instanceof Var then left = left.name
-  new Assign(il.internalnonlocal(left), exp)
+  new Assign(il.internallocal(left), exp)
 il.internalnonlocalassign = (left, exp) ->
   if left instanceof Var then left = left.name
-  new Assign(il.internallocal(left), exp)
+  new Assign(il.internalnonlocal(left), exp)
 il.if_ = (test, then_, else_) -> new If(test, then_, else_)
 il.deref = (exp) -> new Deref(exp)
 
@@ -671,8 +675,8 @@ vop2 = (name, toCode, _effect=il.EFFECT) ->
   (args...) -> new Vop(args)
 
 il.attr = vop('attr', ((compiler)->args = @args; "(#{compiler.toCode(args[0])}).#{compiler.toCode(args[1])}"), il.PURE)
-il.nonlocal = (vari) -> new NonlocalDecl(vari.name)
-il.local = (vari) -> new LocalDecl(vari.name)
+il.nonlocal = (vars) -> new NonlocalDecl(vars)
+il.local = (vars...) -> new LocalDecl(vars)
 il.vardecl = vop('vardecl', (compiler)->args = @args; "var #{(compiler.toCode(e) for e in args).join(', ')}")
 il.array = vop('array', (compiler)->args = @args; "[#{(compiler.toCode(e) for e in args).join(', ')}]")
 il.suffixinc = vop('suffixdec', (compiler)->args = @args; "#{compiler.toCode(args[0])}++")

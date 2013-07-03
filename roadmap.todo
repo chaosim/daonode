@@ -8,7 +8,8 @@ just javascript:
   ☐ toCode: remove unnecessary parenthesis by using precedence of operator
 optimization:
   ☐ assign optimization
-  ☐ v = v, unnessary pure expression statement
+  ☐ special assign convert to augment assign and inc/dec when jsify.
+  ✔ v = v, unnessary pure expression statement @done (13-07-03 08:35)
   ☐ loop optimization: assign, extract computation
   ☐ tail recursive
   ✔ il.clamda can replace parmenter v directly @done (13-07-02 16:09)

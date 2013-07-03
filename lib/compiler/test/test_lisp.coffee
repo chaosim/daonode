@@ -70,7 +70,7 @@ exports.Test =
     test.equal solve(begin(callcc(jsfun((k) -> k(null))), add(1, 2))), 3
     test.done()
 
-#xexports.Test =
+#exports.Test =
   "test block lamda": (test) ->
     a = makeLabel('a')
     b = makeLabel('b')

@@ -103,16 +103,16 @@ exports.Test =
   "test lazysome": (test) ->
     _ = vari('__')
     result = vari('result')
-#    test.equal  solve(begin(assign(_, dummy('__')), parsetext(lazysome(char(_)), string('a')))), null
-#    test.deepEqual  solve(begin(assign(_, dummy('__')), assign(result, logicvar('result')),
-#                                parsetext(lazysome(char(_), result, _), string('a')), getvalue(result))), ['a']
-#    test.deepEqual  solve(begin(assign(_, dummy('__')), assign(result, logicvar('result')),
-#                                settext(string('ab')), lazysome(char(_), result, _), eoi, getvalue(result))), ['a', 'b']
-#    test.equal  solve(parsetext(begin(assign(_, dummy('__')), lazysome(char(_)), char(string('c')), eoi), string('abc'))), true
-#    test.equal  solve(parsetext(begin(lazysome(char(string('a'))), nextchar), string('b'))), false
-#    test.equal  solve(parsetext(begin(lazysome(char(string('a'))), eoi), string('b'))), false
-#    test.equal  solve(begin(assign(_, dummy('__')), parsetext(lazysome(begin(char(_), print_(getvalue(_)))), string('abc')))), null
-#    test.equal  solve(begin(assign(_, dummy('__')), parsetext(findall(lazysome(begin(char(_), print_(getvalue(_))))), string('abc')))), 3
+    test.equal  solve(begin(assign(_, dummy('__')), parsetext(lazysome(char(_)), string('a')))), null
+    test.deepEqual  solve(begin(assign(_, dummy('__')), assign(result, logicvar('result')),
+                                parsetext(lazysome(char(_), result, _), string('a')), getvalue(result))), ['a']
+    test.deepEqual  solve(begin(assign(_, dummy('__')), assign(result, logicvar('result')),
+                                settext(string('ab')), lazysome(char(_), result, _), eoi, getvalue(result))), ['a', 'b']
+    test.equal  solve(parsetext(begin(assign(_, dummy('__')), lazysome(char(_)), char(string('c')), eoi), string('abc'))), true
+    test.equal  solve(parsetext(begin(lazysome(char(string('a'))), nextchar), string('b'))), false
+    test.equal  solve(parsetext(begin(lazysome(char(string('a'))), eoi), string('b'))), false
+    test.equal  solve(begin(assign(_, dummy('__')), parsetext(lazysome(begin(char(_), print_(getvalue(_)))), string('abc')))), null
+    test.equal  solve(begin(assign(_, dummy('__')), parsetext(findall(lazysome(begin(char(_), print_(getvalue(_))))), string('abc')))), 3
     test.done()
 
 #exports.Test =
@@ -241,19 +241,19 @@ exports.Test =
                                                char(string(',')), char(string('c'))), string('a,b,c')), getvalue(result))), ['a']
     test.done()
 
-exports.Test =
+#exports.Test =
   "test lazyany": (test) ->
     _ = vari('__')
     result = vari('result')
     test.equal  solve(begin(assign(_, dummy('__')), parsetext(lazyany(char(_)), string('a')))), null
-#    test.deepEqual  solve(begin(assign(_, dummy('__')), assign(result, logicvar('result')),
-#                                parsetext(lazyany(char(_), result, _), string('a')), getvalue(result))), []
-#    test.deepEqual  solve(begin(assign(_, dummy('__')), assign(result, logicvar('result')),
-#                                settext(string('ab')), lazyany(char(_), result, _), eoi, getvalue(result))), ['a', 'b']
-#    test.equal  solve(parsetext(begin(assign(_, dummy('__')), lazyany(char(_)), char(string('c')), eoi), string('abc'))), true
-#    test.equal  solve(parsetext(begin(lazyany(char(string('a'))), nextchar), string('b'))), 'b'
-#    test.equal  solve(parsetext(begin(lazyany(char(string('a'))), eoi), string('b'))), 0
-#    test.equal  solve(begin(assign(_, dummy('__')), parsetext(lazyany(begin(char(_), print_(getvalue(_)))), string('abc')))), null
+    test.deepEqual  solve(begin(assign(_, dummy('__')), assign(result, logicvar('result')),
+                                parsetext(lazyany(char(_), result, _), string('a')), getvalue(result))), []
+    test.deepEqual  solve(begin(assign(_, dummy('__')), assign(result, logicvar('result')),
+                                settext(string('ab')), lazyany(char(_), result, _), eoi, getvalue(result))), ['a', 'b']
+    test.equal  solve(parsetext(begin(assign(_, dummy('__')), lazyany(char(_)), char(string('c')), eoi), string('abc'))), true
+    test.equal  solve(parsetext(begin(lazyany(char(string('a'))), nextchar), string('b'))), 'b'
+    test.equal  solve(parsetext(begin(lazyany(char(string('a'))), eoi), string('b'))), 0
+    test.equal  solve(begin(assign(_, dummy('__')), parsetext(lazyany(begin(char(_), print_(getvalue(_)))), string('abc')))), null
     test.equal  solve(begin(assign(_, dummy('__')), parsetext(findall(lazyany(begin(char(_), print_(getvalue(_))))), string('abc')))), 3
     test.done()
 

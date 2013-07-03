@@ -33,22 +33,24 @@ compile = (exp, path) ->
 
 compileToCode = (exp) ->
   compiler = new Compiler()
-  v = il.vari('v')
-  f = il.assign(il.vari('exports.main'), il.clamda(v, exp))
+  v = il.internallocal('v')
+  f = il.assign(il.usernonlocalattr('exports.main'), il.clamda(v, exp))
   f.refMap = {}
   f.analyze(compiler, f.refMap)
-  f = f.optimize(new Env(), compiler)
+  locals = {}; nonlocals = {}
+  lamdaVars = {_userlocals:locals, _usernonlocals: nonlocals, _locals:locals, _nonlocals: nonlocals}
+  f = f.optimize(new Env(null, {}, lamdaVars), compiler)
   f = f.jsify()
   f.toCode(compiler)
 
-vari = (name) -> il.vari(name)
+vari = (name) -> il.internallocal(name)
 
 xexports = {}
 
 exports.Test =
   "test vari assign": (test) ->
-    x = il.vari('x')
-    test.equal  solve(il.let_([x, 1], il.addassign(x, 1), x)), 2
-#    test.equal  solve(il.let_([x, 1],il.let_([x,2], x), x)), 1
+    x = il.userlocal('x')
+#    test.equal  solve(il.let_([x, 1], il.addassign(x, 1), x)), 2
+    test.equal  solve(il.let_([x, 1],il.let_([x,2], x), x)), 1
     test.done()
 
