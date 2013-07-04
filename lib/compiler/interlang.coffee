@@ -17,8 +17,8 @@ class Element
   Object.defineProperty @::, '$', get: -> @constructor
 
 class Var extends Element
-  constructor: (@name) ->
-  toString: () -> @name
+  constructor: (@name, @suffix='') ->
+  toString: () -> @name+@suffix
 class UserVar extends Var
 class UserLocalVar extends UserVar
 class UserNonlocalVar extends UserVar
@@ -66,7 +66,7 @@ class Clamda extends Lamda
   toString: () -> "(#{toString(@v)} -> #{toString(@body)})"
 #  call: (value) -> new CApply(@, value)
   call: (value) ->
-    result = replace(@body, @v.name, value)
+    result = replace(@body, @v.toString(), value)
     if result.constructor is TopBegin then result.constructor = Begin
     result
 
@@ -115,7 +115,7 @@ replace = (exp, param, value) ->
   if exp_replace then exp_replace.call(exp, param, value)
   else exp
 
-Var::replace = (param, value) -> if @name is param then value else @
+Var::replace = (param, value) -> if @toString() is param then value else @
 Assign::replace = (param, value) -> new @constructor(@left, replace(@exp, param, value))
 ListAssign::replace = (param, value) -> new @constructor(@lefts, replace(@exp, param, value))
 If::replace = (param, value) ->  new If(replace(@test, param, value), replace(@then_, param, value), replace(@else_, param, value))
@@ -136,7 +136,10 @@ optimize = (exp, env, compiler) ->
   if exp_optimize then exp_optimize.call(exp, env, compiler)
   else exp
 
-Var::optimize = (env, compiler) -> env.lookup(@)
+Var::optimize = (env, compiler) ->   @
+#  content = env.lookup(@)
+#  if content instanceof Assign then content.exp
+#  else content
 Assign::optimize = (env, compiler) ->
   left = @left
   if left instanceof VirtualOperation
@@ -145,7 +148,11 @@ Assign::optimize = (env, compiler) ->
   else if left instanceof UserNonlocalVar then env.usernonlocals()[left] = left
   else if left instanceof InternalLocalVar then env.locals()[left] = left
   else if left instanceof InternalNonlocalVar then env.nonlocals()[left] = left
-  new @constructor(left, compiler.optimize(@exp, env))
+  exp = compiler.optimize(@exp, env)
+  assign = new @constructor(left, exp)
+#  env.bindings[left] = assign
+  assign
+
 LocalDecl::optimize = (env, compiler) ->
   for vari in @vars
     if vari instanceof UserVar then env.userlocals()[vari] = vari
@@ -218,8 +225,7 @@ IdCont::optimize = (env, compiler) -> @
 
 Apply::optimize = (env, compiler) ->
   caller =  compiler.optimize(@caller, env)
-  args = (compiler.optimize(a, env) for a in @args)
-  caller.optimizeApply?(args, env, compiler) or new Apply(caller, args)
+  caller.optimizeApply?(@args, env, compiler) or new Apply(caller, (compiler.optimize(a, env) for a in @args))
 
 VirtualOperation::optimize = (env, compiler) ->
   args = (compiler.optimize(a, env) for a in @args)
@@ -255,9 +261,6 @@ Deref::optimize = (env, compiler) ->
 Code::optimize = (env, compiler) -> @
 JSFun::optimize = (env, compiler) ->  new JSFun(compiler.optimize(@fun, env))
 
-Var::optimizeApply = (args, env, compiler) ->  new Apply(@, args)
-Apply::optimizeApply = (args, env, compiler) ->  new Apply(@, args)
-
 Lamda::optimizeApply = (args, env, compiler) ->
   params = @params
   exps = (il.assign(p, args[i]) for p, i in params)
@@ -270,9 +273,10 @@ Lamda::optimizeApply = (args, env, compiler) ->
   new Apply(lamda, [])
 
 Clamda::optimizeApply = (args, env, compiler) ->
-  il.begin(il.assign(@v, compiler.optimize(args[0], env)), @body).optimize(env, compiler)
+  il.begin(il.assign(@v, args[0]), @body).optimize(env, compiler)
+
 RecursiveClamda::optimizeApply = (args, env, compiler) ->
-  il.begin(il.assign(@v, compiler.optimize(args[0], env)), @body).optimize(env, compiler)
+  il.begin(il.assign(@v, args[0]), @body).optimize(env, compiler)
 
 IdCont::optimizeApply = (args, env, compiler) -> compiler.optimize(args[0], env)
 
@@ -505,14 +509,14 @@ Begin::insertReturn = () ->
 
 Lamda::toCode = (compiler) ->
   compiler.parent = @
-  "function(#{(a.name for a in @params).join(', ')}){#{compiler.toCode(@body)}}"
+  "function(#{(a.toString() for a in @params).join(', ')}){#{compiler.toCode(@body)}}"
 Clamda::toCode = (compiler) ->
   compiler.parent = @
-  "function(#{@v.name}){#{compiler.toCode(@body)}}"
+  "function(#{@v.toString()}){#{compiler.toCode(@body)}}"
 Fun::toCode = (compiler) -> @func.toString()
 Return::toCode = (compiler) -> "return #{compiler.toCode(@value)};"
 Throw::toCode = (compiler) -> "throw #{compiler.toCode(@value)};"
-Var::toCode = (compiler) -> @name
+Var::toCode = (compiler) -> @toString()
 NonlocalDecl::toCode = (compiler) -> ''
 Assign::toCode = (compiler) -> "#{compiler.toCode(@left)} = #{compiler.toCode(@exp)}"
 AugmentAssign::toCode = (compiler) -> "#{compiler.toCode(@left)} #{@operator} #{compiler.toCode(@exp)}"

@@ -146,7 +146,7 @@ exports.Test =
     test.equal  solve(parsetext(orp(begin(assign(_, dummy('__')), greedysome(char(_)), char(string('c')), eoi), 1), string('abc'))), 1
     test.done()
 
-#xexports.Test =
+#exports.Test =
   "test some": (test) ->
     _ = vari('__')
     result = vari('result')
@@ -204,7 +204,7 @@ exports.Test =
                                 times(char(string('b')), n, result, string('b')), eoi, getvalue(result))), ['b', 'b', 'b']
     test.done()
 
-#exports.Test =
+#xexports.Test =
   "test seplist": (test) ->
     _ = vari('__')
     result = vari('result')
