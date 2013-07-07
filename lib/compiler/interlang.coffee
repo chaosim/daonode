@@ -14,11 +14,13 @@ class Element
   call: (args...) -> new Apply(@, args)
   apply: (args) -> new Apply(@, args)
   toCode: (compiler) -> throw new  NotImplement(@, "toCode")
+  isValue: () -> false
   Object.defineProperty @::, '$', get: -> @constructor
 
 class Var extends Element
   constructor: (@name, @suffix='') ->
   toString: () -> @name+@suffix
+  isValue: () -> @isConst
 class UserVar extends Var
 class UserLocalVar extends UserVar
 class UserNonlocalVar extends UserVar
@@ -38,6 +40,16 @@ class NonlocalDecl extends LocalDecl
 class Assign extends Element
   constructor: (@left, @exp) -> super
   toString: () -> "#{toString(@left)} = #{toString(@exp)}"
+  remove: () -> @_removed = true
+  dont_remove: () -> @_removed = false
+  removed: () ->
+    if @_removed==true then true
+    else if @_removed==false then false
+    else if @dependency
+      for item in @dependency
+        if item.removed()==false then return false
+    else true
+
 class ListAssign extends Assign
   constructor: (@lefts, @exp) -> @name = @toString()
   toString: () -> "#{toString(@lefts)} = #{toString(@exp)}"
@@ -61,6 +73,7 @@ class Lamda extends Element
   constructor: (@params, @body) -> super
   toString: () -> "(#{(toString(e) for e in @params).join(', ')} -> #{toString(@body)})"
   call: (args...) -> new Apply(@, args)
+  isValue: () -> true
   apply: (args) -> new Apply(@, args)
 class UserLamda extends Lamda
 class Clamda extends Lamda
@@ -138,21 +151,30 @@ optimize = (exp, env, compiler) ->
   if exp_optimize then exp_optimize.call(exp, env, compiler)
   else exp
 
-Var::optimize = (env, compiler) ->   @
-#  content = env.lookup(@)
-#  if content instanceof Assign then content.exp
-#  else content
+Var::optimize = (env, compiler) ->
+  content = env.lookup(@)
+  if content instanceof Assign then content.exp
+  else content
 Assign::optimize = (env, compiler) ->
   left = @left
   if left instanceof VirtualOperation
     left = new left.constructor(compiler.optimize(a, env) for a in left.args)
-  else if left instanceof UserLocalVar then  env.userlamda?.locals[left] = left
-  else if left instanceof UserNonlocalVar then  env.userlamda?.nonlocals[left] = left
-  else if left instanceof InternalLocalVar then  env.lamda?.locals[left] = left
-  else if left instanceof InternalNonlocalVar then  env.lamda?.nonlocals[left] = left
+  else
+    if left.isConst
+      if left.haveAssigned then throw Error(@, "should assign to const more than once.")
+      else left.haveAssigned = true
+    if left instanceof UserLocalVar then  env.userlamda?.locals[left] = left
+    else if left instanceof UserNonlocalVar
+      env.userlamda?.nonlocals[left] = left
+      @_removed = false
+    else if left instanceof InternalLocalVar then  env.lamda?.locals[left] = left
+    else if left instanceof InternalNonlocalVar then  env.lamda?.nonlocals[left] = left
   exp = compiler.optimize(@exp, env)
   assign = new @constructor(left, exp)
-#  env.bindings[left] = assign
+  if isValue(exp) then env.bindings[left] = assign
+  else
+    env.bindings[left] = left
+    assign._removed = false
   assign
 
 LocalDecl::optimize = (env, compiler) ->
@@ -234,12 +256,10 @@ Apply::optimize = (env, compiler) ->
 
 VirtualOperation::optimize = (env, compiler) ->
   args = (compiler.optimize(a, env) for a in @args)
-  myBoolize = (memo, x) ->
-    if memo is undefined then undefined
-    else if boolize(x) is undefined then undefined
-    else true
-  bool = _.reduce(args, myBoolize, true)
-  if bool and @func then @func.apply(null, args)
+  _isValue = true
+  for a in args
+    if not isValue(a) then _isValue = false; break
+  if _isValue and @func then @func.apply(null, args)
   else new @constructor(args)
 
 Begin::optimize = (env, compiler) ->
@@ -282,11 +302,12 @@ RecursiveClamda::optimizeApply = (args, env, compiler) ->
 IdCont::optimizeApply = (args, env, compiler) -> compiler.optimize(args[0], env)
 
 JSFun::optimizeApply = (args, env, compiler) ->
-    f = @fun
-    t = typeof f
-    if t is 'function' then new Apply(f, args)
-    else if t is 'string' then new Apply(il.fun(f), args)
-    else f.apply(args).optimize(env, compiler)
+  args = (compiler.optimize(a, env) for a in args)
+  f = @fun
+  t = typeof f
+  if t is 'function' then new Apply(f, args)
+  else if t is 'string' then new Apply(il.fun(f), args)
+  else f.apply(args).optimize(env, compiler)
 
 MAX_EXTEND_CODE_SIZE = 10
 
@@ -375,14 +396,19 @@ isDeclaration  = (exp) ->
   if exp_isDeclaration then exp_isDeclaration.call(exp)
   else false
 
+isValue = (exp) ->
+  exp_isValue = exp?.isValue
+  if exp_isValue then exp_isValue.call(exp)
+  else true
+
 il.PURE = 0; il.EFFECT = 1; il.IO = 2
 il.pure = pure = (exp) -> exp._effect = il.PURE; exp
 il.effect = (exp) -> exp._effect = il.EFFECT; exp
 il.io = (exp) -> exp._effect = il.IO; exp
 
 sideEffect = (exp) ->
-  exp_effect = exp?.sideEffect
-  if exp_effect then exp_effect.call(exp)
+  exp_sideEffect = exp?.sideEffect
+  if exp_sideEffect then exp_sideEffect.call(exp)
   else il.PURE
 
 expsEffect = (exps) ->
@@ -480,7 +506,7 @@ New::jsify = (compiler, env) ->
   else if exp instanceof New then throw new Error(exp)
   else if exp instanceof Throw then exp
   else if exp instanceof Return then throw new Error(exp)
-  else new New(@value)
+  else new New(exp)
 If::jsify = (compiler, env) ->
   {test, then_, else_} = @
   test = jsify(test, compiler, env)
@@ -505,6 +531,7 @@ Begin::jsify = (compiler, env) ->
     throw new  Error "begin should have at least one exp"
   result = []
   for e in exps
+    if e instanceof Assign then if e.removed() then continue
     e = jsify(e, compiler, env)
     if e instanceof Begin then result.concat e.exps
     else if e instanceof New then result.push e
@@ -519,7 +546,6 @@ Lamda::jsify = (compiler, env) ->
   for k of locals1
     if not hasOwnProperty.call(nonlocals, k) and k not in @params then locals.push(il.symbol(k))
   body = jsify(@body, compiler, env)
-  body = insertReturn(body)
   if locals.length>0 then new Lamda(@params, il.topbegin(il.vardecl(locals...), body))
   else new Lamda(@params, body)
 Clamda::jsify = (compiler, env) ->
@@ -529,7 +555,6 @@ Clamda::jsify = (compiler, env) ->
   for k of locals1
     if not hasOwnProperty.call(nonlocals, k) and k.name isnt @v.name then locals.push(il.symbol(k))
   body = jsify(@body, compiler, env)
-  body = insertReturn(body)
   if locals.length>0 then il.clamda(@v,il.vardecl(locals...), body)
   else  il.clamda(@v, body)
 
@@ -610,7 +635,7 @@ VirtualOperation::jsify = (compiler, env) ->
   exps.push(new @constructor(args))
   il.begin(exps...)
 
-insertReturn = (exp) ->
+il.insertReturn = insertReturn = (exp) ->
   exp_insertReturn = exp?.insertReturn
   if exp_insertReturn then exp_insertReturn.call(exp)
   else new Return(exp)
@@ -629,10 +654,12 @@ Begin::insertReturn = () ->
 
 Lamda::toCode = (compiler) ->
   compiler.parent = @
-  "function(#{(a.toString() for a in @params).join(', ')}){#{compiler.toCode(@body)}}"
+  body = insertReturn(@body)
+  "function(#{(a.toString() for a in @params).join(', ')}){#{compiler.toCode(body)}}"
 Clamda::toCode = (compiler) ->
   compiler.parent = @
-  "function(#{@v.toString()}){#{compiler.toCode(@body)}}"
+  body = insertReturn(@body)
+  "function(#{@v.toString()}){#{compiler.toCode(body)}}"
 Fun::toCode = (compiler) -> @func.toString()
 Return::toCode = (compiler) -> "return #{compiler.toCode(@value)};"
 Throw::toCode = (compiler) -> "throw #{compiler.toCode(@value)};"
@@ -732,13 +759,13 @@ binary = (symbol, func, effect=il.PURE) ->
   class Binary extends BinaryOperation
     symbol: symbol
     toCode: (compiler) -> args = @args; "#{compiler.toCode(args[0])} #{symbol} #{compiler.toCode(args[1])}"
-    func; func
+    func: func
     _effect: effect
   (x, y) -> new Binary([x, y])
 unary = (symbol, func, effect=il.PURE) ->
   class Unary extends UnaryOperation
     symbol: symbol
-    func; func
+    func: func
     _effect: effect
     toCode: (compiler) -> "#{symbol}#{compiler.toCode(@args[0])}"
   (x) -> new Unary([x])

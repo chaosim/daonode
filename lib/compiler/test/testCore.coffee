@@ -46,7 +46,7 @@ exports.Test =
     test.equal  solve(console_log), console.log
     test.done()
 
-#xexports.Test =
+#exports.Test =
   "test jsfun": (test) ->
     console_log = 'console.log'
     test.equal  solve(funcall(jsfun(console_log), 1)), null
@@ -77,6 +77,14 @@ exports.Test =
     test.throws (-> solve(qq(add(uqs(uqs([1,2])))))), Error
     test.done()
 
+#xexports.Test =
+  "test macro": (test) ->
+    x = 'x'; y = 'y'; z = 'z'
+    test.equal  solve(macall(macro([x], 1), print_(1))), 1
+    test.equal  solve(macall(macro([x], x), print_(1))), null
+    test.equal  solve(macall(macro([x, y, z], if_(x, y, z)), eq(1, 1), print_(1), print_(2))), null
+    test.done()
+
 #exports.Test =
   "test lambda": (test) ->
     x = 'x'; y = 'y'
@@ -85,13 +93,5 @@ exports.Test =
     test.equal  solve(funcall(lamda([x], x), 1)), 1
     test.equal  solve(funcall(lamda([x, y], add(x, y)), 1, 1)), 2
     test.equal  solve(begin(assign(f, lamda([], 1)), funcall(f))), 1
-    test.done()
-
-#xexports.Test =
-  "test macro": (test) ->
-    x = 'x'; y = 'y'; z = 'z'
-    test.equal  solve(macall(macro([x], 1), print_(1))), 1
-    test.equal  solve(macall(macro([x], x), print_(1))), null
-    test.equal  solve(macall(macro([x, y, z], if_(x, y, z)), eq(1, 1), print_(1), print_(2))), null
     test.done()
 

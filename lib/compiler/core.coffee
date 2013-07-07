@@ -54,10 +54,10 @@ exports.Compiler = class Compiler
              il.assign(il.cutcont, il.failcont),
              il.run(il.clamda(v2, @cont(exp, done)))]
     lamda = il.userlamda([], exps...)
-    exp = il.assign(il.attr(il.usernonlocal('exports'), il.symbol('main')), lamda)
     env = new OptimizationEnv(env, {})
-    exp = exp.optimize(env, @)
-    exp = exp.jsify(@, env)
+    lamda = lamda.optimize(env, @)
+    lamda = lamda.jsify(@, env)
+    exp = il.assign(il.attr(il.usernonlocal('exports'), il.symbol('main')), lamda)
     exp.toCode(@)
 
   newvar: (v) -> if _.isString(v) then @env.newvar(il.internallocal(v)) else @env.newvar(v)
@@ -86,7 +86,7 @@ exports.Compiler = class Compiler
       switch task
         when 'assign' then return @cont(exp, @clamda(v, il.assign(item, v), cont.call(item)))
         when 'augment-assign'
-          return @cont(exp, @clamda(v, il.assign(item, il[op](item, v), cont.call(item))))
+          return @cont(exp, @clamda(v, il.assign(item, il[op](item, v)), cont.call(item)))
         when 'inc'
           return il.begin(il.assign(item, il.add(item, 1)), cont.call(item))
         when 'dec'
