@@ -46,6 +46,8 @@ class AugmentAssign extends Assign
 class Return extends Element
   constructor: (@value) -> super
   toString: () -> "return(#{toString(@value)})"
+class New extends Return
+  toString: () -> "new(#{toString(@value)})"
 class Throw extends Return
   toString: () -> "throw(#{toString(@value)})"
 class Begin extends Element
@@ -144,10 +146,10 @@ Assign::optimize = (env, compiler) ->
   left = @left
   if left instanceof VirtualOperation
     left = new left.constructor(compiler.optimize(a, env) for a in left.args)
-  else if left instanceof UserLocalVar then env.userlocals()[left] = left
-  else if left instanceof UserNonlocalVar then env.usernonlocals()[left] = left
-  else if left instanceof InternalLocalVar then env.locals()[left] = left
-  else if left instanceof InternalNonlocalVar then env.nonlocals()[left] = left
+  else if left instanceof UserLocalVar then  env.userlamda?.locals[left] = left
+  else if left instanceof UserNonlocalVar then  env.userlamda?.nonlocals[left] = left
+  else if left instanceof InternalLocalVar then  env.lamda?.locals[left] = left
+  else if left instanceof InternalNonlocalVar then  env.lamda?.nonlocals[left] = left
   exp = compiler.optimize(@exp, env)
   assign = new @constructor(left, exp)
 #  env.bindings[left] = assign
@@ -155,21 +157,21 @@ Assign::optimize = (env, compiler) ->
 
 LocalDecl::optimize = (env, compiler) ->
   for vari in @vars
-    if vari instanceof UserVar then env.userlocals()[vari] = vari
-    else env.locals()[vari] = vari
+    if vari instanceof UserVar then env.userlamda.locals[vari] = vari
+    else env.lamda.locals[vari] = vari
   null
 NonlocalDecl::optimize = (env, compiler) ->
   for vari in @vars
-    if vari instanceof UserVar then env.usernonlocals()[vari] = vari
-    else env.nonlocals()[vari] = vari
+    if vari instanceof UserVar then env.userlamda.nonlocals[vari] = vari
+    else env.lamda.nonlocals[vari] = vari
   null
 ListAssign::optimize = (env, compiler) ->
   lefts = []
   for left in @lefts
-    if left instanceof UserNonlocalVar then env.usernonlocals()[left] = left
-    else if left instanceof UserLocalVar then env.userlocals()[left] = left
-    else if left instanceof InternalNonlocalVar then env.nonlocals()[left] = left
-    else  env.locals()[left] = left
+    if left instanceof UserNonlocalVar then env.userlamda.nonlocals[left] = left
+    else if left instanceof UserLocalVar then env.userlamda.locals[left] = left
+    else if left instanceof InternalNonlocalVar then env.lamda.nonlocals[left] = left
+    else  env.lamda.locals[left] = left
     if left instanceof VirtualOperation
       lefts.push new left.constructor(compiler.optimize(a, env) for a in left.args)
     else lefts.push left
@@ -196,31 +198,34 @@ If::optimize = (env, compiler) ->
       else_ = else_.else_
     new If(test, then_, else_)
 
-Return::optimize = (env, compiler) -> new Return(compiler.optimize(@value, env))
+Return::optimize = (env, compiler) ->
+  env.lamda.haveReturn = true
+  new Return(compiler.optimize(@value, env))
 Throw::optimize = (env, compiler) -> new Throw(compiler.optimize(@value, env))
+New::optimize = (env, compiler) -> new New(compiler.optimize(@value, env))
 Lamda::optimize = (env, compiler) ->
   bindings = {}
   for p in @params then bindings[p] = p
-  locals = {}; nonlocals = {}
-  env = env.extendBindings(bindings, {_locals:locals, _nonlocals:nonlocals})
-  result = new Lamda(@params,compiler.optimize(@body, env))
-  result.locals = locals; result.nonlocals = nonlocals
-  return result
+  @locals = {}; @nonlocals = {}
+  env = env.extendBindings(bindings, @)
+  @body = compiler.optimize(@body, env)
+  @_optimized = true
+  return @
 UserLamda::optimize = (env, compiler) ->
   bindings = {}
   for p in @params then bindings[p] = p
-  locals = {}; nonlocals = {}
-  env = env.extendBindings(bindings, {_userlocals:locals, _usernonlocals:nonlocals})
-  result = new UserLamda(@params,compiler.optimize(@body, env))
-  result.locals = locals; result.nonlocals = nonlocals
-  return result
+  @locals = {}; @nonlocals = {}
+  env = env.extendBindings(bindings,@, @)
+  @body = compiler.optimize(@body, env)
+  @_optimized = true
+  return @
 Clamda::optimize = (env, compiler) ->
-  locals = {}; nonlocals = {}
-  body = compiler.optimize(@body,  env.extend(@v, @v, {_locals:locals, _nonlocals:nonlocals}))
-  result = il.clamda(@v, body)
-  result.locals = locals; result.nonlocals = nonlocals
-  result
-ClamdaBody::optimize = (env, compiler) ->new ClamdaBody(@v, compiler.optimize(@body, env.extend(@v, @v)))
+  bindings = {}; bindings[@v] = @v
+  @locals = {}; @nonlocals = {}
+  env = env.extendBindings(bindings, @)
+  @body = compiler.optimize(@body, env)
+  @_optimized = true
+  return @
 IdCont::optimize = (env, compiler) -> @
 
 Apply::optimize = (env, compiler) ->
@@ -247,7 +252,7 @@ Begin::optimize = (env, compiler) ->
     if e instanceof Begin
       exps = e.exps
       result = result.concat(exps)
-      waitPop = sideEffect(result[-1]) is il.PURE
+      waitPop = sideEffect(result[result.length-1]) is il.PURE
     else
       result.push e
       waitPop = sideEffect(e) is il.PURE
@@ -262,15 +267,11 @@ Code::optimize = (env, compiler) -> @
 JSFun::optimize = (env, compiler) ->  new JSFun(compiler.optimize(@fun, env))
 
 Lamda::optimizeApply = (args, env, compiler) ->
-  params = @params
-  exps = (il.assign(p, args[i]) for p, i in params)
+  exps = (il.assign(p, args[i]) for p, i in @params)
   exps.push @body
-  locals = {}; nonlocals = {}
-  env = env.extendBindings({}, {_locals:locals, _nonlocals:nonlocals})
-  lamda = new Lamda([], null)
-  lamda.body = compiler.optimize(il.topbegin(exps...), env)
-  lamda.locals = locals; lamda.nonlocals = nonlocals
-  new Apply(lamda, [])
+  body = compiler.optimize(il.topbegin(exps...), env)
+  if @haveReturn then new Apply(new Lamda([], body), [])
+  else body
 
 Clamda::optimizeApply = (args, env, compiler) ->
   il.begin(il.assign(@v, args[0]), @body).optimize(env, compiler)
@@ -398,7 +399,8 @@ Var::sideEffect = () -> il.PURE
 NonlocalDecl::sideEffect = () -> il.PURE
 Assign::sideEffect = () -> il.EFFECT
 Return::sideEffect = () -> sideEffect(@value)
-Throw::sideEffect = () -> il.PURE
+Throw::sideEffect = () -> il.IO
+New::sideEffect = () -> sideEffect(@value)
 If::sideEffect = () -> expsEffect [@test, @then_, @else_]
 Begin::sideEffect = () -> expsEffect(@exps)
 Lamda::sideEffect = () ->  il.PURE
@@ -427,69 +429,186 @@ IO = (exp) ->
   if exp_IO then exp_IO.call(exp)
   else false
 
-jsify = (exp) ->
+setJsified = (exp) -> exp?._jsified = true; exp
+isJsified = (exp) -> exp?._jsified or false
+
+jsify = (exp, compiler, env) ->
+  if isJsified(exp) then return exp
   exp_jsify = exp?.jsify
-  if exp_jsify then exp_jsify.call(exp)
+  if exp_jsify then exp_jsify.call(exp, compiler, env)
   else exp
 
-Assign::jsify = () ->
-  exp = @exp
+Assign::jsify = (compiler, env) ->
+  exp = jsify(@exp, compiler, env)
   if exp instanceof Begin
     exps = exp.exps
     length = exps.length
-    assign = new @constructor(@left, jsify(exps[length-1])).jsify()
-    exps = (jsify(e) for e in exps[0...length-1])
-    il.begin((exps.concat([assign]))...)
-  else if exp instanceof ClamdaBody
-    new @constructor(@left, exp.body).jsify()
+    exps[length-1] = new @constructor(@left, exps[length-1]).jsify(compiler, env)
+    exp
   else if exp instanceof If
-    new If(exp.test, new @constructor(@left, exp.then_).jsify(),
-           new @constructor(@left, exp.else_).jsify())
-  else new @constructor(@left, jsify(exp))
-ListAssign::jsify = () ->
-  lefts = @lefts; exp =  @exp
-  il.begin((new Assign(lefts[i], il.index(exp, i)) for i in [0...lefts.length])...)
+    new If(exp.test, new @constructor(@left, exp.then_),
+           new @constructor(@left, exp.else_)).jsify(compiler, env)
+  else if exp instanceof New then new @constructor(@left, exp)
+  else if exp instanceof Throw then exp
+  else if exp instanceof Return then throw new Error(exp)
+  else new @constructor(@left, exp)
 
-Return::jsify = () -> new @constructor(jsify(@value))
-If::jsify = () -> new If(@test, jsify(@then_), jsify(@else_))
-Begin::jsify = () ->
+Return::jsify = (compiler, env) ->
+  exp = jsify(@value, compiler, env)
+  if exp instanceof Begin
+    exps = exp.exps
+    length = exps.length
+    exps[length-1] = new @constructor(exps[length-1]).jsify(compiler, env)
+    exp
+  else if exp instanceof If
+    new If(exp.test, new @constructor(exp.then_),
+           new @constructor(exp.else_)).jsify(compiler, env)
+  else if exp instanceof New then new @constructor(exp)
+  else if exp instanceof Throw then exp
+  else if exp instanceof Return then throw new Error(exp)
+  else new @constructor(@value)
+New::jsify = (compiler, env) ->
+  exp = jsify(@value, compiler, env)
+  if exp instanceof Begin
+    exps = exp.exps
+    length = exps.length
+    exps[length-1] = new New(exps[length-1]).jsify(compiler, env)
+    exp
+  else if exp instanceof If
+    new If(exp.test, new New(exp.then_),
+           new New(exp.else_)).jsify(compiler, env)
+  else if exp instanceof New then throw new Error(exp)
+  else if exp instanceof Throw then exp
+  else if exp instanceof Return then throw new Error(exp)
+  else new New(@value)
+If::jsify = (compiler, env) ->
+  {test, then_, else_} = @
+  test = jsify(test, compiler, env)
+  then_ = jsify(then_, compiler, env)
+  else_ = jsify(else_, compiler, env)
+  if test instanceof Begin
+    exps = test.exps
+    length = test.length
+    exps[length-1] = new If(test[length-1], then_, else_).jsify(compiler, env)
+    test
+  else if test instanceof If
+    t = compiler.newvar('test')
+    il.begin(new If(test.test, il.assign(t, test.then_), il.assign(t, test.else_)).jsify(compiler, env),
+            new If(t, then_, else_))
+  else if test instanceof New then new If(test, then_, else_)
+  else if test instanceof Return then throw new Error(test)
+  else new If(test, then_, else_)
+Begin::jsify = (compiler, env) ->
   exps = @exps
   length = exps.length
   if length is 0 or length is 1
     throw new  Error "begin should have at least one exp"
   result = []
   for e in exps
-    result.push(jsify(e))
+    e = jsify(e, compiler, env)
+    if e instanceof Begin then result.concat e.exps
+    else if e instanceof New then result.push e
+    else if e instanceof Throw then result.push e; break
+    else if e instanceof Return then throw new Error(e)
+    else result.push(e)
   new @constructor(result)
-Lamda::jsify = () ->
+Lamda::jsify = (compiler, env) ->
   locals = []
   nonlocals = @nonlocals
   locals1 = @locals
   for k of locals1
     if not hasOwnProperty.call(nonlocals, k) and k not in @params then locals.push(il.symbol(k))
-  body = jsify(@body)
+  body = jsify(@body, compiler, env)
   body = insertReturn(body)
   if locals.length>0 then new Lamda(@params, il.topbegin(il.vardecl(locals...), body))
   else new Lamda(@params, body)
-Clamda::jsify = () ->
+Clamda::jsify = (compiler, env) ->
   locals = []
   nonlocals = @nonlocals
   locals1 = @locals
   for k of locals1
     if not hasOwnProperty.call(nonlocals, k) and k.name isnt @v.name then locals.push(il.symbol(k))
-  body = jsify(@body)
+  body = jsify(@body, compiler, env)
   body = insertReturn(body)
   if locals.length>0 then il.clamda(@v,il.vardecl(locals...), body)
   else  il.clamda(@v, body)
 
-ClamdaBody::jsify = () -> jsify(@body)
-Apply::jsify = () ->
-  args = (jsify(a) for a in @args)
-  new @constructor(jsify(@caller), args)
-CApply::jsify = () -> new CApply(@caller.jsify(), jsify(@args[0]))
-VirtualOperation::jsify = () ->
-  args = (jsify(a) for a in @args)
-  new @constructor(args)
+Apply::jsify = (compiler, env) ->
+  exps = []
+  args = []
+  caller = jsify(@caller, compiler, env)
+  if caller instanceof Begin
+    exps1 = caller.exps
+    length = exps1.length
+    last = exps1[length-1]
+    if sideEffect(last)==il.PURE
+      exps = exps.concat(exps[0...length-1])
+      caller1 = last
+    else
+      caller1 = compiler.newvar('caller')
+      exps = exps.concat(exps[0...length-1])
+      exps.push(il.assign(caller1, last))
+  else if caller instanceof If
+    caller1 = compiler.newvar('caller')
+    exps.push(new If(caller.test, il.assign(caller1, caller.then_).jsify(compiler, env),
+                     il.assign(caller1, caller.else_).jsify(compiler, env)))
+  else if caller instanceof New then new Error(caller)
+  else if caller instanceof Throw then exps.push caller; return il.begin(exps...)
+  else if caller instanceof Return then throw new Error(caller)
+  else caller1 = caller
+  for a in @args
+    a = jsify(a, compiler, env)
+    if a instanceof Begin
+      aexps = a.exps
+      length = aexps.length
+      last = aexps[length-1]
+      if sideEffect(last)==il.PURE
+        exps = exps.concat(aexps[0...length-1])
+        args.push(last)
+      else
+        t = compiler.newvar('arg')
+        exps = exps.concat(aexps[0...length-1])
+        exps.push(il.assign(t, last).jsify(compiler, env))
+        args.push(t)
+    else if a instanceof If
+      t = compiler.newvar('arg')
+      exps.push(new If(a.test, il.assign(t, a.then_).jsify(compiler, env), il.assign(t, a.else_).jsify(compiler, env)))
+      args.push(t)
+    else if a instanceof New then args.push(a)
+    else if a instanceof Return then throw new Error(a)
+    else if a instanceof Throw then exps.push a; return il.begin(exps...)
+    else args.push(a)
+  exps.push(new @constructor(caller1, args))
+  il.begin(exps...)
+
+CApply::jsify = (compiler, env) -> new CApply(@caller.jsify(compiler, env), jsify(@args[0], compiler, env))
+VirtualOperation::jsify = (compiler, env) ->
+  exps = []
+  args = []
+  for a in @args
+    a = jsify(a, compiler, env)
+    if a instanceof Begin
+      aexps = a.exps
+      length = aexps.length
+      last = aexps[length-1]
+      if sideEffect(last)==il.PURE
+        exps = exps.concat(aexps[0...length-1])
+        args.push(last)
+      else
+        t = compiler.newvar('arg')
+        exps = exps.concat(aexps[0...length-1])
+        exps.push(il.assign(t, last).jsify(compiler, env))
+        args.push(t)
+    else if a instanceof If
+      t = compiler.newvar('arg')
+      exps.push(new If(a.test, il.assign(t, a.then_).jsify(compiler, env), il.assign(t, a.else_).jsify(compiler, env)))
+      args.push(t)
+    else if a instanceof New then args.push(a)
+    else if a instanceof Throw then result.push a; return il.begin(exps...)
+    else if a instanceof Return then throw new Error(a)
+    else args.push(a)
+  exps.push(new @constructor(args))
+  il.begin(exps...)
 
 insertReturn = (exp) ->
   exp_insertReturn = exp?.insertReturn
@@ -498,6 +617,7 @@ insertReturn = (exp) ->
 
 Assign::insertReturn = () -> il.begin(@, il.return(@left))
 Return::insertReturn = () -> @
+New::insertReturn = () -> new Return(@)
 If::insertReturn = () ->
   if @isStatement() then new If(@test, insertReturn(@then_), insertReturn(@else_))
   else new Return(@)
@@ -516,6 +636,7 @@ Clamda::toCode = (compiler) ->
 Fun::toCode = (compiler) -> @func.toString()
 Return::toCode = (compiler) -> "return #{compiler.toCode(@value)};"
 Throw::toCode = (compiler) -> "throw #{compiler.toCode(@value)};"
+New::toCode = (compiler) -> "new #{compiler.toCode(@value)}"
 Var::toCode = (compiler) -> @toString()
 NonlocalDecl::toCode = (compiler) -> ''
 Assign::toCode = (compiler) -> "#{compiler.toCode(@left)} = #{compiler.toCode(@exp)}"
@@ -548,6 +669,7 @@ isStatement = (exp) ->
 If::isStatement = () -> isStatement(@then_) or isStatement(@else_)
 Begin::isStatement = () -> true
 Return::isStatement = () -> true
+New::isStatement = () -> false
 Assign::isStatement = () -> true
 
 vari = (klass, name) -> new klass(name)
@@ -597,6 +719,7 @@ il.topbegin = (exps...) -> begin(TopBegin, exps...)
 il.print = (exps...) -> new Print(exps)
 il.return = (value) -> new Return(value)
 il.throw = (value) -> new Throw(value)
+il.new = (value) -> new New(value)
 il.lamda = (params, body...) -> new Lamda(params, il.topbegin(body...))
 il.userlamda = (params, body...) -> new UserLamda(params, il.topbegin(body...))
 il.clamda = (v, body...) -> new Clamda(v, il.topbegin(body...))
@@ -660,7 +783,7 @@ il.lshiftassign = augmentAssign("<<=", (x, y) -> x << y)
 il.rshiftassign = augmentAssign(">>=", (x, y) -> x >> y)
 
 
-il.listassign = (lefts..., exp) -> new ListAssign(lefts, exp)
+il.listassign = (lefts..., exp) -> il.begin((il.assign(lefts[i], il.index(exp, i)) for i in [0...lefts.length])...)
 
 il.not_ = unary("!", (x) -> !x)
 il.neg = unary("-", (x) -> -x)
@@ -706,7 +829,6 @@ il.pop = vop('pop', (compiler)->args = @args; "(#{compiler.toCode(args[0])}).pop
 il.concat = vop('concat', ((compiler)->args = @args; "(#{compiler.toCode(args[0])}).concat(#{compiler.toCode(args[1])})"), il.PURE)
 il.instanceof = vop('instanceof', ((compiler)->args = @args; "(#{compiler.toCode(args[0])}) instanceof (#{compiler.toCode(args[1])})"), il.PURE)
 il.run = vop('run', (compiler)->args = @args; "solver.run(#{compiler.toCode(args[0])})")
-il.new = vop('new', (compiler)->args = @args; "new #{compiler.toCode(args[0])}")
 il.evalexpr = vop('evalexpr', (compiler)->args = @args; "solve(#{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})")
 il.require = vop('require', (compiler)->args = @args; "require(#{compiler.toCode(args[0])})")
 

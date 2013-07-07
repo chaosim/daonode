@@ -3,7 +3,7 @@ fs = require("fs")
 beautify = require('js-beautify').js_beautify
 il = require("../interlang")
 
-{Compiler, Env} = require '../core'
+{Compiler, OptimizationEnv} = require '../core'
 
 solve = (exp, path) ->
   path = compile(exp, path)
@@ -39,7 +39,7 @@ compileToCode = (exp) ->
   f.analyze(compiler, f.refMap)
   locals = {}; nonlocals = {}
   lamdaVars = {_userlocals:locals, _usernonlocals: nonlocals, _locals:locals, _nonlocals: nonlocals}
-  f = f.optimize(new Env(null, {}, lamdaVars), compiler)
+  f = f.optimize(new OptimizationEnv(null, {}, lamdaVars), compiler)
   f = f.jsify()
   f.toCode(compiler)
 
@@ -50,7 +50,8 @@ xexports = {}
 exports.Test =
   "test vari assign": (test) ->
     x = il.internallocal('x')
+    x2 = il.internallocal('x2')
     test.equal  solve(il.let_([x, 1], il.assign(x, il.add(x,1)), x)), 2
-#    test.equal  solve(il.let_([x, 1],il.let_([x,2], x), x)), 1
+    test.equal  solve(il.let_([x, 1],il.let_([x2,2], x2), x)), 1
     test.done()
 

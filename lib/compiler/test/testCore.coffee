@@ -87,7 +87,7 @@ exports.Test =
     test.equal  solve(begin(assign(f, lamda([], 1)), funcall(f))), 1
     test.done()
 
-#exports.Test =
+#xexports.Test =
   "test macro": (test) ->
     x = 'x'; y = 'y'; z = 'z'
     test.equal  solve(macall(macro([x], 1), print_(1))), 1

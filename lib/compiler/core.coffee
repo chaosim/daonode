@@ -54,11 +54,10 @@ exports.Compiler = class Compiler
              il.assign(il.cutcont, il.failcont),
              il.run(il.clamda(v2, @cont(exp, done)))]
     lamda = il.userlamda([], exps...)
-    lamda.locals = locals = {}; lamda.nonlocals = nonlocals = {}
-    lamdaVars = {_userlocals:locals, _usernonlocals: nonlocals, _locals:locals, _nonlocals: nonlocals}
     exp = il.assign(il.attr(il.usernonlocal('exports'), il.symbol('main')), lamda)
-    exp = exp.optimize(new OptimizationEnv(null, {}, lamdaVars), @)
-    exp = exp.jsify()
+    env = new OptimizationEnv(env, {})
+    exp = exp.optimize(env, @)
+    exp = exp.jsify(@, env)
     exp.toCode(@)
 
   newvar: (v) -> if _.isString(v) then @env.newvar(il.internallocal(v)) else @env.newvar(v)
@@ -812,7 +811,8 @@ exports.Env = class Env
 
 class CpsEnv extends Env
   constructor: (@outer, @bindings) ->
-    @indexMap = {}; @vars = {}
+    if @outer then @indexMap = @outer.indexMap; @vars = @outer.vars
+    else @indexMap = {}; @vars = {}
 
   newvar: (vari) ->
     vars = @vars
@@ -837,30 +837,15 @@ class CpsEnv extends Env
         @bindings[vari] = v = @newvar(vari)
         v
 
-exports.OptimizationEnv = class OptimizationEnv extends Env
-  constructor: (@outer, @bindings, vars) ->
-    @variables = variables = {}
-    for k of bindings
-      if hasOwnProperty.call(bindings, k)
-        variables[k] = true
-    if @outer
-      outerVariables = @outer.variables
-      for k of outerVariables
-        if hasOwnProperty.call(outerVariables, k)
-          variables[k] = true
-    _.extend(@, vars)
-  extend: (vari, value, vars) -> bindings = {}; bindings[vari] = value; new OptimizationEnv(@, bindings, vars)
-  extendBindings: (bindings, vars) -> new OptimizationEnv(@, bindings, vars)
+exports.OptimizationEnv = class OptimizationEnv extends CpsEnv
+  constructor: (@outer, @bindings, @lamda, @userlamda) -> super
+  extendBindings: (bindings, lamda, userlamda) -> new OptimizationEnv(@, bindings, lamda, userlamda)
   lookup: (vari) ->
     bindings = @bindings
     if bindings.hasOwnProperty(vari) then return bindings[vari]
     else
       outer = @outer
       if outer then outer.lookup(vari) else vari
-  locals: () -> @_locals or @outer.locals()
-  nonlocals: () -> @_nonlocals or @outer.nonlocals()
-  userlocals: () -> @_userlocals or @outer.userlocals()
-  usernonlocals: () -> @_usernonlocals or @outer.usernonlocals()
 
 exports.Error = class Error
   constructor: (@exp, @message='', @stack = @) ->  # @stack: to make webstorm nodeunit happy.

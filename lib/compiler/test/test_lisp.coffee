@@ -30,8 +30,8 @@ exports.Test =
     test.equal  solve(begin(assign(a, 1))), 1
     test.equal  solve(begin(assign(a, 1), a)), 1
     test.equal  solve(begin(assign(a, 1), inc(a))), 2
-#    test.equal  solve(begin(assign(a, 1), inc(a), inc(a))), 3
-#    test.equal  solve(begin(assign(a, 1), inc(a), inc(a), inc(a))), 4
+    test.equal  solve(begin(assign(a, 1), inc(a), inc(a))), 3
+    test.equal  solve(begin(assign(a, 1), inc(a), inc(a), inc(a))), 4
     test.done()
 
 #xexports.Test =
