@@ -169,13 +169,11 @@ exports.Test =
     test.equal  solve(begin(assign(_, dummy('__')), parsetext(some(char(_)), string('a')))), 1
     test.equal  solve(begin(assign(_, dummy('__')), parsetext(some(char(_)), string('ab')))), 2
     test.equal  solve(parsetext(begin(assign(_, dummy('__')), some(char(_)), eoi), string('abc'))), true
-    test.equal core.status, core.SUCCESS
     test.deepEqual  solve(begin(assign(_, dummy('__')), assign(result, logicvar('result')),
                                 parsetext(some(char(_), result, _), string('a')), getvalue(result))), ['a']
     test.equal core.status, core.SUCCESS
     test.deepEqual  solve(begin(assign(_, dummy('__')), assign(result, logicvar('result')),
                                 settext(string('ab')), some(char(_), result, _), eoi, getvalue(result))), ['a', 'b']
-    test.equal core.status, core.SUCCESS
     test.equal  solve(parsetext(begin(assign(_, dummy('__')), some(char(_)), char(string('c')), eoi), string('abc'))), true
     test.equal  solve(parsetext(begin(assign(_, dummy('__')), some(char(string('a')))), string('b'))), 0
     test.equal  solve(parsetext(begin(assign(_, dummy('__')), some(char(string('a'))), eoi), string('b'))), false
@@ -220,7 +218,7 @@ exports.Test =
                                 times(char(string('b')), n, result, string('b')), eoi, getvalue(result))), ['b', 'b', 'b']
     test.done()
 
-#xexports.Test =
+#exports.Test =
   "test seplist": (test) ->
     _ = vari('__')
     result = vari('result')
@@ -234,7 +232,7 @@ exports.Test =
     test.equal  solve(begin(assign(_, dummy('__')), parsetext(seplist(char(_), {sep:char(string(',')), times:3}), string('a,a,')))), false
     test.done()
 
-#exports.Test =
+#xexports.Test =
   "test seplist2": (test) ->
     _ = vari('__')
     result = vari('result')

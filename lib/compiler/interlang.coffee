@@ -9,6 +9,12 @@ exports.NotImplement = class NotImplement extends Error
 
 toString = (o) -> o?.toString?() or o
 
+expressionToCode = (compiler, exp) ->
+  if exp instanceof Var or
+  exp instanceof VirtualOperation and (exp.name=='attr' or exp.name=='index')
+    compiler.toCode(exp)
+  else "(#{compiler.toCode(exp)})"
+
 class Element
   constructor: () ->  @name = @toString()
   call: (args...) -> new Apply(@, args)
@@ -38,7 +44,7 @@ class NonlocalDecl extends LocalDecl
   toString: () -> "nonlocalDecl(#{@vars}"
 
 class Assign extends Element
-  constructor: (@left, @exp) -> super
+  constructor: (@left, @exp) -> super; @_removed = false
   toString: () -> "#{toString(@left)} = #{toString(@exp)}"
   remove: () -> @_removed = true
   dont_remove: () -> @_removed = false
@@ -53,8 +59,10 @@ class Assign extends Element
 class ListAssign extends Assign
   constructor: (@lefts, @exp) -> @name = @toString()
   toString: () -> "#{toString(@lefts)} = #{toString(@exp)}"
+
 class AugmentAssign extends Assign
   toString: () -> "#{toString(@left)} #{@operator} #{toString(@exp)}"
+
 class Return extends Element
   constructor: (@value) -> super
   toString: () -> "return(#{toString(@value)})"
@@ -175,6 +183,9 @@ Assign::optimize = (env, compiler) ->
   assign = new @constructor(left, exp)
   if isValue(exp)
     if exp instanceof Lamda and left.isRecursive
+      env.bindings[left] = left
+      assign._removed = false
+    else if not isAtomic(exp)
       env.bindings[left] = left
       assign._removed = false
     else if left instanceof VirtualOperation
@@ -425,6 +436,8 @@ isValue = (exp) ->
   if exp_isValue then exp_isValue.call(exp)
   else true
 
+isAtomic = (exp) -> _.isString(exp) or _.isNumber(exp)
+
 il.PURE = 0; il.EFFECT = 1; il.IO = 2
 il.pure = pure = (exp) -> exp._effect = il.PURE; exp
 il.effect = (exp) -> exp._effect = il.EFFECT; exp
@@ -577,8 +590,8 @@ If::toCode = (compiler) ->
 #    if else_ is undefined then "((#{compiler.toCode(@test)}) && (#{compiler.toCode(@then_)}))"
 #    else "(#{compiler.toCode(@test)}) ? (#{compiler.toCode(@then_)}) : (#{compiler.toCode(@else_)})"
 Apply::toCode = (compiler) ->
-  "(#{compiler.toCode(@caller)})(#{(compiler.toCode(arg) for arg in @args).join(', ')})"
-CApply::toCode = (compiler) -> "(#{compiler.toCode(@caller)})(#{compiler.toCode(@args[0])})"
+  "#{expressionToCode(compiler, @caller)}(#{(compiler.toCode(arg) for arg in @args).join(', ')})"
+CApply::toCode = (compiler) -> "#{expressionToCode(compiler, @caller)}(#{compiler.toCode(@args[0])})"
 Begin::toCode = (compiler) -> compiler.parent = @; "{#{(compiler.toCode(exp) for exp in @exps).join('; ')}}"
 TopBegin::toCode = (compiler) -> compiler.parent = @; "#{(compiler.toCode(exp) for exp in @exps).join('; ')}"
 Print::toCode = (compiler) ->  "console.log(#{(compiler.toCode(exp) for exp in @exps).join(', ')})"
@@ -656,7 +669,7 @@ il.jsfun = (fun) -> new JSFun(fun)
 binary = (symbol, func, effect=il.PURE) ->
   class Binary extends BinaryOperation
     symbol: symbol
-    toCode: (compiler) -> args = @args; "#{compiler.toCode(args[0])} #{symbol} #{compiler.toCode(args[1])}"
+    toCode: (compiler) -> args = @args; "#{expressionToCode(compiler, args[0])} #{symbol} #{expressionToCode(compiler, args[1])}"
     func: func
     _effect: effect
   (x, y) -> new Binary([x, y])
@@ -665,7 +678,7 @@ unary = (symbol, func, effect=il.PURE) ->
     symbol: symbol
     func: func
     _effect: effect
-    toCode: (compiler) -> "#{symbol}#{compiler.toCode(@args[0])}"
+    toCode: (compiler) -> "#{symbol}#{expressionToCode(compiler, @args[0])}"
   (x) -> new Unary([x])
 
 il.eq = binary("===", (x, y) -> x is y)
@@ -731,28 +744,28 @@ vop2 = (name, toCode, _effect=il.EFFECT) ->
     isStatement: () -> true
   (args...) -> new Vop(args)
 
-il.attr = vop('attr', ((compiler)->args = @args; "(#{compiler.toCode(args[0])}).#{compiler.toCode(args[1])}"), il.PURE)
+il.attr = vop('attr', ((compiler) -> args = @args; "#{expressionToCode(compiler, args[0])}.#{compiler.toCode(args[1])}"), il.PURE)
 il.nonlocal = (vars) -> new NonlocalDecl(vars)
 il.local = (vars...) -> new LocalDecl(vars)
 il.vardecl = vop('vardecl', (compiler)->args = @args; "var #{(compiler.toCode(e) for e in args).join(', ')}")
-il.array = vop('array', (compiler)->args = @args; "[#{(compiler.toCode(e) for e in args).join(', ')}]")
-il.suffixinc = vop('suffixdec', (compiler)->args = @args; "#{compiler.toCode(args[0])}++")
-il.suffixdec = vop('suffixdec', (compiler)->args = @args; "#{compiler.toCode(args[0])}--")
+il.array = vop('array', (compiler)->args = @args; "[#{(expressionToCode(compiler, e) for e in args).join(', ')}]")
+il.suffixinc = vop('suffixdec', (compiler)->args = @args; "#{expressionToCode(compiler, args[0])}++")
+il.suffixdec = vop('suffixdec', (compiler)->args = @args; "#{expressionToCode(compiler, args[0])}--")
 il.catches = il.usernonlocalattr('solver.catches')
-il.pushCatch = vop('pushCatch', (compiler)->args = @args; "solver.pushCatch(#{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})")
-il.popCatch = vop('popCatch', (compiler)->args = @args; "solver.popCatch(#{compiler.toCode(args[0])})")
-il.findCatch = vop('findCatch', ((compiler)->args = @args; "solver.findCatch(#{compiler.toCode(args[0])})"), il.PURE)
+il.pushCatch = vop('pushCatch', (compiler)->args = @args; "solver.pushCatch(#{expressionToCode(compiler, args[0])}, #{expressionToCode(compiler, args[1])})")
+il.popCatch = vop('popCatch', (compiler)->args = @args; "solver.popCatch(#{expressionToCode(compiler, args[0])})")
+il.findCatch = vop('findCatch', ((compiler)->args = @args; "solver.findCatch(#{expressionToCode(compiler, args[0])})"), il.PURE)
 il.fake = vop('fake', (compiler)->args = @args; "solver.fake(#{compiler.toCode(args[0])})").apply([])
 il.restore = vop('restore', (compiler)->args = @args; "solver.restore(#{compiler.toCode(args[0])})")
 il.getvalue = vop('getvalue', ((compiler)->args = @args; "solver.trail.getvalue(#{compiler.toCode(args[0])})"), il.PURE)
 il.list = vop('list', ((compiler)->args = @args; "[#{(compiler.toCode(a) for a in args).join(', ')}]"), il.PURE)
-il.length = vop('length', ((compiler)->args = @args; "(#{compiler.toCode(args[0])}).length"), il.PURE)
-il.index = vop('index', ((compiler)->args = @args; "(#{compiler.toCode(args[0])})[#{compiler.toCode(args[1])}]"), il.PURE)
-il.slice = vop('slice', ((compiler)->args = @args; "#{compiler.toCode(args[0])}.slice(#{compiler.toCode(args[1])}, #{compiler.toCode(args[2])})"), il.PURE)
-il.push = vop('push', (compiler)->args = @args; "(#{compiler.toCode(args[0])}).push(#{compiler.toCode(args[1])})")
-il.pop = vop('pop', (compiler)->args = @args; "(#{compiler.toCode(args[0])}).pop()")
-il.concat = vop('concat', ((compiler)->args = @args; "(#{compiler.toCode(args[0])}).concat(#{compiler.toCode(args[1])})"), il.PURE)
-il.instanceof = vop('instanceof', ((compiler)->args = @args; "(#{compiler.toCode(args[0])}) instanceof (#{compiler.toCode(args[1])})"), il.PURE)
+il.length = vop('length', ((compiler)->args = @args; "#{expressionToCode(compiler, args[0])}.length"), il.PURE)
+il.index = vop('index', ((compiler)->args = @args; "#{expressionToCode(compiler, args[0])}[#{compiler.toCode(args[1])}]"), il.PURE)
+il.slice = vop('slice', ((compiler)->args = @args; "#{expressionToCode(compiler, args[0])}.slice(#{compiler.toCode(args[1])}, #{compiler.toCode(args[2])})"), il.PURE)
+il.push = vop('push', (compiler)->args = @args; "#{expressionToCode(compiler, args[0])}.push(#{compiler.toCode(args[1])})")
+il.pop = vop('pop', (compiler)->args = @args; "#{expressionToCode(compiler, args[0])}.pop()")
+il.concat = vop('concat', ((compiler)->args = @args; "#{expressionToCode(compiler, args[0])}.concat(#{compiler.toCode(args[1])})"), il.PURE)
+il.instanceof = vop('instanceof', ((compiler)->args = @args; "#{expressionToCode(compiler, args[0])} instanceof #{expressionToCode(compiler, args[1])}"), il.PURE)
 il.run = vop('run', (compiler)->args = @args; "solver.run(#{compiler.toCode(args[0])})")
 il.evalexpr = vop('evalexpr', (compiler)->args = @args; "solve(#{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})")
 il.require = vop('require', (compiler)->args = @args; "require(#{compiler.toCode(args[0])})")
@@ -760,10 +773,10 @@ il.require = vop('require', (compiler)->args = @args; "require(#{compiler.toCode
 il.newLogicVar = vop('newLogicVar', ((compiler)->args = @args; "new Var(#{compiler.toCode(args[0])})"), il.PURE)
 il.newDummyVar = vop('newDummyVar', ((compiler)->args = @args; "new DummyVar(#{compiler.toCode(args[0])})"), il.PURE)
 il.unify = vop('unify', (compiler)->args = @args; "solver.trail.unify(#{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})")
-il.bind = vop('bind', (compiler)->args = @args; "#{compiler.toCode(args[0])}.bind(#{compiler.toCode(args[1])}, solver.trail)")
+il.bind = vop('bind', (compiler)->args = @args; "#{expressionToCode(compiler, args[0])}.bind(#{compiler.toCode(args[1])}, solver.trail)")
 
 il.solver = il.usernonlocal('solver')
-il.undotrail = vop('undotrail', (compiler)->args = @args; "#{compiler.toCode(args[0])}.undo()")
+il.undotrail = vop('undotrail', (compiler)->args = @args; "#{expressionToCode(compiler, args[0])}.undo()")
 il.failcont = il.usernonlocalattr('solver.failcont')
 il.setfailcont = (cont) -> il.assign(il.failcont, cont)
 il.setcutcont = (cont) -> il.assign(il.cutcont, cont)

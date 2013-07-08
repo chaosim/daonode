@@ -577,6 +577,7 @@ exports.Compiler = class Compiler
       trail = @newvar('trail')
       state = @newvar('state')
       anyCont = @newvar('anyCont')
+      anyCont.isRecursive = true
       v = @newvar('v')
       v1 = @newvar('v')
       il.begin(
@@ -600,6 +601,8 @@ exports.Compiler = class Compiler
       v = @newvar('v')
       anyCont = @newvar('anyCont')
       anyFcont = @newvar('anyFcont')
+      anyCont.isRecursive = true
+      anyFcont.isRecursive = true
       il.begin(
         il.local(trail),
         il.assign(anyCont, il.recclamda(v,
@@ -617,6 +620,7 @@ exports.Compiler = class Compiler
     'greedyany': (cont, exp) ->
       fc = @newvar('fc')
       anyCont = @newvar('anyCont')
+      anyCont.isRecursive = true
       v = @newvar('v')
       v1 = @newvar('v')
       il.begin(
