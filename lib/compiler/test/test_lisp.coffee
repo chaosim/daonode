@@ -90,7 +90,7 @@ exports.Test =
     test.equal  solve(block(a, assign(f, lamda([x], block(b, break_(a, 2), 1))), funcall(f, 1), 3)), 2  # optimization error
     test.done()
 
-#xexports.Test =
+#exports.Test =
   "test loop while until": (test) ->
     x = vari('x')
     a = makeLabel('x')

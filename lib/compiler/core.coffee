@@ -252,6 +252,7 @@ exports.Compiler = class Compiler
       defaultExits.push(cont)
       continues = @continues[label] ?= []
       f = @newvar('block'+label)
+      f.isRecursive = true
       fun = il.clamda(@newvar('v'), null)
       continues.push(f)
       defaultContinues = @continues[''] ?= []   # if no label, go here
@@ -844,8 +845,10 @@ exports.OptimizationEnv = class OptimizationEnv extends CpsEnv
     bindings = @bindings
     if bindings.hasOwnProperty(vari) then return bindings[vari]
     else
-      outer = @outer
-      if outer then outer.lookup(vari) else vari
+      if @isConst
+        outer = @outer
+        if outer then outer.lookup(vari) else vari
+      else vari
 
 exports.Error = class Error
   constructor: (@exp, @message='', @stack = @) ->  # @stack: to make webstorm nodeunit happy.

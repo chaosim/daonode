@@ -40,7 +40,6 @@ compileToCode = (exp) ->
   locals = {}; nonlocals = {}
   lamdaVars = {_userlocals:locals, _usernonlocals: nonlocals, _locals:locals, _nonlocals: nonlocals}
   f = f.optimize(new OptimizationEnv(null, {}, lamdaVars), compiler)
-  f = f.jsify()
   f.toCode(compiler)
 
 vari = (name) -> il.internallocal(name)
