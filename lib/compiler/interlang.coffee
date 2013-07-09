@@ -10,8 +10,8 @@ exports.NotImplement = class NotImplement extends Error
 toString = (o) -> o?.toString?() or o
 
 expressionToCode = (compiler, exp) ->
-  if exp instanceof Var or
-  exp instanceof VirtualOperation and (exp.name=='attr' or exp.name=='index')
+  if exp instanceof Var or _.isString(exp) or _.isNumber(exp) or _.isArray(exp)\
+     or exp instanceof VirtualOperation and (exp.name=='attr' or exp.name=='index')
     compiler.toCode(exp)
   else "(#{compiler.toCode(exp)})"
 
@@ -44,17 +44,17 @@ class NonlocalDecl extends LocalDecl
   toString: () -> "nonlocalDecl(#{@vars}"
 
 class Assign extends Element
-  constructor: (@left, @exp) -> super; @_removed = false
+  constructor: (@left, @exp) -> super; @dependency = []
   toString: () -> "#{toString(@left)} = #{toString(@exp)}"
   remove: () -> @_removed = true
   dont_remove: () -> @_removed = false
   removed: () ->
     if @_removed==true then true
     else if @_removed==false then false
-    else if @dependency
+    else
       for item in @dependency
         if item.removed()==false then return false
-    else true
+      true
 
 class ListAssign extends Assign
   constructor: (@lefts, @exp) -> @name = @toString()
@@ -154,195 +154,205 @@ Deref::replace = (param, value) -> new Deref(value.replace(@exp, param))
 Code::replace = (param, value) -> @
 JSFun::replace = (param, value) ->  new JSFun(replace(@fun, param, value))
 
-optimize = (exp, env, compiler) ->
-  exp_optimize = exp?.optimize
-  if exp_optimize then exp_optimize.call(exp, env, compiler)
-  else exp
+exports.optimize = optimize = (expr, env, compiler) ->
+  if expr instanceof Var
+    outerEnv = env.outer
+    if outerEnv
+      envExp = outerEnv.lookup(expr)
+      if envExp instanceof Assign then envExp._removed = false
+    content = env.lookup(expr)
+    if content instanceof Assign
+      if expr.isRecursive then expr
+      else content.exp
+    else if _.isArray(content) then expr
+    else content
 
-Var::optimize = (env, compiler) ->
-  content = env.lookup(@)
-  if content instanceof Assign
-    if @isRecursive then @
-    else content.exp
-  else content
-Assign::optimize = (env, compiler) ->
-  left = @left
-  if left instanceof VirtualOperation
-    left = new left.constructor(compiler.optimize(a, env) for a in left.args)
-  else
-    if left.isConst
-      if left.haveAssigned then throw Error(@, "should assign to const more than once.")
-      else left.haveAssigned = true
-    if left instanceof UserLocalVar then  env.userlamda?.locals[left] = left
-    else if left instanceof UserNonlocalVar
-      env.userlamda?.nonlocals[left] = left
-      @_removed = false
-    else if left instanceof InternalLocalVar then  env.lamda?.locals[left] = left
-    else if left instanceof InternalNonlocalVar then  env.lamda?.nonlocals[left] = left
-  exp = compiler.optimize(@exp, env)
-  assign = new @constructor(left, exp)
-  if isValue(exp)
-    if exp instanceof Lamda and left.isRecursive
-      env.bindings[left] = left
-      assign._removed = false
-    else if not isAtomic(exp)
-      env.bindings[left] = left
-      assign._removed = false
-    else if left instanceof VirtualOperation
-      assign._removed = false
-    else
-      env.bindings[left] = assign
-  else
-    env.bindings[left] = left
-    assign._removed = false
-  assign
-
-LocalDecl::optimize = (env, compiler) ->
-  for vari in @vars
-    if vari instanceof UserVar then env.userlamda.locals[vari] = vari
-    else env.lamda.locals[vari] = vari
-  null
-NonlocalDecl::optimize = (env, compiler) ->
-  for vari in @vars
-    if vari instanceof UserVar then env.userlamda.nonlocals[vari] = vari
-    else env.lamda.nonlocals[vari] = vari
-  null
-ListAssign::optimize = (env, compiler) ->
-  lefts = []
-  for left in @lefts
-    if left instanceof UserNonlocalVar then env.userlamda.nonlocals[left] = left
-    else if left instanceof UserLocalVar then env.userlamda.locals[left] = left
-    else if left instanceof InternalNonlocalVar then env.lamda.nonlocals[left] = left
-    else  env.lamda.locals[left] = left
+  else if expr instanceof Assign
+    left = expr.left
     if left instanceof VirtualOperation
-      lefts.push new left.constructor(compiler.optimize(a, env) for a in left.args)
-    else lefts.push left
-  new @constructor(lefts, compiler.optimize(@exp, env))
-If::optimize = (env, compiler) ->
-  test = optimize(@test, env, compiler)
-  test_bool = boolize(test)
-  if test_bool is true
-    then_ = optimize(@then_, env, compiler)
-    if then_ instanceof If and then_.test is test # (if a (if a b c) d)
-      then_ = then_.then_
-    then_
-  else if test_bool is false
-    else_ = optimize(@else_, env, compiler)
-    if else_ instanceof If and else_.test is test # (if a b (if a c d))
-      else_ = else_.else_
-    else_
-  else
-    then_= optimize(@then_, env, compiler)
-    else_ = optimize(@else_, env, compiler)
-    if then_ instanceof If and then_.test is test # (if a (if a b c) d)
-      then_ = then_.then_
-    if else_ instanceof If and else_.test is test # (if a b (if a c d))
-      else_ = else_.else_
-    new If(test, then_, else_)
-
-Return::optimize = (env, compiler) ->
-  env.lamda.haveReturn = true
-  new Return(compiler.optimize(@value, env))
-Throw::optimize = (env, compiler) -> new Throw(compiler.optimize(@value, env))
-New::optimize = (env, compiler) -> new New(compiler.optimize(@value, env))
-Lamda::optimize = (env, compiler) ->
-  if @_optimized then return @
-  envBindings = env.bindings
-  for k,v of envBindings
-    if hasOwnProperty.call(envBindings, k) and v instanceof Assign
-      v._removed = false
-  bindings = {}
-  for p in @params then bindings[p] = p
-  @locals = {}; @nonlocals = {}
-  env = env.extendBindings(bindings, @)
-  @body = compiler.optimize(@body, env)
-  @_optimized = true
-  return @
-UserLamda::optimize = (env, compiler) ->
-  if @_optimized then return @
-  envBindings = env.bindings
-  for k,v of envBindings
-    if hasOwnProperty.call(envBindings, k) and v instanceof Assign
-      v._removed = false
-  bindings = {}
-  for p in @params then bindings[p] = p
-  @locals = {}; @nonlocals = {}
-  env = env.extendBindings(bindings,@, @)
-  @body = compiler.optimize(@body, env)
-  @_optimized = true
-  return @
-Clamda::optimize = (env, compiler) ->
-  if @_optimized then return @
-  envBindings = env.bindings
-  for k,v of envBindings
-    if hasOwnProperty.call(envBindings, k) and v instanceof Assign
-      v._removed = false
-  bindings = {}; bindings[@v] = @v
-  @locals = {}; @nonlocals = {}
-  env = env.extendBindings(bindings, @)
-  @body = compiler.optimize(@body, env)
-  @_optimized = true
-  return @
-IdCont::optimize = (env, compiler) -> @
-
-Apply::optimize = (env, compiler) ->
-  caller =  compiler.optimize(@caller, env)
-  caller.optimizeApply?(@args, env, compiler) or new Apply(caller, (compiler.optimize(a, env) for a in @args))
-
-VirtualOperation::optimize = (env, compiler) ->
-  args = (compiler.optimize(a, env) for a in @args)
-  _isValue = true
-  for a in args
-    if not isValue(a) then _isValue = false; break
-  if _isValue and @func then @func.apply(null, args)
-  else new @constructor(args)
-
-Begin::optimize = (env, compiler) ->
-  result = []
-  waitPop = false
-  for exp in @exps
-    e = compiler.optimize(exp, env)
-    if isDeclaration(e) then continue
-    if waitPop then result.pop()
-    if e instanceof Begin
-      exps = e.exps
-      result = result.concat(exps)
-      waitPop = sideEffect(result[result.length-1]) is il.PURE
+      left = new left.constructor(optimize(a, env, compiler) for a in left.args)
     else
-      result.push e
-      waitPop = sideEffect(e) is il.PURE
-  if result.length>1 then  new @constructor(result)
-  else result[0]
-Deref::optimize = (env, compiler) ->
-  exp = @exp
-  if _.isString(exp) then exp
-  else if _.isNumber(exp) then exp
-  else new Deref(compiler.optimize(exp, env))
-Code::optimize = (env, compiler) -> @
-JSFun::optimize = (env, compiler) ->  new JSFun(compiler.optimize(@fun, env))
+      if left.isConst
+        if left.haveAssigned then throw Error(expr, "should not assign to const more than once.")
+        else left.haveAssigned = true
+      if left instanceof UserLocalVar
+        locals = env.userlamda?.locals
+        if locals
+          if locals[left]? then locals[left]++
+          else locals[left] = 1
+      else if left instanceof UserNonlocalVar
+        env.userlamda?.nonlocals[left] = left
+      else if left instanceof InternalLocalVar then  env.lamda?.locals[left] = left
+      else if left instanceof InternalNonlocalVar then  env.lamda?.nonlocals[left] = left
+    exp = optimize(expr.exp, env, compiler)
+    assign = new expr.constructor(left, exp)
+    outerEnv = env.outer
+    if outerEnv
+      envExp = outerEnv.lookup(left)
+      if envExp instanceof Assign then envExp._removed = false
+    if isValue(exp)
+      if exp instanceof Lamda and left.isRecursive
+        env.bindings[left] = exp
+        assign._removed = false
+      else if not isAtomic(exp)
+        env.bindings[left] = exp
+        assign._removed = false
+      else if left instanceof VirtualOperation
+        assign._removed = false
+      else
+        env.bindings[left] = assign
+    else
+      env.bindings[left] = left
+      assign._removed = false
+    assign
+  else if expr instanceof LocalDecl
+    for vari in expr.vars
+      if vari instanceof UserVar then env.userlamda.locals[vari] = vari
+      else env.lamda.locals[vari] = vari
+    null
+  else if expr instanceof NonlocalDecl
+    for vari in expr.vars
+      if vari instanceof UserVar then env.userlamda.nonlocals[vari] = vari
+      else env.lamda.nonlocals[vari] = vari
+    null
 
-Lamda::optimizeApply = (args, env, compiler) ->
-  exps = (il.assign(p, args[i]) for p, i in @params)
-  exps.push @body
-  body = compiler.optimize(il.topbegin(exps...), env)
-  if not isStatement(body) then body
-  else new Apply(new Lamda([], body), [])
+  else if expr instanceof If
+    test = optimize(expr.test, env, compiler)
+    test_bool = boolize(test)
+    if test_bool is true
+      then_ = optimize(expr.then_, env, compiler)
+      if then_ instanceof If and then_.test is test # (if a (if a b c) d)
+        then_ = then_.then_
+      then_
+    else if test_bool is false
+      else_ = optimize(expr.else_, env, compiler)
+      if else_ instanceof If and else_.test is test # (if a b (if a c d))
+        else_ = else_.else_
+      else_
+    else
+      then_= optimize(expr.then_, env, compiler)
+      else_ = optimize(expr.else_, env, compiler)
+      if then_ instanceof If and then_.test is test # (if a (if a b c) d)
+        then_ = then_.then_
+      if else_ instanceof If and else_.test is test # (if a b (if a c d))
+        else_ = else_.else_
+      new If(test, then_, else_)
 
-Clamda::optimizeApply = (args, env, compiler) ->
-  il.begin(il.assign(@v, args[0]), @body).optimize(env, compiler)
+  else if expr instanceof Throw then  new Throw(optimize(expr.value, env, compiler))
+  else if expr instanceof New then new New(optimize(expr.value, env, compiler))
+  else if expr instanceof IdCont then expr
 
-RecursiveClamda::optimizeApply = (args, env, compiler) ->
-  il.begin(il.assign(@v, args[0]), @body).optimize(env, compiler)
+  else if expr instanceof Clamda
+    if expr._optimized then return expr
+    #  envBindings = env.bindings
+    #  for k,v of envBindings
+    #    if hasOwnProperty.call(envBindings, k) and v instanceof Assign
+    #      v._removed = false
+    bindings = {}; bindings[expr.v] = expr.v
+    expr.locals = {}; expr.nonlocals = {}; expr.vars = {}; expr.childrenLamda = []
+    env = env.extendBindings(bindings, expr)
+    body = optimize(expr.body, env, compiler)
+    expr.body = jsify(body, compiler, env)
+    expr._optimized = true
+    expr._jsified = true
+    return expr
 
-IdCont::optimizeApply = (args, env, compiler) -> compiler.optimize(args[0], env)
+  else if expr instanceof UserLamda
+    if expr._optimized then return expr
+    #  envBindings = env.bindings
+    #  for k,v of envBindings
+    #    if hasOwnProperty.call(envBindings, k) and v instanceof Assign
+    #      v._removed = false
+    bindings = {}
+    for p in expr.params then bindings[p] = p
+    expr.locals = {}; expr.nonlocals = {}; expr.vars = {}; expr.childrenLamda = []
+    env = env.extendBindings(bindings,expr, expr)
+    body = optimize(expr.body, env, compiler)
+    expr.body = jsify(body, compiler, env)
+    expr._jsified = true
+    expr._optimized = true
+    return expr
 
-JSFun::optimizeApply = (args, env, compiler) ->
-  args = (compiler.optimize(a, env) for a in args)
-  f = @fun
-  t = typeof f
-  if t is 'function' then new Apply(f, args)
-  else if t is 'string' then new Apply(il.fun(f), args)
-  else f.apply(args).optimize(env, compiler)
+  else if expr instanceof Lamda
+    if expr._optimized then return expr
+    env.lamda.childrenLamda.push(expr)
+  #  envBindings = env.bindings
+  #  for k,v of envBindings
+  #    if hasOwnProperty.call(envBindings, k) and v instanceof Assign
+  #      if vars[k] then v._removed = false
+    bindings = {}
+    for p in expr.params then bindings[p] = p
+    expr.locals = {}; expr.nonlocals = {}; expr.vars = {}; expr.childrenLamda = []
+    env = env.extendBindings(bindings, expr)
+    body = optimize(expr.body, env, compiler)
+    expr.body = jsify(body, compiler, env)
+    expr._jsified = true
+  #  vars = expr.allVars()
+    expr._optimized = true
+    return expr
+
+  else if expr instanceof Apply
+    caller =  optimize(expr.caller, env, compiler)
+    args = expr.args
+    if caller instanceof IdCont
+      optimize(args[0], env)
+    else if caller instanceof RecursiveClamda
+      optimize(il.begin(il.assign(caller.v, args[0]), caller.body), env, compiler)
+    else if caller instanceof Clamda
+      optimize(il.begin(il.assign(caller.v, args[0]), caller.body), env, compiler)
+    else if caller instanceof JSFun
+      args = (optimize(a, env, compiler) for a in args)
+      f = caller.fun
+      t = typeof f
+      if t is 'function' then new Apply(f, args)
+      else if t is 'string' then new Apply(il.fun(f), args)
+      else f.apply(args).optimize(env, compiler)
+    else if caller instanceof Lamda
+      exps = (il.assign(p, args[i]) for p, i in caller.params)
+      exps.push caller.body
+      body = optimize(il.topbegin(exps...), env, compiler)
+      body = jsify(body, compiler, env)
+      if not isStatement(body) then body
+      else new Apply(new Lamda([], body), [])
+    else new Apply(caller, (optimize(a, env, compiler) for a in expr.args))
+
+  else if expr instanceof VirtualOperation
+    args = (optimize(a, env, compiler) for a in expr.args)
+    _isValue = true
+    for a in args
+      if not isValue(a) then _isValue = false; break
+    if _isValue and expr.func then expr.func.apply(null, args)
+    else new expr.constructor(args)
+
+  else if expr instanceof Begin
+    result = []
+    waitPop = false
+    for exp in expr.exps
+      e = optimize(exp, env, compiler)
+      if isDeclaration(e) then continue
+      if waitPop then result.pop()
+      if e instanceof Begin
+        exps = e.exps
+        result = result.concat(exps)
+        waitPop = sideEffect(result[result.length-1]) is il.PURE
+      else
+        result.push e
+        waitPop = sideEffect(e) is il.PURE
+    if result.length>1 then  new expr.constructor(result)
+    else result[0]
+
+  else if expr instanceof Deref
+    exp = expr.exp
+    if _.isString(exp) then exp
+    else if _.isNumber(exp) then exp
+    else new Deref(optimize(exp, env, compiler))
+
+  else if expr instanceof Code then expr
+
+  else if expr instanceof JSFun
+    new JSFun(optimize(expr.fun, env, compiler))
+
+  else expr
 
 MAX_EXTEND_CODE_SIZE = 10
 
@@ -436,7 +446,7 @@ isValue = (exp) ->
   if exp_isValue then exp_isValue.call(exp)
   else true
 
-isAtomic = (exp) -> _.isString(exp) or _.isNumber(exp)
+isAtomic = (exp) -> not _.isObject(exp)
 
 il.PURE = 0; il.EFFECT = 1; il.IO = 2
 il.pure = pure = (exp) -> exp._effect = il.PURE; exp
@@ -511,14 +521,20 @@ Begin::jsify = (compiler, env) ->
   if length is 0 or length is 1
     throw new  Error "begin should have at least one exp"
   result = []
+  waitPop = false
   for e in exps
     if e instanceof Assign and e.removed() then continue
+    if waitPop then result.pop()
     e = jsify(e, compiler, env)
-    if e instanceof Begin then result.concat e.exps
-    else if e instanceof New then result.push e
+    if e instanceof Begin
+      result = result.concat e.exps
+      waitPop = sideEffect(result[result.length-1]) is il.PURE
+    else if e instanceof New
+      result.push e
+      waitPop = sideEffect(e) is il.PURE
     else if e instanceof Throw then result.push e; break
     else if e instanceof Return then throw new Error(e)
-    else result.push(e)
+    else result.push(e); waitPop = sideEffect(e) is il.PURE
   if result.length==1 then result[0]
   else new @constructor(result)
 
@@ -529,7 +545,6 @@ Lamda::jsify = (compiler, env) ->
   for k of locals1
     if not hasOwnProperty.call(nonlocals, k) and k not in @params then locals.push(il.symbol(k))
   body = jsify(@body, compiler, env)
-  body = insertReturn(body)
   if locals.length>0 then new Lamda(@params, il.topbegin(il.vardecl(locals...), body))
   else new Lamda(@params, body)
 
@@ -540,12 +555,19 @@ Clamda::jsify = (compiler, env) ->
   for k of locals1
     if not hasOwnProperty.call(nonlocals, k) and k.name isnt @v.name then locals.push(il.symbol(k))
   body = jsify(@body, compiler, env)
-  body = insertReturn(body)
   if locals.length>0 then il.clamda(@v,il.vardecl(locals...), body)
   else  il.clamda(@v, body)
 
 Apply::jsify = (compiler, env) ->
-  new @constructor(jsify(@caller, compiler, env), (jsify(a, compiler, env) for a in @args))
+  caller = @caller
+  if caller instanceof Lamda and caller.params.length is 0
+    body = jsify(caller.body, compiler, env)
+    if not isStatement(body) then body
+    else new Apply(new caller.constructor([], body), [])
+  else
+    new @constructor(jsify(@caller, compiler, env), (jsify(a, compiler, env) for a in @args))
+
+
 VirtualOperation::jsify = (compiler, env) -> new @constructor(jsify(a, compiler, env) for a in @args)
 
 il.insertReturn = insertReturn = (exp) ->
@@ -567,10 +589,12 @@ Begin::insertReturn = () ->
 
 Lamda::toCode = (compiler) ->
   compiler.parent = @
-  "function(#{(a.toString() for a in @params).join(', ')}){#{compiler.toCode(@body)}}"
+  body = insertReturn(@body)
+  "function(#{(a.toString() for a in @params).join(', ')}){#{compiler.toCode(body)}}"
 Clamda::toCode = (compiler) ->
   compiler.parent = @
-  "function(#{@v.toString()}){#{compiler.toCode(@body)}}"
+  body = insertReturn(@body)
+  "function(#{@v.toString()}){#{compiler.toCode(body)}}"
 Fun::toCode = (compiler) -> @func.toString()
 Return::toCode = (compiler) -> "return #{compiler.toCode(@value)};"
 Throw::toCode = (compiler) -> "throw #{compiler.toCode(@value)};"
@@ -748,7 +772,7 @@ il.attr = vop('attr', ((compiler) -> args = @args; "#{expressionToCode(compiler,
 il.nonlocal = (vars) -> new NonlocalDecl(vars)
 il.local = (vars...) -> new LocalDecl(vars)
 il.vardecl = vop('vardecl', (compiler)->args = @args; "var #{(compiler.toCode(e) for e in args).join(', ')}")
-il.array = vop('array', (compiler)->args = @args; "[#{(expressionToCode(compiler, e) for e in args).join(', ')}]")
+il.array = vop('array', (compiler)->args = @args; "[#{(compiler.toCode(e) for e in args).join(', ')}]")
 il.suffixinc = vop('suffixdec', (compiler)->args = @args; "#{expressionToCode(compiler, args[0])}++")
 il.suffixdec = vop('suffixdec', (compiler)->args = @args; "#{expressionToCode(compiler, args[0])}--")
 il.catches = il.usernonlocalattr('solver.catches')

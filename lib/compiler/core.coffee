@@ -55,7 +55,7 @@ exports.Compiler = class Compiler
              il.run(il.clamda(v2, @cont(exp, done)))]
     lamda = il.userlamda([], exps...)
     env = new OptimizationEnv(env, {})
-    lamda = lamda.optimize(env, @)
+    lamda = il.optimize(lamda, env, @)
     lamda = lamda.jsify(@, env)
     exp = il.assign(il.attr(il.usernonlocal('exports'), il.symbol('main')), lamda)
     exp.toCode(@)
@@ -207,7 +207,7 @@ exports.Compiler = class Compiler
 
     "funcall": (cont, caller, args...) ->
       compiler = @
-      f = @newvar('f')
+      f = @newvar('func')
       length = args.length
       params = (@newvar('arg'+i) for i in [0...length])
       cont = cont.call(f.apply(params))
@@ -218,7 +218,7 @@ exports.Compiler = class Compiler
 
     "macall": (cont, caller, args...) ->
       compiler = @
-      f = @newvar('f'); v = @newvar('v')
+      f = @newvar('func'); v = @newvar('v')
       length = args.length
       params = (@newvar('arg'+i) for i in [0...length])
       cont = f.apply(params)
@@ -438,11 +438,12 @@ exports.Compiler = class Compiler
                 il.setfailcont(il.clamda(v, il.assign(v1, v), il.setfailcont(fc), cont.call(v1))),
                 @cont(goal, il.failcont))
       else
+        v2 = @newvar('v')
         result1 = @newvar('result')
         il.begin(
           il.assign(result1, []),
           il.assign(fc, il.failcont),
-          il.setfailcont(il.clamda(v, il.assign(v1, v),
+          il.setfailcont(il.clamda(v2, il.assign(v1, v2),
                                    il.if_(il.unify(result, result1), fc.call(v1),
                                        il.begin(il.setfailcont(fc), cont.call(null))))),
           @cont(exp, @clamda(v, il.assign(v1, v),
@@ -718,11 +719,6 @@ exports.Compiler = class Compiler
       compiler = @
       v = @newvar('v')
       compiler.cont(item, compiler.clamda(v, cont.call(il[name](il.solver, v))))
-
-  optimize: (exp, env) ->
-    expOptimize = exp?.optimize
-    if expOptimize then expOptimize.call(exp, env, @)
-    else exp
 
   toCode: (exp) ->
     exptoCode = exp?.toCode
