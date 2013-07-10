@@ -96,9 +96,6 @@ class Clamda extends Lamda
 class RecursiveClamda extends Clamda
   call: (value) -> new CApply(@, value)
 
-class ClamdaBody extends Clamda
-  toString: () -> "{#{@v}: #{toString(@body)}}"
-  call: (value) -> new Error("How is it happened to call with ClamdaBody? #{@}")
 class IdCont extends Clamda
 class JSFun extends Element
   constructor: (@fun) -> super
@@ -143,9 +140,8 @@ Assign::replace = (param, value) -> new @constructor(@left, replace(@exp, param,
 ListAssign::replace = (param, value) -> new @constructor(@lefts, replace(@exp, param, value))
 If::replace = (param, value) ->  new If(replace(@test, param, value), replace(@then_, param, value), replace(@else_, param, value))
 Return::replace = (param, value) -> new @constructor(replace(@value, param, value))
-Lamda::replace = (param, value) -> @ #param should not occure in Lamda
-Clamda::replace = (param, value) -> @  #param should not occure in Lamda
-ClamdaBody::replace = (param, value) -> throw Error("#replace param with value in clamda should do before optimize Clamda")
+Lamda::replace = (param, value) -> @ #param should not occur in Lamda
+Clamda::replace = (param, value) -> @  #param should not occur in Clamda
 IdCont::replace = (param, value) -> @
 Apply::replace = (param, value) -> new Apply(replace(@caller, param, value), (replace(a, param, value) for a in @args))
 VirtualOperation::replace = (param, value) -> new @constructor((replace(a, param, value) for a in @args))
@@ -154,38 +150,64 @@ Deref::replace = (param, value) -> new Deref(value.replace(@exp, param))
 Code::replace = (param, value) -> @
 JSFun::replace = (param, value) ->  new JSFun(replace(@fun, param, value))
 
-exports.optimize = optimize = (expr, env, compiler) ->
-  if expr instanceof Var
-    outerEnv = env.outer
-    if outerEnv
-      envExp = outerEnv.lookup(expr)
-      if envExp instanceof Assign then envExp._removed = false
-    content = env.lookup(expr)
-    if content instanceof Assign
-      if expr.isRecursive then expr
-      else content.exp
-    else if _.isArray(content) then expr
-    else content
+TASK_OPTIMIZE = 0;
+TASK_FUNC = 1
 
-  else if expr instanceof Assign
-    left = expr.left
-    if left instanceof VirtualOperation
-      left = new left.constructor(optimize(a, env, compiler) for a in left.args)
-    else
-      if left.isConst
-        if left.haveAssigned then throw Error(expr, "should not assign to const more than once.")
-        else left.haveAssigned = true
-      if left instanceof UserLocalVar
-        locals = env.userlamda?.locals
-        if locals
-          if locals[left]? then locals[left]++
-          else locals[left] = 1
-      else if left instanceof UserNonlocalVar
-        env.userlamda?.nonlocals[left] = left
-      else if left instanceof InternalLocalVar then  env.lamda?.locals[left] = left
-      else if left instanceof InternalNonlocalVar then  env.lamda?.nonlocals[left] = left
-    exp = optimize(expr.exp, env, compiler)
-    assign = new expr.constructor(left, exp)
+exports.optimize = (exp, env, compiler) ->
+  result = null
+  compiler.tasks = tasks = []
+  tasks.push(null, [TASK_OPTIMIZE, exp, env])
+  while 1
+    task = tasks.pop()
+    if not task then break
+    switch task[0]
+      when TASK_OPTIMIZE then result = optimize(task[1], task[2], compiler)
+      when TASK_FUNC then result = task[1](result)
+  result
+
+optimize = (exp, env, compiler) ->
+  exp_optimize = exp?.optimize
+  if exp_optimize then exp_optimize.call(exp,  env, compiler)
+  else exp
+
+appendTasks = (compiler, tasks) ->
+  compilerTasks = compiler.tasks
+  for i in [tasks.length- 1..0]
+    compilerTasks.push(tasks[i])
+
+Var::optimize = (env, compiler) ->
+  outerEnv = env.outer
+  if outerEnv
+    envExp = outerEnv.lookup(@)
+    if envExp instanceof Assign then envExp._removed = false
+  content = env.lookup(@)
+  if content instanceof Assign
+    if @isRecursive then @
+    else content.exp
+  else if _.isArray(content) then @
+  else content
+
+Assign::optimize = (env, compiler) ->
+  left = @left
+  if left instanceof VirtualOperation
+    left = new left.constructor(optimize(a, env, compiler) for a in left.args)
+  else
+    if left.isConst
+      if left.haveAssigned then throw Error(@, "should not assign to const more than once.")
+      else left.haveAssigned = true
+    if left instanceof UserLocalVar
+      locals = env.userlamda?.locals
+      if locals
+        if locals[left]? then locals[left]++
+        else locals[left] = 1
+    else if left instanceof UserNonlocalVar
+      env.userlamda?.nonlocals[left] = left
+    else if left instanceof InternalLocalVar then  env.lamda?.locals[left] = left
+    else if left instanceof InternalNonlocalVar then  env.lamda?.nonlocals[left] = left
+  tasks = []
+  tasks.push([TASK_OPTIMIZE, @exp, env])
+  tasks.push([TASK_FUNC, ((exp) =>
+    assign = new @constructor(left, exp)
     outerEnv = env.outer
     if outerEnv
       envExp = outerEnv.lookup(left)
@@ -204,132 +226,171 @@ exports.optimize = optimize = (expr, env, compiler) ->
     else
       env.bindings[left] = left
       assign._removed = false
-    assign
-  else if expr instanceof LocalDecl
-    for vari in expr.vars
-      if vari instanceof UserVar then env.userlamda.locals[vari] = vari
-      else env.lamda.locals[vari] = vari
-    null
-  else if expr instanceof NonlocalDecl
-    for vari in expr.vars
-      if vari instanceof UserVar then env.userlamda.nonlocals[vari] = vari
-      else env.lamda.nonlocals[vari] = vari
-    null
+    assign)])
+  appendTasks(compiler, tasks)
 
-  else if expr instanceof If
-    test = optimize(expr.test, env, compiler)
+LocalDecl::optimize = (env, compiler) ->
+  for vari in @vars
+    if vari instanceof UserVar then env.userlamda.locals[vari] = vari
+    else env.lamda.locals[vari] = vari
+  null
+
+NonlocalDecl = (env, compiler) ->
+  for vari in @vars
+    if vari instanceof UserVar then env.userlamda.nonlocals[vari] = vari
+    else env.lamda.nonlocals[vari] = vari
+  null
+
+If::optimize = (env, compiler) ->
+  tasks = []
+  tasks.push([TASK_OPTIMIZE, @test, env])
+  tasks.push([TASK_FUNC, ((test) =>
     test_bool = boolize(test)
     if test_bool is true
-      then_ = optimize(expr.then_, env, compiler)
-      if then_ instanceof If and then_.test is test # (if a (if a b c) d)
-        then_ = then_.then_
-      then_
+      tasks = []
+      tasks.push([TASK_OPTIMIZE, @then_, env])
+      tasks.push([TASK_FUNC, ((then_) ->
+        if then_ instanceof If and then_.test is test # (if a (if a b c) d)
+          then_ = then_.then_
+        then_)])
+      appendTasks(compiler, tasks)
     else if test_bool is false
-      else_ = optimize(expr.else_, env, compiler)
-      if else_ instanceof If and else_.test is test # (if a b (if a c d))
-        else_ = else_.else_
-      else_
+      tasks = []
+      tasks.push([TASK_OPTIMIZE, @else_, env])
+      tasks.push([TASK_FUNC, ((else_) ->
+        if else_ instanceof If and else_.test is test # (if a b (if a c d))
+          else_ = else_.else_
+        else_)])
+      appendTasks(compiler, tasks)
     else
-      then_= optimize(expr.then_, env, compiler)
-      else_ = optimize(expr.else_, env, compiler)
-      if then_ instanceof If and then_.test is test # (if a (if a b c) d)
-        then_ = then_.then_
-      if else_ instanceof If and else_.test is test # (if a b (if a c d))
-        else_ = else_.else_
-      new If(test, then_, else_)
+      tasks = []
+      tasks.push([TASK_OPTIMIZE, @then_, env])
+      tasks.push([TASK_FUNC, ((then_) ->
+          tasks = []
+          tasks.push([TASK_OPTIMIZE, @else_, env])
+          tasks.push([TASK_FUNC, ((else_) ->
+            if then_ instanceof If and then_.test is test # (if a (if a b c) d)
+              then_ = then_.then_
+            if else_ instanceof If and else_.test is test # (if a b (if a c d))
+              else_ = else_.else_
+            new If(test, then_, else_))])
+          appendTasks(compiler, tasks)
+        )])
+      appendTasks(compiler, tasks))
+  ])
+  appendTasks(compiler, tasks)
 
-  else if expr instanceof Throw then  new Throw(optimize(expr.value, env, compiler))
-  else if expr instanceof New then new New(optimize(expr.value, env, compiler))
-  else if expr instanceof IdCont then expr
+Throw::optimize = (env, compiler) ->
+  tasks = []
+  tasks.push([TASK_OPTIMIZE, @value, env])
+  tasks.push([TASK_FUNC, ((value) -> new Throw(value))])
+  appendTasks(compiler, tasks)
+New::optimize = (env, compiler) ->
+  tasks = []
+  tasks.push([TASK_OPTIMIZE, @value, env])
+  tasks.push([TASK_FUNC, ((value) -> new New(value))])
+  appendTasks(compiler, tasks)
+IdCont::optimize = (env, compiler) -> @
 
-  else if expr instanceof Clamda
-    if expr._optimized then return expr
-    #  envBindings = env.bindings
-    #  for k,v of envBindings
-    #    if hasOwnProperty.call(envBindings, k) and v instanceof Assign
-    #      v._removed = false
-    bindings = {}; bindings[expr.v] = expr.v
-    expr.locals = {}; expr.nonlocals = {}; expr.vars = {}; expr.childrenLamda = []
-    env = env.extendBindings(bindings, expr)
-    body = optimize(expr.body, env, compiler)
-    expr.body = jsify(body, compiler, env)
-    expr._optimized = true
-    expr._jsified = true
-    return expr
-
-  else if expr instanceof UserLamda
-    if expr._optimized then return expr
-    #  envBindings = env.bindings
-    #  for k,v of envBindings
-    #    if hasOwnProperty.call(envBindings, k) and v instanceof Assign
-    #      v._removed = false
-    bindings = {}
-    for p in expr.params then bindings[p] = p
-    expr.locals = {}; expr.nonlocals = {}; expr.vars = {}; expr.childrenLamda = []
-    env = env.extendBindings(bindings,expr, expr)
-    body = optimize(expr.body, env, compiler)
-    expr.body = jsify(body, compiler, env)
-    expr._jsified = true
-    expr._optimized = true
-    return expr
-
-  else if expr instanceof Lamda
-    if expr._optimized then return expr
-    env.lamda.childrenLamda.push(expr)
+Clamda::optimize = (env, compiler) ->
+  if @_optimized then return @
+  tasks = []
   #  envBindings = env.bindings
   #  for k,v of envBindings
   #    if hasOwnProperty.call(envBindings, k) and v instanceof Assign
-  #      if vars[k] then v._removed = false
-    bindings = {}
-    for p in expr.params then bindings[p] = p
-    expr.locals = {}; expr.nonlocals = {}; expr.vars = {}; expr.childrenLamda = []
-    env = env.extendBindings(bindings, expr)
-    body = optimize(expr.body, env, compiler)
-    expr.body = jsify(body, compiler, env)
-    expr._jsified = true
-  #  vars = expr.allVars()
-    expr._optimized = true
-    return expr
+  #      v._removed = false
+  bindings = {}; bindings[@v] = @v
+  @locals = {}; @nonlocals = {}; @vars = {}; @childrenLamda = []
+  env = env.extendBindings(bindings, @)
+  tasks.push([TASK_OPTIMIZE, @body, env])
+  tasks.push([TASK_FUNC, ((body) =>
+    @body = jsify(body, compiler, env)
+    @_jsified = true
+    #  vars = @allVars()
+    @_optimized = true
+    @)])
+  appendTasks(compiler, tasks)
 
-  else if expr instanceof Apply
-    caller =  optimize(expr.caller, env, compiler)
-    args = expr.args
-    if caller instanceof IdCont
-      optimize(args[0], env)
-    else if caller instanceof RecursiveClamda
-      optimize(il.begin(il.assign(caller.v, args[0]), caller.body), env, compiler)
-    else if caller instanceof Clamda
-      optimize(il.begin(il.assign(caller.v, args[0]), caller.body), env, compiler)
-    else if caller instanceof JSFun
-      args = (optimize(a, env, compiler) for a in args)
-      f = caller.fun
-      t = typeof f
-      if t is 'function' then new Apply(f, args)
-      else if t is 'string' then new Apply(il.fun(f), args)
-      else f.apply(args).optimize(env, compiler)
-    else if caller instanceof Lamda
-      exps = (il.assign(p, args[i]) for p, i in caller.params)
-      exps.push caller.body
-      body = optimize(il.topbegin(exps...), env, compiler)
-      body = jsify(body, compiler, env)
-      if not isStatement(body) then body
-      else new Apply(new Lamda([], body), [])
-    else new Apply(caller, (optimize(a, env, compiler) for a in expr.args))
+UserLamda::optimize = (env, compiler) ->
+  tasks = []
+  if @_optimized then return @
+  #  envBindings = env.bindings
+  #  for k,v of envBindings
+  #    if hasOwnProperty.call(envBindings, k) and v instanceof Assign
+  #      v._removed = false
+  bindings = {}
+  for p in @params then bindings[p] = p
+  @locals = {}; @nonlocals = {}; @vars = {}; @childrenLamda = []
+  env = env.extendBindings(bindings,@, @)
+  tasks.push([TASK_OPTIMIZE, @body, env])
+  tasks.push([TASK_FUNC, ((body) =>
+    @body = jsify(body, compiler, env)
+    @_jsified = true
+    #  vars = @allVars()
+    @_optimized = true
+    @)])
+  appendTasks(compiler, tasks)
 
-  else if expr instanceof VirtualOperation
-    args = (optimize(a, env, compiler) for a in expr.args)
+Lamda::optimize = (env, compiler) ->
+  tasks = []
+  if @_optimized then return @
+  env.lamda.childrenLamda.push(@)
+#  envBindings = env.bindings
+#  for k,v of envBindings
+#    if hasOwnProperty.call(envBindings, k) and v instanceof Assign
+#      if vars[k] then v._removed = false
+  bindings = {}
+  for p in @params then bindings[p] = p
+  @locals = {}; @nonlocals = {}; @vars = {}; @childrenLamda = []
+  env = env.extendBindings(bindings, @)
+  tasks.push([TASK_OPTIMIZE, @body, env])
+  tasks.push([TASK_FUNC, ((body) =>
+    @body = jsify(body, compiler, env)
+    @_jsified = true
+    #  vars = @allVars()
+    @_optimized = true
+    @)])
+  appendTasks(compiler, tasks)
+
+Apply::optimize = (env, compiler) ->
+  tasks = []
+  tasks.push([TASK_OPTIMIZE, @caller, env])
+  tasks.push([TASK_FUNC, ((caller) =>
+    tasks = []
+    optimizeApply = caller.optimizeApply
+    if optimizeApply then optimizeApply.call(caller, @args, env, compiler)
+    else
+      args = []
+      for a in @args
+        tasks.push([TASK_OPTIMIZE, a, env])
+        tasks.push([TASK_FUNC, ((arg) -> args.push(arg); args)])
+      tasks.push([TASK_FUNC, (args) -> new Apply(caller, args)])
+      appendTasks(compiler, tasks)
+    )])
+  appendTasks(compiler, tasks)
+
+VirtualOperation::optimize = (env, compiler) ->
+  tasks = []
+  args = []
+  for a in @args
+    tasks.push([TASK_OPTIMIZE, a, env])
+    tasks.push([TASK_FUNC, ((arg) -> args.push(arg); args)])
+  tasks.push([TASK_FUNC, ((args) =>
     _isValue = true
     for a in args
       if not isValue(a) then _isValue = false; break
-    if _isValue and expr.func then expr.func.apply(null, args)
-    else new expr.constructor(args)
+    if _isValue and @func then @func.apply(null, args)
+    else new @constructor(args))])
+  appendTasks(compiler, tasks)
 
-  else if expr instanceof Begin
-    result = []
-    waitPop = false
-    for exp in expr.exps
-      e = optimize(exp, env, compiler)
-      if isDeclaration(e) then continue
+Begin::optimize = (env, compiler) ->
+  tasks = []
+  result = []
+  waitPop = false
+  thisExps = @exps
+  tasks.push([TASK_OPTIMIZE, thisExps.shift(), env])
+  task = [TASK_FUNC, ((e) ->
+    if not isDeclaration(e)
       if waitPop then result.pop()
       if e instanceof Begin
         exps = e.exps
@@ -338,21 +399,70 @@ exports.optimize = optimize = (expr, env, compiler) ->
       else
         result.push e
         waitPop = sideEffect(e) is il.PURE
-    if result.length>1 then  new expr.constructor(result)
-    else result[0]
+    if thisExps.length
+      tasks = []
+      tasks.push([TASK_OPTIMIZE, thisExps.shift(), env])
+      tasks.push(task)
+      appendTasks(compiler, tasks)
+  )]
+  tasks.push(task)
+  tasks.push([TASK_FUNC, ((x) =>
+    if result.length>1 then  new @constructor(result)
+    else result[0])])
+  appendTasks(compiler, tasks)
 
-  else if expr instanceof Deref
-    exp = expr.exp
-    if _.isString(exp) then exp
-    else if _.isNumber(exp) then exp
-    else new Deref(optimize(exp, env, compiler))
+Deref::optimize = (env, compiler) ->
+  exp = @exp
+  if _.isString(exp) then exp
+  else if _.isNumber(exp) then exp
+  else
+    tasks = []
+    tasks.push([TASK_OPTIMIZE, @value, env])
+    tasks.push([TASK_FUNC, ((value) -> new Deref(value))])
+    appendTasks(compiler, tasks)
 
-  else if expr instanceof Code then expr
+Code::optimize = (env, compiler) -> @
 
-  else if expr instanceof JSFun
-    new JSFun(optimize(expr.fun, env, compiler))
+JSFun::optimize = (env, compiler) ->
+  tasks = []
+  tasks.push([TASK_OPTIMIZE, @fun, env])
+  tasks.push([TASK_FUNC, ((value) -> new JSFun(value))])
+  appendTasks(compiler, tasks)
 
-  else expr
+Lamda::optimizeApply = (args, env, compiler) ->
+  tasks = []
+  exps = (il.assign(p, args[i]) for p, i in @params)
+  exps.push @body
+  tasks.push([TASK_OPTIMIZE, il.topbegin(exps...), env])
+  tasks.push([TASK_FUNC, ((body) ->
+    if not isStatement(body) then body
+    else new Apply(new Lamda([], body), [])
+  )])
+  appendTasks(compiler, tasks)
+
+Clamda::optimizeApply = (args, env, compiler) ->
+  tasks = compiler.tasks
+  tasks.push([TASK_OPTIMIZE, il.begin(il.assign(@v, args[0]), @body), env])
+
+RecursiveClamda::optimizeApply = (args, env, compiler) ->
+  tasks = compiler.tasks
+  tasks.push([TASK_OPTIMIZE, il.begin(il.assign(@v, args[0]), @body), env])
+
+IdCont::optimizeApply = (args, env, compiler) -> optimize(args[0], env, compiler)
+
+JSFun::optimizeApply = (args, env, compiler) ->
+  tasks = []
+  optimizedArgs = []
+  for a in args
+    tasks.push([TASK_OPTIMIZE, a, env])
+    tasks.push([TASK_FUNC, ((arg) -> optimizedArgs.push(arg); optimizedArgs)])
+  f = @fun
+  tasks.push([TASK_FUNC, ((args) ->
+    t = typeof f
+    if t is 'function' then new Apply(f, args)
+    else if t is 'string' then new Apply(il.fun(f), args)
+    else f.apply(args).optimize(env, compiler))])
+  appendTasks(compiler, tasks)
 
 MAX_EXTEND_CODE_SIZE = 10
 
@@ -387,13 +497,6 @@ Clamda::analyze = (compiler, refMap) ->
   for x, i of childMap
     if x!=@v.name
       if hasOwnProperty.call(refMap, x) then refMap[x] += i else refMap[x] = i
-ClamdaBody::analyze = (compiler, refMap) ->
-  childMap = @refMap = {}
-  analyze(@body, compiler, childMap)
-  for x, i of childMap
-    if x!=@v.name
-      if hasOwnProperty.call(refMap, x) then refMap[x] += i else refMap[x] = i
-
 codeSize = (exp) ->
   exp_codeSize = exp?.codeSize
   if exp_codeSize then exp_codeSize.call(exp)
@@ -406,7 +509,6 @@ Begin::codeSize = () -> _.reduce(@exps, ((memo, e) -> memo + codeSize(e)), 0)
 VirtualOperation::codeSize = () -> 1
 Lamda::codeSize = () -> codeSize(@body) + 2
 Clamda::codeSize = () -> codeSize(@body) + 1
-ClamdaBody::codeSize = () -> codeSize(@body)
 Apply::codeSize = () -> _.reduce(@args, ((memo, e) -> memo + codeSize(e)), codeSize(@caller))
 CApply::codeSize = () -> codeSize(@caller.body) + codeSize(@args[0]) + 2
 
@@ -427,7 +529,6 @@ VirtualOperation::boolize = () ->
   !!(@func?.apply(null, @args)) or undefined
 Lamda::boolize = () -> true
 Clamda::boolize = () -> true
-ClamdaBody::boolize = () -> boolize(@body)
 Apply::boolize = () ->
   caller = @caller
   if caller instanceof Lamda or caller instanceof Clamda then return boolize(caller.body)

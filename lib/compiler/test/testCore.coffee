@@ -67,6 +67,7 @@ exports.Test =
     test.equal  solve(eval_(quote(print_(1)), string('f:/daonode/lib/compiler/test/compiled2.js'))), null
     test.done()
 
+#xexports.Test =
   "test quasiquote": (test) ->
     test.equal solve(qq(1)), 1
     a = add(1, 2)
@@ -85,7 +86,7 @@ exports.Test =
     test.equal  solve(macall(macro([x, y, z], if_(x, y, z)), eq(1, 1), print_(1), print_(2))), null
     test.done()
 
-#exports.Test =
+#xexports.Test =
   "test lambda": (test) ->
     x = 'x'; y = 'y'
     f = vari('f')
