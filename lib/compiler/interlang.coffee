@@ -265,7 +265,7 @@ If::optimize = (env, compiler) ->
     else
       tasks = []
       tasks.push([TASK_OPTIMIZE, @then_, env])
-      tasks.push([TASK_FUNC, ((then_) ->
+      tasks.push([TASK_FUNC, ((then_) =>
           tasks = []
           tasks.push([TASK_OPTIMIZE, @else_, env])
           tasks.push([TASK_FUNC, ((else_) ->
@@ -356,15 +356,15 @@ Apply::optimize = (env, compiler) ->
   tasks = []
   tasks.push([TASK_OPTIMIZE, @caller, env])
   tasks.push([TASK_FUNC, ((caller) =>
-    tasks = []
     optimizeApply = caller.optimizeApply
     if optimizeApply then optimizeApply.call(caller, @args, env, compiler)
     else
+      tasks = []
       args = []
       for a in @args
         tasks.push([TASK_OPTIMIZE, a, env])
         tasks.push([TASK_FUNC, ((arg) -> args.push(arg); args)])
-      tasks.push([TASK_FUNC, (args) -> new Apply(caller, args)])
+      tasks.push([TASK_FUNC, (x) -> new Apply(caller, args)])
       appendTasks(compiler, tasks)
     )])
   appendTasks(compiler, tasks)
@@ -384,11 +384,14 @@ VirtualOperation::optimize = (env, compiler) ->
   appendTasks(compiler, tasks)
 
 Begin::optimize = (env, compiler) ->
+  thisExps = @exps
+  length = thisExps.length
+  if length is 0 then null
   tasks = []
   result = []
   waitPop = false
-  thisExps = @exps
-  tasks.push([TASK_OPTIMIZE, thisExps.shift(), env])
+  i = 0
+  tasks.push([TASK_OPTIMIZE, thisExps[i], env])
   task = [TASK_FUNC, ((e) ->
     if not isDeclaration(e)
       if waitPop then result.pop()
@@ -399,9 +402,9 @@ Begin::optimize = (env, compiler) ->
       else
         result.push e
         waitPop = sideEffect(e) is il.PURE
-    if thisExps.length
+    if ++i<length
       tasks = []
-      tasks.push([TASK_OPTIMIZE, thisExps.shift(), env])
+      tasks.push([TASK_OPTIMIZE, thisExps[i], env])
       tasks.push(task)
       appendTasks(compiler, tasks)
   )]
@@ -686,7 +689,7 @@ Begin::insertReturn = () ->
   exps = @exps
   length = exps.length
   last = insertReturn(exps[length-1])
-  begin(@constructor, [exps[0...length-1]..., last]...)
+  new @constructor([exps[0...length-1]..., last])
 
 Lamda::toCode = (compiler) ->
   compiler.parent = @

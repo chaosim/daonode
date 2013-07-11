@@ -46,14 +46,30 @@ vari = (name) -> il.internallocal(name)
 xexports = {}
 
 exports.Test =
-  "test vari assign": (test) ->
+  "test1": (test) ->
     x = il.internallocal('x')
     x2 = il.internallocal('x2')
-#    test.equal  solve(il.let_([], 1)), 1
+    test.equal  solve(1), 1
+    test.equal  solve(il.let_([], 1)), 1
     test.equal  solve(il.assign(x, il.let_([], 1))), 1
-#    test.equal  solve(il.begin(il.assign(x, il.let_([], 1)), 2)), 2
-#    test.equal  solve(il.let_([], il.assign(x, 1), 1)), 1
-#    test.equal  solve(il.let_([x, 1], il.assign(x, il.add(x,1)), x)), 2
-#    test.equal  solve(il.let_([x, 1],il.let_([x2,2], x2), x)), 1
+    test.equal  solve(il.begin(il.assign(x, il.let_([], 1)), 2)), 2
+    test.equal  solve(il.let_([], il.assign(x, 1), 1)), 1
+    test.equal  solve(il.let_([x, 1], il.assign(x, il.add(x,1)), x)), 2
+    test.equal  solve(il.let_([x, 1],il.let_([x2,2], x2), x)), 1
+    test.done()
+
+exports.Test =
+  "test2": (test) ->
+    x = il.internallocal('x')
+    f = il.internallocal('f')
+    x2 = il.internallocal('x2')
+#    test.equal  solve(il.if_(1, 2, 3)), 2
+#    test.equal  solve(il.let_([x, 1], il.if_(1, 2, 3))), 2
+#    test.equal  solve(il.begin(il.assign(f, il.lamda([], 0)), f.call())), 0
+#    test.equal  solve(il.begin(il.assign(f, il.lamda([x], il.if_(il.eq(x,0), 0, f.call(il.sub(x, 1))))), f.call(2))), 0
+    test.equal  solve(il.begin(il.assign(f, il.lamda([x], il.if_(il.eq(x,0), 0, il.begin(il.assign(x, il.sub(x, 1)), f.call(x))))), f.call(2))), 0
+#    test.equal  solve(il.begin(il.assign(x, 2),
+#                               il.assign(f, il.lamda([], il.if_(il.eq(x,0), 0, il.begin(il.assign(x, il.sub(x, 1)), f.call())))),
+#                               f.call())), 0
     test.done()
 
