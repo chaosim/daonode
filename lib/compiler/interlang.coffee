@@ -176,6 +176,7 @@ appendTasks = (compiler, tasks) ->
     compilerTasks.push(tasks[i])
 
 Var::optimize = (env, compiler) ->
+  if @isRecursive then return @
   outerEnv = env.outer
   if outerEnv
     envExp = outerEnv.lookup(@)
@@ -186,6 +187,8 @@ Var::optimize = (env, compiler) ->
     else content.exp
   else if _.isArray(content) then @
   else content
+
+Symbol::optimize = (env, compiler) -> @
 
 Assign::optimize = (env, compiler) ->
   left = @left
@@ -213,7 +216,7 @@ Assign::optimize = (env, compiler) ->
       envExp = outerEnv.lookup(left)
       if envExp instanceof Assign then envExp._removed = false
     if isValue(exp)
-      if exp instanceof Lamda and left.isRecursive
+      if exp instanceof Lamda and not left.isRecursive
         env.bindings[left] = exp
         assign._removed = false
       else if not isAtomic(exp)
@@ -345,7 +348,7 @@ Lamda::optimize = (env, compiler) ->
   env = env.extendBindings(bindings, @)
   tasks.push([TASK_OPTIMIZE, @body, env])
   tasks.push([TASK_FUNC, ((body) =>
-    @body = jsify(body, compiler, env)
+    body = jsify(body, compiler, env)
     @_jsified = true
     #  vars = @allVars()
     @_optimized = true
@@ -393,15 +396,15 @@ Begin::optimize = (env, compiler) ->
   i = 0
   tasks.push([TASK_OPTIMIZE, thisExps[i], env])
   task = [TASK_FUNC, ((e) ->
-    if not isDeclaration(e)
-      if waitPop then result.pop()
-      if e instanceof Begin
-        exps = e.exps
-        result = result.concat(exps)
-        waitPop = sideEffect(result[result.length-1]) is il.PURE
-      else
-        result.push e
-        waitPop = sideEffect(e) is il.PURE
+#    if not isDeclaration(e)
+    if waitPop then result.pop()
+    if e instanceof Begin
+      exps = e.exps
+      result = result.concat(exps)
+      waitPop = sideEffect(result[result.length-1]) is il.PURE
+    else
+      result.push e
+      waitPop = sideEffect(e) is il.PURE
     if ++i<length
       tasks = []
       tasks.push([TASK_OPTIMIZE, thisExps[i], env])
@@ -643,24 +646,8 @@ Begin::jsify = (compiler, env) ->
   else new @constructor(result)
 
 Lamda::jsify = (compiler, env) ->
-  locals = []
-  nonlocals = @nonlocals
-  locals1 = @locals
-  for k of locals1
-    if not hasOwnProperty.call(nonlocals, k) and k not in @params then locals.push(il.symbol(k))
-  body = jsify(@body, compiler, env)
-  if locals.length>0 then new Lamda(@params, il.topbegin(il.vardecl(locals...), body))
-  else new Lamda(@params, body)
-
-Clamda::jsify = (compiler, env) ->
-  locals = []
-  nonlocals = @nonlocals
-  locals1 = @locals
-  for k of locals1
-    if not hasOwnProperty.call(nonlocals, k) and k.name isnt @v.name then locals.push(il.symbol(k))
-  body = jsify(@body, compiler, env)
-  if locals.length>0 then il.clamda(@v,il.vardecl(locals...), body)
-  else  il.clamda(@v, body)
+  if not @_jsifyied then @body = jsify(@body, compiler, env); @_jsifyied = true
+  @
 
 Apply::jsify = (compiler, env) ->
   caller = @caller
@@ -670,7 +657,6 @@ Apply::jsify = (compiler, env) ->
     else new Apply(new caller.constructor([], body), [])
   else
     new @constructor(jsify(@caller, compiler, env), (jsify(a, compiler, env) for a in @args))
-
 
 VirtualOperation::jsify = (compiler, env) -> new @constructor(jsify(a, compiler, env) for a in @args)
 
@@ -693,12 +679,29 @@ Begin::insertReturn = () ->
 
 Lamda::toCode = (compiler) ->
   compiler.parent = @
-  body = insertReturn(@body)
+  locals = []
+  nonlocals = @nonlocals
+  locals1 = @locals
+  for k of locals1
+    if not hasOwnProperty.call(nonlocals, k) and k not in @params then locals.push(il.symbol(k))
+  body = @body
+  if locals.length>0 then body = il.topbegin(il.vardecl(locals...), @body)
+  body = insertReturn(body)
+  if body instanceof Begin then body.constructor = TopBegin
   "function(#{(a.toString() for a in @params).join(', ')}){#{compiler.toCode(body)}}"
+
 Clamda::toCode = (compiler) ->
   compiler.parent = @
-  body = insertReturn(@body)
+  locals = []
+  nonlocals = @nonlocals
+  locals1 = @locals
+  for k of locals1
+    if not hasOwnProperty.call(nonlocals, k) and k isnt @v then locals.push(il.symbol(k))
+  body = @body
+  if locals.length>0 then body = il.topbegin(il.vardecl(locals...), body)
+  body = insertReturn(body)
   "function(#{@v.toString()}){#{compiler.toCode(body)}}"
+
 Fun::toCode = (compiler) -> @func.toString()
 Return::toCode = (compiler) -> "return #{compiler.toCode(@value)};"
 Throw::toCode = (compiler) -> "throw #{compiler.toCode(@value)};"

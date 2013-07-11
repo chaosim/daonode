@@ -59,17 +59,25 @@ exports.Test =
     test.done()
 
 exports.Test =
-  "test2": (test) ->
+  "test lamda call": (test) ->
     x = il.internallocal('x')
     f = il.internallocal('f')
-    x2 = il.internallocal('x2')
 #    test.equal  solve(il.if_(1, 2, 3)), 2
 #    test.equal  solve(il.let_([x, 1], il.if_(1, 2, 3))), 2
 #    test.equal  solve(il.begin(il.assign(f, il.lamda([], 0)), f.call())), 0
-#    test.equal  solve(il.begin(il.assign(f, il.lamda([x], il.if_(il.eq(x,0), 0, f.call(il.sub(x, 1))))), f.call(2))), 0
-    test.equal  solve(il.begin(il.assign(f, il.lamda([x], il.if_(il.eq(x,0), 0, il.begin(il.assign(x, il.sub(x, 1)), f.call(x))))), f.call(2))), 0
-#    test.equal  solve(il.begin(il.assign(x, 2),
+    test.equal  solve(il.begin(il.assign(f, il.lamda([x], il.if_(il.eq(x,0), 0, f.call(il.sub(x, 1))))), f.call(5))), 0
+#    test.equal  solve(il.begin(il.assign(f, il.lamda([x], il.if_(il.eq(x,0), 0, il.begin(il.assign(x, il.sub(x, 1)), f.call(x))))), f.call(1000))), 0
+#    test.equal  solve(il.begin(il.assign(x, 1000),
 #                               il.assign(f, il.lamda([], il.if_(il.eq(x,0), 0, il.begin(il.assign(x, il.sub(x, 1)), f.call())))),
 #                               f.call())), 0
     test.done()
+
+xexports.Test =
+  "test userlocal": (test) ->
+    x = il.userlocal('x')
+    f = il.internallocal('f')
+    v = il.internallocal('v')
+    test.equal  solve(il.begin(il.assign(f, il.userlamda([], il.clamda(v, il.assign(x, il.add(x, 1)), x))), 1)), 1
+    test.done()
+
 

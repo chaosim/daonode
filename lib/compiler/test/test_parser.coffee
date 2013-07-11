@@ -72,7 +72,7 @@ exports.Test =
     test.equal  solve(parsetext(may(char(string('a'))), string('b'))), 0
     test.done()
 
-#exports.Test =
+#xexports.Test =
   "test parallel": (test) ->
     test.equal  solve(begin(settext(string('1')), parallel(char(string('1')), number(1)))), 1
     test.equal  solve(begin(settext(string('12')), parallel(char(string('1')), number(12)))), 2
@@ -117,7 +117,7 @@ exports.Test =
     test.equal  solve(parsetext(begin(assign(_, dummy('__')), any(char(string('a'))), eoi), string('b'))), false
     test.done()
 
-#exports.Test =
+#xexports.Test =
   "test greedyany": (test) ->
     _ = vari('__')
     result = vari('result')
@@ -131,7 +131,7 @@ exports.Test =
                                 settext(string('ab')), greedyany(char(_), result, _), eoi, getvalue(result))), ['a', 'b']
     test.done()
 
-#exports.Test =
+#xexports.Test =
   "test lazysome": (test) ->
     _ = vari('__')
     result = vari('result')
@@ -162,7 +162,7 @@ exports.Test =
     test.equal  solve(parsetext(orp(begin(assign(_, dummy('__')), greedysome(char(_)), char(string('c')), eoi), 1), string('abc'))), 1
     test.done()
 
-#exports.Test =
+#xexports.Test =
   "test some": (test) ->
     _ = vari('__')
     result = vari('result')
@@ -218,7 +218,7 @@ exports.Test =
                                 times(char(string('b')), n, result, string('b')), eoi, getvalue(result))), ['b', 'b', 'b']
     test.done()
 
-#exports.Test =
+#xexports.Test =
   "test seplist": (test) ->
     _ = vari('__')
     result = vari('result')

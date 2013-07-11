@@ -839,7 +839,12 @@ class CpsEnv extends Env
         v
 
 exports.OptimizationEnv = class OptimizationEnv extends CpsEnv
-  constructor: (@outer, @bindings, @lamda, @userlamda) -> super
+  constructor: (@outer, @bindings, @lamda, userlamda) ->
+    if userlamda then @userlamda = userlamda
+    else while outer
+        if outer.userlamda then @userlamda = outer.userlamda; return
+        outer = outer.outer
+
   extendBindings: (bindings, lamda, userlamda) -> new OptimizationEnv(@, bindings, lamda, userlamda)
   lookup: (vari) ->
     bindings = @bindings
