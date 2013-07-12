@@ -36,7 +36,7 @@ compileToCode = (exp) ->
   v = il.internallocal('v')
   lamda = il.clamda(v, exp)
   env = new OptimizationEnv(env, {})
-  lamda = il.optimize(lamda, env, compiler)
+  lamda = compiler.optimize(lamda, env)
   lamda = lamda.jsify(@, env)
   f = il.assign(il.usernonlocalattr('exports.main'), lamda)
   f.toCode(compiler)
@@ -65,8 +65,8 @@ exports.Test =
 #    test.equal  solve(il.if_(1, 2, 3)), 2
 #    test.equal  solve(il.let_([x, 1], il.if_(1, 2, 3))), 2
 #    test.equal  solve(il.begin(il.assign(f, il.lamda([], 0)), f.call())), 0
-    test.equal  solve(il.begin(il.assign(f, il.lamda([x], il.if_(il.eq(x,0), 0, f.call(il.sub(x, 1))))), f.call(5))), 0
-#    test.equal  solve(il.begin(il.assign(f, il.lamda([x], il.if_(il.eq(x,0), 0, il.begin(il.assign(x, il.sub(x, 1)), f.call(x))))), f.call(1000))), 0
+#    test.equal  solve(il.begin(il.assign(f, il.lamda([x], il.if_(il.eq(x,0), 0, f.call(il.sub(x, 1))))), f.call(5))), 0
+    test.equal  solve(il.begin(il.assign(f, il.lamda([x], il.if_(il.eq(x,0), 0, il.begin(il.assign(x, il.sub(x, 1)), f.call(x))))), f.call(1000))), 0
 #    test.equal  solve(il.begin(il.assign(x, 1000),
 #                               il.assign(f, il.lamda([], il.if_(il.eq(x,0), 0, il.begin(il.assign(x, il.sub(x, 1)), f.call())))),
 #                               f.call())), 0
@@ -80,4 +80,14 @@ xexports.Test =
     test.equal  solve(il.begin(il.assign(f, il.userlamda([], il.clamda(v, il.assign(x, il.add(x, 1)), x))), 1)), 1
     test.done()
 
+
+exports.Test =
+  "test label": (test) ->
+    x = 5
+    `label1://`
+    while 1
+      if not x
+        do -> `break label1`;1
+      else console.log x--
+    test.done()
 

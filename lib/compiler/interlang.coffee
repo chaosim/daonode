@@ -56,10 +56,6 @@ class Assign extends Element
         if item.removed()==false then return false
       true
 
-class ListAssign extends Assign
-  constructor: (@lefts, @exp) -> @name = @toString()
-  toString: () -> "#{toString(@lefts)} = #{toString(@exp)}"
-
 class AugmentAssign extends Assign
   toString: () -> "#{toString(@left)} #{@operator} #{toString(@exp)}"
 
@@ -73,6 +69,9 @@ class Throw extends Return
 class Begin extends Element
   constructor: (@exps) -> super
   toString: () -> "begin(#{(toString(e) for e in @exps).join(',')})"
+class ExpressionList extends Begin
+  constructor: (@exps) -> super
+  toString: () -> "exprlist(#{(toString(e) for e in @exps).join(',')})"
 class TopBegin extends Begin
   toString: () -> "topbegin(#{(toString(e) for e in @exps).join(',')})"
 class Print extends Begin
@@ -117,18 +116,43 @@ class Fun extends Element
 class Apply extends Element
   constructor: (@caller, @args) -> super
   toString: () -> "(#{toString(@caller)})(#{(toString(arg) for arg in @args).join(', ')})"
-class CApply extends Apply
-  constructor: (cont, value) -> @caller = cont; @args = [value]; @name = @toString()
 
 class Deref extends Element
   constructor: (@exp) -> super
   toString: () -> "deref(#{toString(@exp)})"
-class Code extends Element
-  constructor: (@string) -> super
-  toString: () -> "code(#{@string})"
+
 class If extends Element
   constructor: (@test, @then_, @else_) -> super
-  toString: () -> "if_(#{toString(@test)}, #{toString(@then_)}, #{toString(@else_)})"
+  toString: () -> "if(#{toString(@test)}, #{toString(@then_)}, #{toString(@else_)})"
+
+class LabelStatement extends Element
+  constructor: (@label, @statement) -> super
+  toString: () -> "#{toString(@label)}: #{toString(@statement)}"
+
+class While extends Element
+  constructor: (@test, @body) -> super
+  toString: () -> "while(#{toString(@test)}, #{toString(@body)})"
+class DoWhile extends While
+  constructor: (@test, @body) -> super
+  toString: () -> "dowhile(#{toString(@test)}, #{toString(@body)})"
+class For extends Element
+  constructor: (@init, @test, @step, @body) -> super
+  toString: () -> "for(#{toString(@test)}, #{toString(@body)})"
+class ForIn extends Element
+  constructor: (@vari, @container, @body) -> super
+  toString: () -> "forin(#{toString(@vari)}, #{toString(@container)}, #{toString(@body)})"
+class ForOf extends Element
+  constructor: (@vari, @container, @body) -> super
+  toString: () -> "forof(#{toString(@vari)}, #{toString(@container)}, #{toString(@body)})"
+class Break extends Element
+  constructor: (@label) -> super
+  toString: () -> "break #{toString(@label)}"
+class Continue extends Break
+  toString: () -> "continue #{toString(@label)}"
+
+class Try extends Element
+  constructor: (@test, @catches, @final) -> super
+  toString: () -> "try(#{toString(@test)}, #{toString(@catches)}, #{toString(@final)})"
 
 replace = (exp, param, value) ->
   exp_replace = exp?.replace
@@ -137,8 +161,15 @@ replace = (exp, param, value) ->
 
 Var::replace = (param, value) -> if @toString() is param then value else @
 Assign::replace = (param, value) -> new @constructor(@left, replace(@exp, param, value))
-ListAssign::replace = (param, value) -> new @constructor(@lefts, replace(@exp, param, value))
 If::replace = (param, value) ->  new If(replace(@test, param, value), replace(@then_, param, value), replace(@else_, param, value))
+LabelStatement::replace = (param, value) ->  new LabelStatement(@label, replace(@statement, param, value))
+While::replace = (param, value) ->  new While(replace(@test, param, value), replace(@body, param, value))
+For::replace = (param, value) ->  new For(replace(@init, param, value), replace(@test, param, value), replace(@step, param, value), replace(@body, param, value))
+ForIn::replace = (param, value) ->  new ForIn(replace(@vari, param, value), replace(@container, param, value), replace(@body, param, value))
+Break::replace = (param, value) -> @
+Try::replace = (param, value) ->
+  catches = ([replace(clause[0], param, value), replace(clause[1], param, value)] for clause in @catches)
+  new Try(replace(@test, param, value), replace(catches, param, value), replace(@final, param, value))
 Return::replace = (param, value) -> new @constructor(replace(@value, param, value))
 Lamda::replace = (param, value) -> @ #param should not occur in Lamda
 Clamda::replace = (param, value) -> @  #param should not occur in Clamda
@@ -147,33 +178,12 @@ Apply::replace = (param, value) -> new Apply(replace(@caller, param, value), (re
 VirtualOperation::replace = (param, value) -> new @constructor((replace(a, param, value) for a in @args))
 Begin::replace = (param, value) -> new @constructor((replace(exp, param, value) for exp in @exps))
 Deref::replace = (param, value) -> new Deref(value.replace(@exp, param))
-Code::replace = (param, value) -> @
 JSFun::replace = (param, value) ->  new JSFun(replace(@fun, param, value))
-
-TASK_OPTIMIZE = 0;
-TASK_FUNC = 1
-
-exports.optimize = (exp, env, compiler) ->
-  result = null
-  compiler.tasks = tasks = []
-  tasks.push(null, [TASK_OPTIMIZE, exp, env])
-  while 1
-    task = tasks.pop()
-    if not task then break
-    switch task[0]
-      when TASK_OPTIMIZE then result = optimize(task[1], task[2], compiler)
-      when TASK_FUNC then result = task[1](result)
-  result
 
 optimize = (exp, env, compiler) ->
   exp_optimize = exp?.optimize
-  if exp_optimize then exp_optimize.call(exp,  env, compiler)
+  if exp_optimize then exp_optimize.call(exp, env, compiler)
   else exp
-
-appendTasks = (compiler, tasks) ->
-  compilerTasks = compiler.tasks
-  for i in [tasks.length- 1..0]
-    compilerTasks.push(tasks[i])
 
 Var::optimize = (env, compiler) ->
   if @isRecursive then return @
@@ -193,7 +203,7 @@ Symbol::optimize = (env, compiler) -> @
 Assign::optimize = (env, compiler) ->
   left = @left
   if left instanceof VirtualOperation
-    left = new left.constructor(optimize(a, env, compiler) for a in left.args)
+    left = new left.constructor(compiler.optimize(a, env) for a in left.args)
   else
     if left.isConst
       if left.haveAssigned then throw Error(@, "should not assign to const more than once.")
@@ -205,198 +215,146 @@ Assign::optimize = (env, compiler) ->
         else locals[left] = 1
     else if left instanceof UserNonlocalVar
       env.userlamda?.nonlocals[left] = left
+      @_removed = false
     else if left instanceof InternalLocalVar then  env.lamda?.locals[left] = left
     else if left instanceof InternalNonlocalVar then  env.lamda?.nonlocals[left] = left
-  tasks = []
-  tasks.push([TASK_OPTIMIZE, @exp, env])
-  tasks.push([TASK_FUNC, ((exp) =>
-    assign = new @constructor(left, exp)
-    outerEnv = env.outer
-    if outerEnv
-      envExp = outerEnv.lookup(left)
-      if envExp instanceof Assign then envExp._removed = false
-    if isValue(exp)
-      if exp instanceof Lamda and not left.isRecursive
-        env.bindings[left] = exp
-        assign._removed = false
-      else if not isAtomic(exp)
-        env.bindings[left] = exp
-        assign._removed = false
-      else if left instanceof VirtualOperation
-        assign._removed = false
-      else
-        env.bindings[left] = assign
-    else
+  exp = compiler.optimize(@exp, env)
+  assign = new @constructor(left, exp)
+  if isValue(exp)
+    if exp instanceof Lamda and left.isRecursive
       env.bindings[left] = left
       assign._removed = false
-    assign)])
-  appendTasks(compiler, tasks)
+    else if not isAtomic(exp)
+      env.bindings[left] = left
+      assign._removed = false
+    else if left instanceof VirtualOperation
+      assign._removed = false
+    else
+      env.bindings[left] = assign
+  else
+    env.bindings[left] = left
+    assign._removed = false
+  assign
 
 LocalDecl::optimize = (env, compiler) ->
   for vari in @vars
     if vari instanceof UserVar then env.userlamda.locals[vari] = vari
     else env.lamda.locals[vari] = vari
   null
-
-NonlocalDecl = (env, compiler) ->
+NonlocalDecl::optimize = (env, compiler) ->
   for vari in @vars
     if vari instanceof UserVar then env.userlamda.nonlocals[vari] = vari
     else env.lamda.nonlocals[vari] = vari
   null
 
 If::optimize = (env, compiler) ->
-  tasks = []
-  tasks.push([TASK_OPTIMIZE, @test, env])
-  tasks.push([TASK_FUNC, ((test) =>
-    test_bool = boolize(test)
-    if test_bool is true
-      tasks = []
-      tasks.push([TASK_OPTIMIZE, @then_, env])
-      tasks.push([TASK_FUNC, ((then_) ->
-        if then_ instanceof If and then_.test is test # (if a (if a b c) d)
-          then_ = then_.then_
-        then_)])
-      appendTasks(compiler, tasks)
-    else if test_bool is false
-      tasks = []
-      tasks.push([TASK_OPTIMIZE, @else_, env])
-      tasks.push([TASK_FUNC, ((else_) ->
-        if else_ instanceof If and else_.test is test # (if a b (if a c d))
-          else_ = else_.else_
-        else_)])
-      appendTasks(compiler, tasks)
-    else
-      tasks = []
-      tasks.push([TASK_OPTIMIZE, @then_, env])
-      tasks.push([TASK_FUNC, ((then_) =>
-          tasks = []
-          tasks.push([TASK_OPTIMIZE, @else_, env])
-          tasks.push([TASK_FUNC, ((else_) ->
-            if then_ instanceof If and then_.test is test # (if a (if a b c) d)
-              then_ = then_.then_
-            if else_ instanceof If and else_.test is test # (if a b (if a c d))
-              else_ = else_.else_
-            new If(test, then_, else_))])
-          appendTasks(compiler, tasks)
-        )])
-      appendTasks(compiler, tasks))
-  ])
-  appendTasks(compiler, tasks)
+  test = optimize(@test, env, compiler)
+  test_bool = boolize(test)
+  if test_bool is true
+    then_ = optimize(@then_, env, compiler)
+    if then_ instanceof If and then_.test is test # (if a (if a b c) d)
+      then_ = then_.then_
+    then_
+  else if test_bool is false
+    else_ = optimize(@else_, env, compiler)
+    if else_ instanceof If and else_.test is test # (if a b (if a c d))
+      else_ = else_.else_
+    else_
+  else
+    then_= optimize(@then_, env, compiler)
+    else_ = optimize(@else_, env, compiler)
+    if then_ instanceof If and then_.test is test # (if a (if a b c) d)
+      then_ = then_.then_
+    if else_ instanceof If and else_.test is test # (if a b (if a c d))
+      else_ = else_.else_
+    new If(test, then_, else_)
 
-Throw::optimize = (env, compiler) ->
-  tasks = []
-  tasks.push([TASK_OPTIMIZE, @value, env])
-  tasks.push([TASK_FUNC, ((value) -> new Throw(value))])
-  appendTasks(compiler, tasks)
-New::optimize = (env, compiler) ->
-  tasks = []
-  tasks.push([TASK_OPTIMIZE, @value, env])
-  tasks.push([TASK_FUNC, ((value) -> new New(value))])
-  appendTasks(compiler, tasks)
-IdCont::optimize = (env, compiler) -> @
+LabelStatement::optimize = (env, compiler) ->  new LabelStatement(@label, optimize(@statement, env, compiler))
 
+While::optimize = (env, compiler) ->
+  test = optimize(@test, env, compiler)
+  new While(test, @body)
+
+For::optimize = (env, compiler) ->
+  init = optimize(@init, env, compiler)
+  test = optimize(@test, env, compiler)
+  step = optimize(@step, env, compiler)
+  body = optimize(@body, env, compiler)
+  new For(init, test, step, body)
+
+ForIn::optimize = (env, compiler) ->
+  new ForIn(optimize(@vari, env, compiler), test = optimize(container, env, compiler), optimize(@body, env, compiler))
+
+Break::optimize = (env, compiler) -> @
+Try::optimize = (env, compiler) ->
+  test = optimize(@test, env, compiler)
+  new Try(test, @catches, @final)
+
+Return::optimize = (env, compiler) ->
+  env.lamda.haveReturn = true
+  new Return(compiler.optimize(@value, env))
+Throw::optimize = (env, compiler) -> new Throw(compiler.optimize(@value, env))
+New::optimize = (env, compiler) -> new New(compiler.optimize(@value, env))
+Lamda::optimize = (env, compiler) ->
+  if @_optimized then return @
+  envBindings = env.bindings
+  for k,v of envBindings
+    if hasOwnProperty.call(envBindings, k) and v instanceof Assign
+      v._removed = false
+  bindings = {}
+  for p in @params then bindings[p] = p
+  @locals = {}; @nonlocals = {}
+  env = env.extendBindings(bindings, @)
+  body = compiler.optimize(@body, env)
+  @body = jsify(body, compiler, env)
+  @_jsified = true
+  @_optimized = true
+  return @
+UserLamda::optimize = (env, compiler) ->
+  if @_optimized then return @
+  bindings = {}
+  for p in @params then bindings[p] = p
+  @locals = {}; @nonlocals = {}
+  env = env.extendBindings(bindings,@, @)
+  body = compiler.optimize(@body, env)
+  @body = jsify(body, compiler, env)
+  @_jsified = true
+  @_optimized = true
+  return @
 Clamda::optimize = (env, compiler) ->
   if @_optimized then return @
-  tasks = []
-  #  envBindings = env.bindings
-  #  for k,v of envBindings
-  #    if hasOwnProperty.call(envBindings, k) and v instanceof Assign
-  #      v._removed = false
+  envBindings = env.bindings
+  for k,v of envBindings
+    if hasOwnProperty.call(envBindings, k) and v instanceof Assign
+      v._removed = false
   bindings = {}; bindings[@v] = @v
-  @locals = {}; @nonlocals = {}; @vars = {}; @childrenLamda = []
+  @locals = {}; @nonlocals = {}
   env = env.extendBindings(bindings, @)
-  tasks.push([TASK_OPTIMIZE, @body, env])
-  tasks.push([TASK_FUNC, ((body) =>
-    @body = jsify(body, compiler, env)
-    @_jsified = true
-    #  vars = @allVars()
-    @_optimized = true
-    @)])
-  appendTasks(compiler, tasks)
-
-UserLamda::optimize = (env, compiler) ->
-  tasks = []
-  if @_optimized then return @
-  #  envBindings = env.bindings
-  #  for k,v of envBindings
-  #    if hasOwnProperty.call(envBindings, k) and v instanceof Assign
-  #      v._removed = false
-  bindings = {}
-  for p in @params then bindings[p] = p
-  @locals = {}; @nonlocals = {}; @vars = {}; @childrenLamda = []
-  env = env.extendBindings(bindings,@, @)
-  tasks.push([TASK_OPTIMIZE, @body, env])
-  tasks.push([TASK_FUNC, ((body) =>
-    @body = jsify(body, compiler, env)
-    @_jsified = true
-    #  vars = @allVars()
-    @_optimized = true
-    @)])
-  appendTasks(compiler, tasks)
-
-Lamda::optimize = (env, compiler) ->
-  tasks = []
-  if @_optimized then return @
-  env.lamda.childrenLamda.push(@)
-#  envBindings = env.bindings
-#  for k,v of envBindings
-#    if hasOwnProperty.call(envBindings, k) and v instanceof Assign
-#      if vars[k] then v._removed = false
-  bindings = {}
-  for p in @params then bindings[p] = p
-  @locals = {}; @nonlocals = {}; @vars = {}; @childrenLamda = []
-  env = env.extendBindings(bindings, @)
-  tasks.push([TASK_OPTIMIZE, @body, env])
-  tasks.push([TASK_FUNC, ((body) =>
-    body = jsify(body, compiler, env)
-    @_jsified = true
-    #  vars = @allVars()
-    @_optimized = true
-    @)])
-  appendTasks(compiler, tasks)
+  body = compiler.optimize(@body, env)
+  @body = jsify(body, compiler, env)
+  @_jsified = true
+  @_optimized = true
+  return @
+IdCont::optimize = (env, compiler) -> @
 
 Apply::optimize = (env, compiler) ->
-  tasks = []
-  tasks.push([TASK_OPTIMIZE, @caller, env])
-  tasks.push([TASK_FUNC, ((caller) =>
-    optimizeApply = caller.optimizeApply
-    if optimizeApply then optimizeApply.call(caller, @args, env, compiler)
-    else
-      tasks = []
-      args = []
-      for a in @args
-        tasks.push([TASK_OPTIMIZE, a, env])
-        tasks.push([TASK_FUNC, ((arg) -> args.push(arg); args)])
-      tasks.push([TASK_FUNC, (x) -> new Apply(caller, args)])
-      appendTasks(compiler, tasks)
-    )])
-  appendTasks(compiler, tasks)
+  caller =  compiler.optimize(@caller, env)
+  caller.optimizeApply?(@args, env, compiler) or new Apply(caller, (compiler.optimize(a, env) for a in @args))
 
 VirtualOperation::optimize = (env, compiler) ->
-  tasks = []
-  args = []
-  for a in @args
-    tasks.push([TASK_OPTIMIZE, a, env])
-    tasks.push([TASK_FUNC, ((arg) -> args.push(arg); args)])
-  tasks.push([TASK_FUNC, ((args) =>
-    _isValue = true
-    for a in args
-      if not isValue(a) then _isValue = false; break
-    if _isValue and @func then @func.apply(null, args)
-    else new @constructor(args))])
-  appendTasks(compiler, tasks)
+  args = (compiler.optimize(a, env) for a in @args)
+  _isValue = true
+  for a in args
+    if not isValue(a) then _isValue = false; break
+  if _isValue and @func then @func.apply(null, args)
+  else new @constructor(args)
 
 Begin::optimize = (env, compiler) ->
-  thisExps = @exps
-  length = thisExps.length
-  if length is 0 then null
-  tasks = []
   result = []
   waitPop = false
-  i = 0
-  tasks.push([TASK_OPTIMIZE, thisExps[i], env])
-  task = [TASK_FUNC, ((e) ->
-#    if not isDeclaration(e)
+  for exp in @exps
+    e = compiler.optimize(exp, env)
+    if isDeclaration(e) then continue
     if waitPop then result.pop()
     if e instanceof Begin
       exps = e.exps
@@ -405,70 +363,37 @@ Begin::optimize = (env, compiler) ->
     else
       result.push e
       waitPop = sideEffect(e) is il.PURE
-    if ++i<length
-      tasks = []
-      tasks.push([TASK_OPTIMIZE, thisExps[i], env])
-      tasks.push(task)
-      appendTasks(compiler, tasks)
-  )]
-  tasks.push(task)
-  tasks.push([TASK_FUNC, ((x) =>
-    if result.length>1 then  new @constructor(result)
-    else result[0])])
-  appendTasks(compiler, tasks)
-
+  if result.length>1 then  new @constructor(result)
+  else result[0]
 Deref::optimize = (env, compiler) ->
   exp = @exp
   if _.isString(exp) then exp
   else if _.isNumber(exp) then exp
-  else
-    tasks = []
-    tasks.push([TASK_OPTIMIZE, @value, env])
-    tasks.push([TASK_FUNC, ((value) -> new Deref(value))])
-    appendTasks(compiler, tasks)
-
-Code::optimize = (env, compiler) -> @
-
-JSFun::optimize = (env, compiler) ->
-  tasks = []
-  tasks.push([TASK_OPTIMIZE, @fun, env])
-  tasks.push([TASK_FUNC, ((value) -> new JSFun(value))])
-  appendTasks(compiler, tasks)
+  else new Deref(compiler.optimize(exp, env))
+JSFun::optimize = (env, compiler) ->  new JSFun(compiler.optimize(@fun, env))
 
 Lamda::optimizeApply = (args, env, compiler) ->
-  tasks = []
   exps = (il.assign(p, args[i]) for p, i in @params)
   exps.push @body
-  tasks.push([TASK_OPTIMIZE, il.topbegin(exps...), env])
-  tasks.push([TASK_FUNC, ((body) ->
-    if not isStatement(body) then body
-    else new Apply(new Lamda([], body), [])
-  )])
-  appendTasks(compiler, tasks)
+  body = compiler.optimize(il.topbegin(exps...), env)
+  if not isStatement(body) then body
+  else new Apply(new Lamda([], body), [])
 
 Clamda::optimizeApply = (args, env, compiler) ->
-  tasks = compiler.tasks
-  tasks.push([TASK_OPTIMIZE, il.begin(il.assign(@v, args[0]), @body), env])
+  il.begin(il.assign(@v, args[0]), @body).optimize(env, compiler)
 
 RecursiveClamda::optimizeApply = (args, env, compiler) ->
-  tasks = compiler.tasks
-  tasks.push([TASK_OPTIMIZE, il.begin(il.assign(@v, args[0]), @body), env])
+  il.begin(il.assign(@v, args[0]), @body).optimize(env, compiler)
 
-IdCont::optimizeApply = (args, env, compiler) -> optimize(args[0], env, compiler)
+IdCont::optimizeApply = (args, env, compiler) -> compiler.optimize(args[0], env)
 
 JSFun::optimizeApply = (args, env, compiler) ->
-  tasks = []
-  optimizedArgs = []
-  for a in args
-    tasks.push([TASK_OPTIMIZE, a, env])
-    tasks.push([TASK_FUNC, ((arg) -> optimizedArgs.push(arg); optimizedArgs)])
+  args = (compiler.optimize(a, env) for a in args)
   f = @fun
-  tasks.push([TASK_FUNC, ((args) ->
-    t = typeof f
-    if t is 'function' then new Apply(f, args)
-    else if t is 'string' then new Apply(il.fun(f), args)
-    else f.apply(args).optimize(env, compiler))])
-  appendTasks(compiler, tasks)
+  t = typeof f
+  if t is 'function' then new Apply(f, args)
+  else if t is 'string' then new Apply(il.fun(f), args)
+  else f.apply(args).optimize(env, compiler)
 
 MAX_EXTEND_CODE_SIZE = 10
 
@@ -477,32 +402,6 @@ isEmpty = (obj) ->
   for key of obj  then if hasOwnProperty.call(obj, key) then return false
   return true
 
-analyze = (exp, compiler, refMap) ->
-  exp_analyze = exp?.analyze
-  if exp_analyze then exp_analyze.call(exp, compiler, refMap)
-
-Var::analyze = (compiler, refMap) -> if hasOwnProperty.call(refMap, @) then refMap[@]++ else refMap[@] = 1
-Assign::analyze = (compiler, refMap) -> analyze(@exp, compiler, refMap)
-If::analyze = (compiler, refMap) ->
-  analyze(@test, compiler, refMap) + analyze(@then_, compiler, refMap) + analyze(@else_, compiler, refMap)
-Begin::analyze = (compiler, refMap) -> analyze(e, compiler, refMap) for e in @exps
-Return::analyze = (compiler, refMap) -> analyze(@value, compiler, refMap)
-Apply::analyze = (compiler, refMap) ->
-  analyze(@caller, compiler, refMap); analyze(e, compiler, refMap) for e in @args
-VirtualOperation::analyze = (compiler, refMap) -> analyze(e, compiler, refMap) for e in @args
-CApply::analyze = (compiler, refMap) ->  analyze(@cont, compiler, refMap); analyze(@value, compiler, refMap)
-Lamda::analyze = (compiler, refMap) ->
-  childMap = @refMap = {}
-  analyze(@body, compiler, childMap)
-  for x, i of childMap
-    if x not in @params
-      if hasOwnProperty.call(refMap, x) then refMap[x] += i else refMap[x] = i
-Clamda::analyze = (compiler, refMap) ->
-  childMap = @refMap = {}
-  analyze(@body, compiler, childMap)
-  for x, i of childMap
-    if x!=@v.name
-      if hasOwnProperty.call(refMap, x) then refMap[x] += i else refMap[x] = i
 codeSize = (exp) ->
   exp_codeSize = exp?.codeSize
   if exp_codeSize then exp_codeSize.call(exp)
@@ -510,13 +409,18 @@ codeSize = (exp) ->
 
 Var::codeSize = () -> 1
 Return::codeSize = () -> codeSize(@value)+1
-If::codeSize = () -> sideEffeft(@test) + codeSize(@then_) + codeSize(@else_) + 1
+If::codeSize = () -> codeSize(@test) + codeSize(@then_) + codeSize(@else_) + 1
+LabelStatement::codeSize = () -> codeSize(@statement)
+For::codeSize = () -> codeSize(@init) + codeSize(@test) + codeSize(@step) + codeSize(@body)+2
+ForIn::codeSize = () -> codeSize(@vari) + codeSize(@container) + codeSize(@body)+2
+While::codeSize = () -> codeSize(@test) + codeSize(@body)+2
+Break::codeSize = () -> 1
+Try::codeSize = () -> codeSize(@test) + codeSize(@catches)+codeSize(@final)+2
 Begin::codeSize = () -> _.reduce(@exps, ((memo, e) -> memo + codeSize(e)), 0)
 VirtualOperation::codeSize = () -> 1
 Lamda::codeSize = () -> codeSize(@body) + 2
 Clamda::codeSize = () -> codeSize(@body) + 1
 Apply::codeSize = () -> _.reduce(@args, ((memo, e) -> memo + codeSize(e)), codeSize(@caller))
-CApply::codeSize = () -> codeSize(@caller.body) + codeSize(@args[0]) + 2
 
 boolize = (exp) ->
   exp_boolize = exp?.boolize
@@ -529,6 +433,12 @@ If::boolize = () ->
   b = boolize(@test)
   if b is undefined then undefined
   if b is true then boolize(@then_) else boolize(@else_)
+LabelStatement::boolize = () -> boolize(@statement)
+For::boolize = () -> undefined
+ForIn::boolize = () -> undefined
+While::boolize = () -> undefined
+Try::boolize = () -> undefined
+Break::boolize = () -> undefined
 Begin::boolize = () -> exps = @exps; boolize(exps[exps.length-1])
 VirtualOperation::boolize = () ->
   for a in @args then if boolize(a) is undefined then return undefined
@@ -541,7 +451,6 @@ Apply::boolize = () ->
   if caller instanceof Var then return undefined
   for a in @args then if boolize(a) is undefined then return undefined
   !!(caller.func?.apply(null, @args)) or undefined
-CApply::boolize = () -> boolize(@caller.body)
 
 isDeclaration  = (exp) ->
   exp_isDeclaration = exp?.isDeclaration
@@ -581,13 +490,18 @@ Return::sideEffect = () -> sideEffect(@value)
 Throw::sideEffect = () -> il.IO
 New::sideEffect = () -> sideEffect(@value)
 If::sideEffect = () -> expsEffect [@test, @then_, @else_]
+LabelStatement::sideEffect = () -> sideEffect(@statement)
+For::sideEffect = () -> expsEffect [@init, @test, @step, @body]
+ForIn::sideEffect = () -> expsEffect [@container, @body]
+While::sideEffect = () -> expsEffect [@test, @body]
+Break::sideEffect = () -> il.EFFECT
+Try::sideEffect = () -> expsEffect [@test, @catches, @final]
 Begin::sideEffect = () -> expsEffect(@exps)
 Lamda::sideEffect = () ->  il.PURE
 JSFun::sideEffect = () ->  il.PURE
 Fun::sideEffect = () ->  il.PURE
 Apply::sideEffect = () ->  Math.max(applySideEffect(@caller), expsEffect(@args))
 VirtualOperation::sideEffect = () ->  Math.max(@_effect, expsEffect(@args))
-CApply::sideEffect = () -> Math.max(applySideEffect(@caller), sideEffect(@args[0]))
 
 applySideEffect = (exp) ->
   exp_applySideEffect = exp?.applySideEffect
@@ -621,6 +535,16 @@ Assign::jsify = (compiler, env) -> @exp = jsify(@exp, compiler, env); @
 Return::jsify = (compiler, env) -> new @constructor(jsify(@value, compiler, env))
 If::jsify = (compiler, env) ->
   new If(jsify(@test, compiler, env), jsify(@then_, compiler, env), jsify(@else_, compiler, env))
+LabelStatement::jsify = (compiler, env) ->  new LabelStatement(@label, jsify(@statement, compiler, env))
+While::jsify = (compiler, env) ->
+  new While(jsify(@test, compiler, env), jsify(@body, compiler, env))
+For::jsify = (compiler, env) ->
+  new For(jsify(@init, compiler, env), jsify(@test, compiler, env), jsify(@step, compiler, env), jsify(@body, compiler, env))
+ForIn::jsify = (compiler, env) ->
+  new ForIn(jsify(@vari, compiler, env), jsify(@container, compiler, env), jsify(@body, compiler, env))
+Break::jsify = (compiler, env) -> @
+Try::jsify = (compiler, env) ->
+  new Try(jsify(@test, compiler, env), jsify(@catches, compiler, env), jsify(@final, compiler, env))
 
 Begin::jsify = (compiler, env) ->
   exps = @exps
@@ -671,6 +595,12 @@ New::insertReturn = () -> new Return(@)
 If::insertReturn = () ->
   if @isStatement() then new If(@test, insertReturn(@then_), insertReturn(@else_))
   else new Return(@)
+LabelStatement::insertReturn = () -> new LabelStatement(@label, insertReturn(@statement))
+While::insertReturn = () ->
+  new Begin(new While(@test, insertReturn(@body)), new Return())
+Break::insertReturn = () -> @
+Try::insertReturn = () ->
+  new Try(@test, insertReturn(@catches), insertReturn(@final))
 Begin::insertReturn = () ->
   exps = @exps
   length = exps.length
@@ -708,7 +638,28 @@ Throw::toCode = (compiler) -> "throw #{compiler.toCode(@value)};"
 New::toCode = (compiler) -> "new #{compiler.toCode(@value)}"
 Var::toCode = (compiler) -> @toString()
 NonlocalDecl::toCode = (compiler) -> ''
-Assign::toCode = (compiler) -> "#{compiler.toCode(@left)} = #{compiler.toCode(@exp)}"
+Assign::toCode = (compiler) ->
+  exp = @exp
+  left = compiler.toCode(@left)
+  if exp instanceof BinaryOperation
+    args = exp.args
+    args0 = compiler.toCode(args[0])
+    args1 = compiler.toCode(args[1])
+    if left == args0
+      symbol = exp.symbol
+      switch symbol
+        when '+'
+          if args1=='1' then "++#{left}"
+          else return "#{left} += #{args1}"
+        when '-'
+          if args1=='1' then "--#{left}"
+          else "#{left} -= #{args1}"
+        when '*', '/', '%', '|', '&', '^', '||', '&&', '<<', '>>'
+          "#{left} #{symbol}= #{args1}"
+        else "#{left} = #{args0} #{symbol} #{args1}"
+    else "#{left} = #{args0} #{symbol} #{args1}"
+  else "#{left} = #{compiler.toCode(exp)}"
+
 AugmentAssign::toCode = (compiler) -> "#{compiler.toCode(@left)} #{@operator} #{compiler.toCode(@exp)}"
 If::toCode = (compiler) ->
   compiler.parent = @
@@ -718,16 +669,31 @@ If::toCode = (compiler) ->
     else "if (#{compiler.toCode(@test)}) #{compiler.toCode(@then_)} else #{compiler.toCode(@else_)}"
   else
     "(#{compiler.toCode(@test)}) ? (#{compiler.toCode(@then_)}) : (#{compiler.toCode(@else_)})"
-#    if else_ is undefined then "((#{compiler.toCode(@test)}) && (#{compiler.toCode(@then_)}))"
-#    else "(#{compiler.toCode(@test)}) ? (#{compiler.toCode(@then_)}) : (#{compiler.toCode(@else_)})"
+LabelStatement::toCode = (compiler) ->  "#{compiler.toCode(@then_)}:#{compiler.toCode(@statement)}"
+For::toCode = (compiler) ->
+  "for (#{compiler.toCode(@init)};#{compiler.toCode(@test)};#{compiler.toCode(@step)}) #{compiler.toCode(@body)}"
+ForIn::toCode = (compiler) ->
+  "for (#{compiler.toCode(@vari)} in #{compiler.toCode(@container)}) #{compiler.toCode(@body)}"
+ForOf::toCode = (compiler) ->
+  "for (#{compiler.toCode(@vari)} of #{compiler.toCode(@container)}) #{compiler.toCode(@body)}"
+While::toCode = (compiler) ->
+  "while (#{compiler.toCode(@test)}) #{compiler.toCode(@body)}"
+DoWhile::toCode = (compiler) ->
+  "do #{compiler.toCode(@body)} while(#{compiler.toCode(@test)}) "
+Try::toCode = (compiler) ->
+  "try #{compiler.toCode(@test)} #{compiler.toCode(@catches)} finally #{compiler.toCode(@final)}"
+Break::toCode = (compiler) ->
+  if @label then "break #{compiler.toCode(@label)}"
+  else "break"
+Continue::toCode = (compiler) ->
+  if @label then "continue #{compiler.toCode(@label)}"
+  else "continue"
 Apply::toCode = (compiler) ->
   "#{expressionToCode(compiler, @caller)}(#{(compiler.toCode(arg) for arg in @args).join(', ')})"
-CApply::toCode = (compiler) -> "#{expressionToCode(compiler, @caller)}(#{compiler.toCode(@args[0])})"
 Begin::toCode = (compiler) -> compiler.parent = @; "{#{(compiler.toCode(exp) for exp in @exps).join('; ')}}"
+ExpressionList::toCode = (compiler) -> compiler.parent = @; "#{(compiler.toCode(exp) for exp in @exps).join(',')}"
 TopBegin::toCode = (compiler) -> compiler.parent = @; "#{(compiler.toCode(exp) for exp in @exps).join('; ')}"
-Print::toCode = (compiler) ->  "console.log(#{(compiler.toCode(exp) for exp in @exps).join(', ')})"
 Deref::toCode = (compiler) ->  "solver.trail.deref(#{compiler.toCode(@exp)})"
-Code::toCode = (compiler) ->  @string
 JSFun::toCode = (compiler) ->  if _.isString(@fun) then @fun  else compiler.toCode(@fun)
 
 isStatement = (exp) ->
@@ -736,7 +702,11 @@ isStatement = (exp) ->
   else false
 
 If::isStatement = () -> isStatement(@then_) or isStatement(@else_)
+LabelStatement::isStatement = () -> true
+While::isStatement = () -> true
+Try::isStatement = () -> true
 Begin::isStatement = () -> true
+ExpressionList::isStatement = () -> true
 Return::isStatement = () -> true
 New::isStatement = () -> false
 Assign::isStatement = () -> true
@@ -851,7 +821,6 @@ il.bitxorassign = augmentAssign("^=", (x, y) -> x ^ y)
 il.lshiftassign = augmentAssign("<<=", (x, y) -> x << y)
 il.rshiftassign = augmentAssign(">>=", (x, y) -> x >> y)
 
-
 il.listassign = (lefts..., exp) -> il.begin((il.assign(lefts[i], il.index(exp, i)) for i in [0...lefts.length])...)
 
 il.not_ = unary("!", (x) -> !x)
@@ -947,6 +916,18 @@ il.iff = (clauses..., else_) ->
   length = clauses.length
   if length is 2 then il.if_(clauses[0], clauses[1], else_)
   else il.if_(clauses[0], clauses[1], il.iff(clauses[2...length]..., else_))
+
+il.label = (label, statement) -> new LabelStatement(label, statement)
+
+il.while_ = (test, body...) -> new While(test, il.begin(body...))
+il.dowhile = (body..., test) -> new DoWhile(test, il.begin(body...))
+il.for_ = (init,test, step, body) -> new For(test, il.begin(body...))
+il.forin = (vari, container, body...) -> new ForIn(vari, container, il.begin(body...))
+il.forof = (vari, container, body...) -> new ForOf(vari, container, il.begin(body...))
+il.try_ = (test, catches, final) -> new Try(test, catches, final)
+
+il.break_ = (label) -> new Break(label)
+il.continue_ = (label) -> new Continue(label)
 
 il.idcont = do -> v = il.internallocal('v'); new IdCont(v, v)
 

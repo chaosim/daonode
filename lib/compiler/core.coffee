@@ -55,7 +55,7 @@ exports.Compiler = class Compiler
              il.run(il.clamda(v2, @cont(exp, done)))]
     lamda = il.userlamda([], exps...)
     env = new OptimizationEnv(env, {})
-    lamda = il.optimize(lamda, env, @)
+    lamda = @optimize(lamda, env)
     lamda = lamda.jsify(@, env)
     exp = il.assign(il.attr(il.usernonlocal('exports'), il.symbol('main')), lamda)
     exp.toCode(@)
@@ -230,6 +230,33 @@ exports.Compiler = class Compiler
           compiler.globalCont = globalCont
           compiler.clamda(params[i], cont).call(il.lamda([], body))
       @cont(caller, @clamda(f, cont))
+
+    "for": (cont, init, test, step, body...) ->
+      init = il.lamda([], compiler.cont(init, il.idcont)).call()
+      test = il.lamda([], compiler.cont(test, il.idcont)).call()
+      step = il.lamda([], compiler.cont(step, il.idcont)).call()
+      body = compiler.expsCont(body, il.idcont)
+      il.begin(il.for_(init, test, step, body), cont.call(null))
+
+    "forin": (cont, vari, container, body...) ->
+      vari = @getvar(vari)
+      container = il.lamda([], compiler.cont(container, il.idcont)).call()
+      body = compiler.expsCont(body, il.idcont)
+      il.begin(il.forin(vari, container), cont.call(null))
+
+    "forof": (cont, vari, container, body...) ->
+      vari = @getvar(vari)
+      container = il.lamda([], compiler.cont(container, il.idcont)).call()
+      body = compiler.expsCont(body, il.idcont)
+      il.begin(il.forof(vari, container), cont.call(null))
+
+    "try": (cont, test, catches, final) ->
+      test = il.lamda([], compiler.cont(test, il.idcont)).call()
+      clauses = []
+      for clause in catches
+        caluses.push([@.getvar(caluse[0]), compiler.cont(clause[1], il.idcont)])
+      final = compiler.cont(final, il.idcont)
+      il.begin(il.try_(test, clauses, final), cont.call(null))
 
     "quasiquote": (cont, exp) -> @quasiquote(exp, cont)
 
@@ -719,6 +746,11 @@ exports.Compiler = class Compiler
       compiler = @
       v = @newvar('v')
       compiler.cont(item, compiler.clamda(v, cont.call(il[name](il.solver, v))))
+
+  optimize: (exp, env) ->
+    expOptimize = exp?.optimize
+    if expOptimize then expOptimize.call(exp, env, @)
+    else exp
 
   toCode: (exp) ->
     exptoCode = exp?.toCode

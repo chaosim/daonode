@@ -1,16 +1,20 @@
 just javascript:
   ✔ function without cont as parameter @done (13-06-28 07:57)
   ✔ augment assign @done (13-06-17 15:32)
-  ☐ javascript while, javascript for
-  ☐ javascript try/catch
+  ✔ javascript while, do/while @done (13-07-12 06:33)
+  ✔ javascript for, for/in, for/of @done (13-07-12 08:51)
+  ✔ javascript break/continue with label @done (13-07-12 08:51)
+  ✔ javascript try/catch @done (13-07-12 06:33)
   ✔ throw @done (13-06-29 15:03)
   ✔ javascript's new @done (13-06-22 21:27)
-  ☐ toCode: remove unnecessary parenthesis by using precedence of operator
+  ✔ toCode: remove unnecessary parenthesis by using precedence of operator @done (13-07-12 06:03)
+    # half done: variable, attribute acceess, array index don't have parenthesis
 optimization:
   ☐ assign optimization
-  ☐ special assign convert to augment assign and inc/dec when jsify.
+  ✔ special assign convert to augment assign and inc/dec when toCode. @done (13-07-12 18:24)
   ✔ v = v, unnessary pure expression statement @done (13-07-03 08:35)
   ☐ loop optimization: assign, extract computation
+  ☐ loop, while, dowhile, until convert to javascript's while/do-while statement.
   ☐ tail recursive
   ✔ il.clamda can replace parmenter v directly @done (13-07-02 16:09)
   ☐ optimize parser terminal's interlang vop

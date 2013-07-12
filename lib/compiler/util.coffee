@@ -67,6 +67,9 @@ exports.break_ = break_ = (label=defaultLabel, value=null) ->
 
 exports.continue_ = continue_ = (label=defaultLabel) -> ['continue',  label]
 
+exports.jsbreak = jsbreak = (label) -> ['jsbreak', label]
+exports.jscontinue_ = jscontinue = (label) -> ['jscontinue',  label]
+
 # loop
 exports.loop_ = (label, body...) ->
   if not isLabel(label) then (label = defaultLabel; body = [label].concat body)
@@ -82,6 +85,18 @@ exports.until_ = (label,body..., test) ->
   if not isLabel(label) then (label = defaultLabel; test = label; body = [test].concat body)
   body = body.concat([if_(not_(test), continue_(label))])
   block(label, body...)
+
+# until
+exports.dowhile = (label,body..., test) ->
+  if not isLabel(label) then (label = defaultLabel; test = label; body = [test].concat body)
+  body = body.concat([if_(test, continue_(label))])
+  block(label, body...)
+
+exports.for_ = (init, test, step, body...) -> ['for', init, test, step, body...]
+
+exports.forin = (vari, container, body...) -> ['forin', vari, container, body...]
+
+exports.try_ = (test, catches, final) -> ['try', test, catches, final]
 
 exports.catch_ =  (tag, forms...) -> ['catch', tag, forms...]
 exports.throw_ = (tag, form) -> ['throw', tag, form]
