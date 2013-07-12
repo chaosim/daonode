@@ -3,7 +3,7 @@ _ = require "underscore"
 {solve} = core = require('../core')
 {string, begin, quote, assign, print_, jsobject,
 funcall, macall, lamda, macro, jsfun,
-if_, add, eq, le, inc, suffixinc, print_, loop_, until_, while_, not_
+if_, add, eq, le, inc, suffixinc, print_, loop_, until_, while_, not_, dec
 eval_, qq, uq, uqs, iff
 block, break_, continue_, makeLabel,
 catch_, throw_, protect, callcc} = require('../util')
@@ -71,26 +71,6 @@ exports.Test =
     test.done()
 
 #exports.Test =
-  "test block lamda": (test) ->
-    a = makeLabel('a')
-    b = makeLabel('b')
-    x = vari('x'); f = vari('f')
-    test.equal  solve(block(a, funcall(lamda([x], break_(a, 2)), 1), 3)), 2
-    test.equal  solve(block(a, block(b, funcall(lamda([x], break_(b, 2)), 1), 1), 3)), 3
-    test.equal  solve(block(a, block(b, funcall(lamda([x], break_(a, 2)), 1), 1), 3)), 2
-    test.done()
-
-#xexports.Test =
-  "test block lamda 2": (test) ->
-    a = makeLabel('a')
-    b = makeLabel('b')
-    x = vari('x'); f = vari('f')
-    test.equal  solve(block(a, block(b, assign(f, lamda([x], break_(b, 2))), funcall(f, 1), 1), 3)), 3  # optimization error
-    test.equal  solve(block(a, block(b, assign(f, lamda([x], break_(a, 2))), funcall(f, 1), 1), 3)), 2  # optimization error
-    test.equal  solve(block(a, assign(f, lamda([x], block(b, break_(a, 2), 1))), funcall(f, 1), 3)), 2  # optimization error
-    test.done()
-
-exports.Test =
   "test loop while until": (test) ->
     x = vari('x')
     a = makeLabel('x')
@@ -112,3 +92,14 @@ exports.Test =
     test.equal  solve(block(a, block(b, break_(b, 2), 1), 3)), 3
     test.equal  solve(begin(assign(x, 1),  block(a, if_(eq(x, 10000), break_(a, x)), inc(x), continue_(a)))), 10000 #print_(x),
     test.done()
+
+xexports.Test =
+  "test block lamda": (test) ->
+    a = makeLabel('a')
+    b = makeLabel('b')
+    x = vari('x'); f = vari('f'); n = vari('n')
+    test.equal  solve(begin(funcall(lamda([x], assign(n, 0),
+                                          block(a, if_(eq(x, 0), break_(a, n)), assign(n, add(n, dec(x))),
+                                                   continue_(a))), 3), 12)), 12
+    test.done()
+

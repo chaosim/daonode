@@ -36,17 +36,17 @@ exports.Compiler = class Compiler
     v = @newvar('v')
     v2 = @newvar('v')
     done = @clamda(v, il.throw(il.new(il.symbol('SolverFinish').call(v))))
-    exps = [ il.userlocalassign('_', il.require('underscore')),
-             il.userlocalassign('__slice', il.attr([], il.symbol('slice'))),
-             il.userlocalassign('solve', il.attr(il.require('f:/daonode/lib/compiler/core.js'), il.symbol('solve'))),
-             il.userlocalassign('parser', il.require('f:/daonode/lib/compiler/parser.js')),
-             il.userlocalassign('solvecore', il.require('f:/daonode/lib/compiler/solve.js')),
-             il.userlocalassign('SolverFinish', il.attr(il.userlocal('solvecore'), il.symbol('SolverFinish'))),
-             il.userlocalassign('Solver', il.attr(il.userlocal('solvecore'), il.symbol('Solver'))),
-             il.userlocalassign('Trail', il.attr(il.userlocal('solvecore'), il.symbol('Trail'))),
-             il.userlocalassign('Var', il.attr(il.userlocal('solvecore'), il.symbol('Var'))),
-             il.userlocalassign('DummyVar', il.attr(il.userlocal('solvecore'), il.symbol('DummyVar'))),
-             il.userlocalassign('solver', il.new(il.symbol('Solver').call())),
+    exps = [ il.assign(il.uservar('_'), il.require('underscore')),
+             il.assign(il.uservar('__slice'), il.attr([], il.symbol('slice'))),
+             il.assign(il.uservar('solve'), il.attr(il.require('f:/daonode/lib/compiler/core.js'), il.symbol('solve'))),
+             il.assign(il.uservar('parser'), il.require('f:/daonode/lib/compiler/parser.js')),
+             il.assign(il.uservar('solvecore'), il.require('f:/daonode/lib/compiler/solve.js')),
+             il.assign(il.uservar('SolverFinish'), il.attr(il.uservar('solvecore'), il.symbol('SolverFinish'))),
+             il.assign(il.uservar('Solver'), il.attr(il.uservar('solvecore'), il.symbol('Solver'))),
+             il.assign(il.uservar('Trail'), il.attr(il.uservar('solvecore'), il.symbol('Trail'))),
+             il.assign(il.uservar('Var'), il.attr(il.uservar('solvecore'), il.symbol('Var'))),
+             il.assign(il.uservar('DummyVar'), il.attr(il.uservar('solvecore'), il.symbol('DummyVar'))),
+             il.assign(il.uservar('solver'), il.new(il.symbol('Solver').call())),
              il.assign(il.state, null),
              il.assign(il.catches, {}),
              il.assign(il.trail, il.newTrail),
@@ -57,12 +57,12 @@ exports.Compiler = class Compiler
     env = new OptimizationEnv(env, {})
     lamda = @optimize(lamda, env)
     lamda = lamda.jsify(@, env)
-    exp = il.assign(il.attr(il.usernonlocal('exports'), il.symbol('main')), lamda)
+    exp = il.assign(il.attr(il.uservar('exports'), il.symbol('main')), lamda)
     exp.toCode(@)
 
-  newvar: (v) -> if _.isString(v) then @env.newvar(il.internallocal(v)) else @env.newvar(v)
-  getvar: (v) -> if _.isString(v) then @env.getvar(il.userlocal(v)) else @env.getvar(v)
-  lookup: (v) -> if _.isString(v) then @env.lookup(il.userlocal(v)) else @env.lookup(v)
+  newvar: (v) -> if _.isString(v) then @env.newvar(il.internalvar(v)) else @env.newvar(v)
+  getvar: (v) -> if _.isString(v) then @env.getvar(il.uservar(v)) else @env.getvar(v)
+  lookup: (v) -> if _.isString(v) then @env.lookup(il.uservar(v)) else @env.lookup(v)
   pushEnv: () -> @env = @env.extend()
   popEnv: () -> @env = @env.outer
 
@@ -144,13 +144,13 @@ exports.Compiler = class Compiler
     "augment-assign": (cont, op, left, exp) ->  @leftValueCont(cont, "augment-assign", left, exp, op)
     'inc': (cont, item) -> @leftValueCont(cont, "inc", item)
     'suffixinc': (cont, item) -> @leftValueCont(cont, "suffixinc", item)
-    'dec': (item) ->  @leftValueCont(cont, "dec", item)
-    'suffixdec': (item) ->  @leftValueCont(cont, "suffixdec", item)
+    'dec': (cont, item) ->  @leftValueCont(cont, "dec", item)
+    'suffixdec': (cont, item) ->  @leftValueCont(cont, "suffixdec", item)
 
     'incp': (cont, item) -> @leftValueCont(cont, "incp", item)
     'suffixincp': (cont, item) -> @leftValueCont(cont, "suffixincp", item)
-    'decp': (item) ->  @leftValueCont(cont, "decp", item)
-    'suffixdecp': (item) ->  @leftValueCont(cont, "suffixdecp", item)
+    'decp': (cont, item) ->  @leftValueCont(cont, "decp", item)
+    'suffixdecp': (cont, item) ->  @leftValueCont(cont, "suffixdecp", item)
 
     "if": (cont, test, then_, else_) ->
         v = @newvar('v')
@@ -634,7 +634,8 @@ exports.Compiler = class Compiler
       il.begin(
         il.local(trail),
         il.assign(anyCont, il.recclamda(v,
-          il.internalnonlocalassign(trail, il.trail),
+          il.nonlocal(trail),
+          il.assign(trail, il.trail),
           il.settrail(il.newTrail),
           il.setfailcont(anyFcont),
           cont.call(null))),
@@ -818,7 +819,7 @@ exports.Compiler = class Compiler
     else [exp[0]].concat(@substMacroArgs(e, params) for e in exp[1...])
 
   interlang: (term) ->
-    if _.isString(term) then return il.userlocal(term)
+    if _.isString(term) then return il.uservar(term)
     if not _.isArray(term) then return term
     length = term.length
     if length is 0 then return term
