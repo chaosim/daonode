@@ -78,11 +78,11 @@ class Lamda extends Element
   call: (args...) -> new Apply(@, args)
   isValue: () -> true
   apply: (args) -> new Apply(@, args)
-class UserLamda extends Lamda
+
+il.UserLamda = class UserLamda extends Lamda
 class Clamda extends Lamda
-  constructor: (@v, @body) -> @name = @toString()
+  constructor: (@v, @body) -> @name = @toString(); @params = [v]
   toString: () -> "(#{toString(@v)} -> #{toString(@body)})"
-#  call: (value) -> new CApply(@, value)
   call: (value) ->
     result = replace(@body, @v.toString(), value)
     if result.constructor is TopBegin then result.constructor = Begin
@@ -181,7 +181,17 @@ optimize = (exp, env, compiler) ->
   if exp_optimize then exp_optimize.call(exp, env, compiler)
   else exp
 
+isParam = (vari, lamda) ->
+  if lamda instanceof Clamda
+    return vari.toString() is lamda.v.toString()
+  else
+    for param in lamda.params
+      if @.toString() is param.toString() then return true
+    return false
+
 Var::optimize = (env, compiler) ->
+  lamda = env.lamda
+  if isParam(@, lamda) then lamda.vars[@] = @
   if @isRecursive then return @
   outerEnv = env.outer
   if outerEnv
@@ -197,6 +207,7 @@ Var::optimize = (env, compiler) ->
 Symbol::optimize = (env, compiler) -> @
 
 Assign::optimize = (env, compiler) ->
+  lamda = env.lamda
   left = @left
   if left instanceof VirtualOperation
     left = new left.constructor(compiler.optimize(a, env) for a in left.args)
@@ -204,8 +215,10 @@ Assign::optimize = (env, compiler) ->
     if left.isConst
       if left.haveAssigned then throw Error(@, "should not assign to const more than once.")
       else left.haveAssigned = true
-    if left instanceof UserVar then env.userlamda?.locals[left] = left
-    else env.lamda?.locals[left] = left
+    if left instanceof UserVar
+      userlamda = env.userlamda
+      if userlamda and not isParam(left, userlamda) then userlamda.locals[left] = left
+    else if not isParam(left, lamda) then lamda.locals[left] = left
   exp = compiler.optimize(@exp, env)
   assign = new @constructor(left, exp)
   if isValue(exp)
@@ -285,45 +298,39 @@ Return::optimize = (env, compiler) ->
 Throw::optimize = (env, compiler) -> new Throw(compiler.optimize(@value, env))
 New::optimize = (env, compiler) -> new New(compiler.optimize(@value, env))
 Lamda::optimize = (env, compiler) ->
-  if @_optimized then return @
-#  envBindings = env.bindings
-#  for k,v of envBindings
-#    if hasOwnProperty.call(envBindings, k) and v instanceof Assign
-#      v._removed = false
+  parentLamda = env.lamda
+  parentBindings = env.bindings
+  if @_optimized
+    if parentLamda
+      vars = @vars
+      for k, v of vars
+        if hasOwnProperty.call(vars, k)
+          envValue = parentBindings[k]
+          if envValue instanceof Assign then envValue._removed = false
+    return @
   bindings = {}
   for p in @params then bindings[p] = p
-  @locals = {}; @nonlocals = {}; @vars = {}
-  env = env.extendBindings(bindings, @)
-  body = compiler.optimize(@body, env)
-  @body = jsify(body, compiler, env)
+  @locals = locals = {}; @nonlocals = nonlocals = {}; @vars = vars = {}
+  newEnv = env.extendBindings(bindings, @)
+  body = compiler.optimize(@body, newEnv)
+  for k, v of vars
+    if hasOwnProperty.call(vars, k) and hasOwnProperty.call(locals, k)
+      delete vars[k]
+  for k, v of nonlocals
+    if hasOwnProperty.call(nonlocals, k)
+      vars[k] = v
+  if parentLamda
+    parentVars = parentLamda.vars
+    for k, v of vars
+      if hasOwnProperty.call(vars, k)
+        if not isParam(v, parentLamda) then parentVars[k] = v
+        envValue = parentBindings[k]
+        if envValue instanceof Assign then envValue._removed = false
+  @body = jsify(body, compiler, newEnv)
   @_jsified = true
   @_optimized = true
   return @
-UserLamda::optimize = (env, compiler) ->
-  if @_optimized then return @
-  bindings = {}
-  for p in @params then bindings[p] = p
-  @locals = {}; @nonlocals = {}; @vars = {}
-  env = env.extendBindings(bindings,@, @)
-  body = compiler.optimize(@body, env)
-  @body = jsify(body, compiler, env)
-  @_jsified = true
-  @_optimized = true
-  return @
-Clamda::optimize = (env, compiler) ->
-  if @_optimized then return @
-#  envBindings = env.bindings
-#  for k,v of envBindings
-#    if hasOwnProperty.call(envBindings, k) and v instanceof Assign
-#      v._removed = false
-  bindings = {}; bindings[@v] = @v
-  @locals = {}; @nonlocals = {}; @vars = {}
-  env = env.extendBindings(bindings, @)
-  body = compiler.optimize(@body, env)
-  @body = jsify(body, compiler, env)
-  @_jsified = true
-  @_optimized = true
-  return @
+
 IdCont::optimize = (env, compiler) -> @
 
 Apply::optimize = (env, compiler) ->
@@ -612,17 +619,6 @@ Lamda::toCode = (compiler) ->
   body = insertReturn(body)
   if body instanceof Begin then body.constructor = TopBegin
   "function(#{(a.toString() for a in @params).join(', ')}){#{compiler.toCode(body)}}"
-
-Clamda::toCode = (compiler) ->
-  locals = []
-  nonlocals = @nonlocals
-  locals1 = @locals
-  for k of locals1
-    if not hasOwnProperty.call(nonlocals, k) and k isnt @v then locals.push(il.symbol(k))
-  body = @body
-  if locals.length>0 then body = il.topbegin(il.vardecl(locals...), body)
-  body = insertReturn(body)
-  "function(#{@v.toString()}){#{compiler.toCode(body)}}"
 
 Fun::toCode = (compiler) -> @func.toString()
 Return::toCode = (compiler) -> "return #{compiler.toCode(@value)};"

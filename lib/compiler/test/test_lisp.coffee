@@ -93,7 +93,7 @@ exports.Test =
     test.equal  solve(begin(assign(x, 1),  block(a, if_(eq(x, 10000), break_(a, x)), inc(x), continue_(a)))), 10000 #print_(x),
     test.done()
 
-xexports.Test =
+#exports.Test =
   "test block lamda": (test) ->
     a = makeLabel('a')
     b = makeLabel('b')

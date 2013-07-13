@@ -101,7 +101,7 @@ exports.Test =
     test.equal  solve(begin(assign(_, dummy('__')), parsetext(findall(lazyany(begin(char(_), print_(getvalue(_))))), string('abc')))), 3
     test.done()
 
-#xexports.Test =
+#exports.Test =
   "test any": (test) ->
     _ = vari('__')
     result = vari('result')
