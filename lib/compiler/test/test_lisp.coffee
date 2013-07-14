@@ -13,18 +13,12 @@ vari = (name) -> name
 xexports = {}
 
 exports.Test =
-  "test assign inc dec": (test) ->
-    a = vari('a')
-    blk = makeLabel('x')
-    test.equal  solve(begin(assign(a, 1),  block(blk, if_(eq(a, 10), break_(blk, a)), inc(a), continue_(blk)))), 10
-    test.done()
-
   "test eval_ quote": (test) ->
     test.equal  solve(quote(1)), 1
     test.equal  solve(eval_(quote(1), string('f:/daonode/lib/compiler/test/compiled2.js'))), 1
     test.done()
 
-#exports.Test =
+#xexports.Test =
   "test assign inc dec": (test) ->
     a = vari('a')
     test.equal  solve(begin(assign(a, 1))), 1
@@ -41,11 +35,13 @@ exports.Test =
     test.equal  solve(begin(1, 2, 3)), 3
     test.done()
 
+#exports.Test =
   "test if_": (test) ->
     test.equal  solve(if_(1, 2, 3)), 2
     test.equal  solve(if_(0, 2, 3)), 3
     test.done()
 
+#xexports.Test =
   "test iff": (test) ->
     test.equal  solve(iff([[1, 2]], 3)), 2
     test.equal  solve(iff([[0, 2], [1, 3]], 5)), 3
@@ -65,12 +61,12 @@ exports.Test =
     test.equal(solve(block(foo, protect(break_(foo, 1),  print_(2), print_(3)))), 1)
     test.done()
 
-#exports.Test =
+#xexports.Test =
   "test callcc": (test) ->
     test.equal solve(begin(callcc(jsfun((k) -> k(null))), add(1, 2))), 3
     test.done()
 
-#exports.Test =
+#xexports.Test =
   "test block lamda": (test) ->
     a = makeLabel('a')
     b = makeLabel('b')
@@ -103,7 +99,7 @@ exports.Test =
     test.equal  solve(begin(assign(x, 1),  until_(a, print_(x), inc(x), eq(x, 5)))), null
     test.done()
 
-#exports.Test =
+#xexports.Test =
   "test block break continue": (test) ->
     a = makeLabel('a')
     b = makeLabel('b')
@@ -114,7 +110,7 @@ exports.Test =
     test.equal  solve(begin(assign(x, 1),  block(a, if_(eq(x, 10000), break_(a, x)), inc(x), continue_(a)))), 10000 #print_(x),
     test.done()
 
-#xexports.Test =
+#exports.Test =
   "test block lamda 3": (test) ->
     a = makeLabel('a')
     b = makeLabel('b')
@@ -122,5 +118,12 @@ exports.Test =
     test.equal  solve(begin(funcall(lamda([x], assign(n, 0),
                                           block(a, if_(eq(x, 0), break_(a, n)), assign(n, add(n, dec(x))),
                                                    continue_(a))), 3), 12)), 12
+    test.done()
+
+#xexports.Test =
+  "test assign inc dec": (test) ->
+    a = vari('a')
+    blk = makeLabel('x')
+    test.equal  solve(begin(assign(a, 1),  block(blk, if_(eq(a, 10), break_(blk, a)), inc(a), continue_(blk)))), 10
     test.done()
 

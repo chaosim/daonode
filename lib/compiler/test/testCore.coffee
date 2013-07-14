@@ -95,7 +95,7 @@ exports.Test =
     test.equal  solve(macall(macro([x], x), print_(1))), null
     test.done()
 
-xexports.Test =
+exports.Test =
   "test macro2": (test) ->
     x = 'x'; y = 'y'; z = 'z'
     test.equal  solve(macall(macro([x, y, z], if_(x, y, z)), eq(1, 1), print_(1), print_(2))), null

@@ -83,14 +83,10 @@ exports.Test =
     test.equal  solve(il.begin(il.assign(f, il.userlamda([], il.clamda(v, il.assign(x, il.add(x, 1)), x))), 1)), 1
     test.done()
 
-
-#exports.Test =
-  "test label": (test) ->
-    x = 5
-    `label1://`
-    while 1
-      if not x
-        1; `break label1`;
-      else console.log x--
+exports.Test =
+  "test tailrecursive": (test) ->
+    x = il.uservar('x')
+    f = il.internalvar('f')
+    test.equal  solve(il.begin(il.assign(f, il.taillamda([x],  il.if_(il.eq(x,0), 0, f.call(il.sub(x, 1))))), f.call(3))), 0
     test.done()
 

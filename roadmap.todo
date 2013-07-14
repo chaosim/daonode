@@ -14,8 +14,9 @@ optimization:
   ✔ special assign convert to augment assign and inc/dec when toCode. @done (13-07-12 18:24)
   ✔ v = v, unnessary pure expression statement @done (13-07-03 08:35)
   ☐ loop optimization: assign, extract computation
-  ☐ loop, while, dowhile, until convert to javascript's while/do-while statement.
-  ☐ tail recursive
+  ✔ loop, while, dowhile, until convert to javascript's while/do-while statement. @done (13-07-14 14:24)
+  ✔ tail recursive @done (13-07-14 19:18)
+    # simple tail recursive: single recursive call, no mutual recursive.
   ✔ il.clamda can replace parmenter v directly @done (13-07-02 16:09)
   ☐ optimize parser terminal's interlang vop
   ✔ il.equalcont @done (13-06-23 21:03)

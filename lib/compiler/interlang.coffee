@@ -73,8 +73,6 @@ class ExpressionList extends Begin
   constructor: (@exps) -> super
   toString: () -> "exprlist(#{(toString(e) for e in @exps).join(',')})"
   separator: ','
-class TopBegin extends Begin
-  toString: () -> "topbegin(#{(toString(e) for e in @exps).join(',')})"
 class Print extends Begin
   toString: () -> "print(#{(toString(e) for e in @exps).join(',')})"
 class Lamda extends Element
@@ -85,12 +83,13 @@ class Lamda extends Element
   apply: (args) -> new Apply(@, args)
 il.UserLamda = class UserLamda extends Lamda
 class BlockLamda extends Lamda
+class TailRecursiveLamda extends Lamda
 class Clamda extends Lamda
   constructor: (@v, @body) -> @name = @toString(); @params = [v]
   toString: () -> "(#{toString(@v)} -> #{toString(@body)})"
   call: (value) ->
     result = replace(@body, @v.toString(), value)
-    if result.constructor is TopBegin then result.constructor = Begin
+    if result.constructor is Begin then result.constructor = Begin
     result
 
 class RecursiveClamda extends Clamda
@@ -374,7 +373,7 @@ JSFun::optimize = (env, compiler) ->  new JSFun(compiler.optimize(@fun, env))
 Lamda::optimizeApply = (args, env, compiler) ->
   exps = (il.assign(p, args[i]) for p, i in @params)
   exps.push @body
-  body = compiler.optimize(il.topbegin(exps...), env)
+  body = compiler.optimize(il.begin(exps...), env)
   body = postOptimize(body, compiler, env)
   if not isStatement(body) then body
   else
@@ -578,10 +577,18 @@ jsify = (exp, compiler, env) ->
   else exp
 
 Assign::jsify = (compiler, env) ->
+  if @_jsified then return @
   left = @left; exp = jsify(@exp, compiler, env)
   if left instanceof BlockVar and left.convertable
-    il.label(left, il.while_(1, convertBlockLamdaBody(exp.body, left)))
-  else new Assign(left, exp)
+    return il.label(left, il.while_(1, convertBlockLamdaBody(exp.body, left)))
+  else
+    if exp instanceof TailRecursiveLamda
+      exp.vari = left
+      body = convertTailRecursive(exp.body, exp)
+      exp.body = il.begin(exp.init, il.while_(1, body))
+  result = new Assign(left, exp)
+  result._jsified = true
+  result
 
 Throw::jsify = (compiler, env) -> @
 Return::jsify = (compiler, env) -> new @constructor(jsify(@value, compiler, env))
@@ -636,7 +643,8 @@ Apply::jsify = (compiler, env) ->
   if caller instanceof Lamda and caller.params.length is 0
     body = jsify(caller.body, compiler, env)
     if not isStatement(body) then body
-    else new Apply(new caller.constructor([], body), [])
+    else
+      new Apply(new caller.constructor([], insertReturn(body)), [])
   else
     if caller instanceof BlockVar and caller.convertable and caller.lamda is env.lamda
       caller
@@ -674,6 +682,117 @@ Lamda::convertBlockLamdaBody = (blockvar) ->
   @
 Apply::convertBlockLamdaBody = (blockvar) -> @
 
+convertTailRecursive = (exp, lamda) ->
+  exp_convertTailRecursive = exp?.convertTailRecursive
+  if exp_convertTailRecursive then exp_convertTailRecursive.call(exp, lamda)
+  else exp
+
+Assign::convertTailRecursive = (lamda) -> @
+If::convertTailRecursive = (lamda) -> new If(@test, convertTailRecursive(@then_, lamda), convertTailRecursive(@else_, lamda))
+LabelStatement::convertTailRecursive = (lamda) -> new LabelStatement(@label, convertTailRecursive(@statement, lamda))
+While::convertTailRecursive = (lamda) -> new While(@test, convertTailRecursive(@body, lamda))
+Break::convertTailRecursive = (lamda) -> @
+Try::convertTailRecursive = (lamda) ->
+  new Try(convertTailRecursive(@test, lamda), convertTailRecursive(@catches, lamda), convertTailRecursive(@final, lamda))
+Begin::convertTailRecursive = (lamda) ->
+  exps = []
+  for e in @exps
+    exps.push(convertTailRecursive e, lamda)
+  new @constructor(exps)
+Throw::convertTailRecursive = (lamda) -> @
+Return::convertTailRecursive = (lamda) ->
+  value = @value
+  if value instanceof If
+    then_ = insertReturn(value.then_)
+    then_ = convertTailRecursive(then_, lamda)
+    else_ = insertReturn(value.else_)
+    else_ = convertTailRecursive(else_, lamda)
+    new If(value.test, then_, else_)
+  else if hasCallOf(value, lamda.vari)
+    steps = []
+    result = convertTailResursiveCall(value, lamda, steps)
+    if result is lamda.vari
+      il.begin(steps...)
+    else il.begin(steps, il.assign(lamda.vari, result))
+  else
+    lamda.init = il.assign(lamda.vari, value)
+    new Return(lamda.vari)
+
+Lamda::convertTailRecursive = (lamda) -> @
+Apply::convertTailRecursive = (lamda) -> @
+
+convertTailResursiveCall = (exp, lamda, steps)  ->
+  exp_convertTailResursiveCall = exp?.convertTailResursiveCall
+  if exp_convertTailResursiveCall then exp_convertTailResursiveCall.call(exp, lamda, steps) 
+  else false
+
+Assign::convertTailResursiveCall = (lamda, steps)  -> new Assign(@left, convertTailResursiveCall(@exp, lamda, steps))
+If::convertTailResursiveCall = (lamda, steps)  ->
+  new If(@test, convertTailResursiveCall(@then_, lamda, steps), convertTailResursiveCall(@else_, lamda, steps))
+LabelStatement::convertTailResursiveCall = (lamda, steps)  -> throw new Error(@)
+While::convertTailResursiveCall = (lamda, steps)  -> throw new Error(@)
+Break::convertTailResursiveCall = (lamda, steps)  -> throw new Error(@)
+Try::convertTailResursiveCall = (lamda, steps)  ->
+  new Try(convertTailResursiveCall(@test, lamda, steps),\
+          convertTailResursiveCall(@catches, lamda, steps),\
+          convertTailResursiveCall(@final, lamda, steps))
+Begin::convertTailResursiveCall = (lamda, steps)  -> throw new Error(@)
+ExpressionList::convertTailResursiveCall = (lamda, steps)  ->
+  exps = []
+  for e in @exps
+    exps.push(convertTailResursiveCall e, lamda, steps)
+  new @constructor(exps)
+Throw::convertTailResursiveCall = (lamda, steps)  ->  throw new Error(@)
+Return::convertTailResursiveCall = (lamda, steps)  -> throw new Error(@)
+Lamda::convertTailResursiveCall = (lamdavar) -> throw new Error(@)
+Apply::convertTailResursiveCall = (lamda, steps)  ->
+  if @caller is lamda.vari
+    params = lamda.params
+    args = @args
+    for i in [0...args.length]
+      a = args[i]
+      param = params[i]
+      if a.toString() isnt param
+        steps.push(new Assign(param, a))
+    lamda.vari
+  else new Apply(convertTailResursiveCall(a, lamda, steps) for a in @args)
+
+VirtualOperation::convertTailResursiveCall = (lamda, steps)  ->
+  new @constructor(convertTailResursiveCall(a, lamda, steps) for a in @args)
+
+hasCallOf = (exp, vari) ->
+  exp_hasCallOf = exp?.hasCallOf
+  if exp_hasCallOf then exp_hasCallOf.call(exp, vari)
+  else false
+
+Assign::hasCallOf = (vari) -> @
+If::hasCallOf = (vari) -> hasCallOf(@then_, vari) or hasCallOf(@else_, vari)
+LabelStatement::hasCallOf = (vari) -> throw new Error(@)
+While::hasCallOf = (vari) -> throw new Error(@)
+Break::hasCallOf = (vari) -> @
+Try::hasCallOf = (vari) ->
+  new Try(hasCallOf(@test, vari), hasCallOf(@catches, vari), hasCallOf(@final, vari))
+Begin::hasCallOf = (vari) -> throw new Error(@)
+ExpressionList::hasCallOf = (vari) ->
+  exps = []
+  for e in @exps
+    exps.push(hasCallOf e, vari)
+  new @constructor(exps)
+Throw::hasCallOf = (vari) ->  false
+Return::hasCallOf = (vari) -> throw new Error(@)
+Lamda::hasCallOf = (varivar) -> false
+Apply::hasCallOf = (vari) ->
+  if @caller is vari then true
+  else
+    for a in @args
+      if hasCallOf(a, vari) then return true
+    return false
+
+VirtualOperation::hasCallOf = (vari) ->
+  for a in @args
+    if hasCallOf(a, vari) then return true
+  return false
+
 il.insertReturn = insertReturn = (exp) ->
   exp_insertReturn = exp?.insertReturn
   if exp_insertReturn then exp_insertReturn.call(exp)
@@ -703,9 +822,8 @@ Lamda::toCode = (compiler) ->
   for k of locals1
     if not hasOwnProperty.call(nonlocals, k) and k not in @params then locals.push(il.symbol(k))
   body = @body
-  if locals.length>0 then body = il.topbegin(il.vardecl(locals...), @body)
-  body = insertReturn(body)
-  if body instanceof Begin then body.constructor = TopBegin
+  if locals.length>0 then body = il.begin(il.vardecl(locals...), @body)
+  if body instanceof Begin then body.constructor = Begin
   "function(#{(a.toString() for a in @params).join(', ')}){#{compiler.toCode(body)}}"
 
 Fun::toCode = (compiler) -> @func.toString()
@@ -739,23 +857,23 @@ If::toCode = (compiler) ->
   compiler.parent = @
   else_ = @else_
   if @isStatement()
-    if else_ is undefined then "if (#{compiler.toCode(@test)}) #{compiler.toCode(@then_)}"
-    else "if (#{compiler.toCode(@test)}) #{compiler.toCode(@then_)} else #{compiler.toCode(@else_)}"
+    if else_ is undefined then "if (#{compiler.toCode(@test)}){#{compiler.toCode(@then_)}}"
+    else "if (#{compiler.toCode(@test)}){#{compiler.toCode(@then_)}}else{#{compiler.toCode(@else_)}}"
   else
     "(#{compiler.toCode(@test)}) ? (#{compiler.toCode(@then_)}) : (#{compiler.toCode(@else_)})"
 LabelStatement::toCode = (compiler) ->  "#{compiler.toCode(@label)}:#{compiler.toCode(@statement)}"
 For::toCode = (compiler) ->
-  "for (#{compiler.toCode(@init)};#{compiler.toCode(@test)};#{compiler.toCode(@step)}) #{compiler.toCode(@body)}"
+  "for (#{compiler.toCode(@init)};#{compiler.toCode(@test)};#{compiler.toCode(@step)}){#{compiler.toCode(@body)}}"
 ForIn::toCode = (compiler) ->
-  "for (#{compiler.toCode(@vari)} in #{compiler.toCode(@container)}) #{compiler.toCode(@body)}"
+  "for (#{compiler.toCode(@vari)} in #{compiler.toCode(@container)}){#{compiler.toCode(@body)}}"
 ForOf::toCode = (compiler) ->
-  "for (#{compiler.toCode(@vari)} of #{compiler.toCode(@container)}) #{compiler.toCode(@body)}"
+  "for (#{compiler.toCode(@vari)} of #{compiler.toCode(@container)}){#{compiler.toCode(@body)}}"
 While::toCode = (compiler) ->
-  "while (#{compiler.toCode(@test)}) #{compiler.toCode(@body)}"
+  "while (#{compiler.toCode(@test)}){#{compiler.toCode(@body)}}"
 DoWhile::toCode = (compiler) ->
-  "do #{compiler.toCode(@body)} while(#{compiler.toCode(@test)}) "
+  "do{#{compiler.toCode(@body)}}while(#{compiler.toCode(@test)}) "
 Try::toCode = (compiler) ->
-  "try #{compiler.toCode(@test)} #{compiler.toCode(@catches)} finally #{compiler.toCode(@final)}"
+  "try{ #{compiler.toCode(@test)}} #{compiler.toCode(@catches)} finally{#{compiler.toCode(@final)}}"
 Break::toCode = (compiler) ->
   if @label then "break #{compiler.toCode(@label)}"
   else "break"
@@ -764,7 +882,7 @@ Continue::toCode = (compiler) ->
   else "continue"
 Apply::toCode = (compiler) ->
   "#{expressionToCode(compiler, @caller)}(#{(compiler.toCode(arg) for arg in @args).join(', ')})"
-Begin::getCode = (compiler) ->
+Begin::toCode = (compiler) ->
   result = ''
   exps = @exps
   length = exps.length
@@ -776,9 +894,6 @@ Begin::getCode = (compiler) ->
   result += compiler.toCode(exps[i])
   result += ''
   result
-Begin::toCode = (compiler) -> "{#{@getCode(compiler)}}"
-TopBegin::toCode = (compiler) -> @getCode(compiler)
-ExpressionList::toCode = (compiler) -> @getCode(compiler)
 Deref::toCode = (compiler) ->  "solver.trail.deref(#{compiler.toCode(@exp)})"
 JSFun::toCode = (compiler) ->  if _.isString(@fun) then @fun  else compiler.toCode(@fun)
 
@@ -817,7 +932,7 @@ il.assign = (left, exp) -> new Assign(left, exp)
 il.if_ = (test, then_, else_) -> new If(test, then_, else_)
 il.deref = (exp) -> new Deref(exp)
 
-begin = (klass, exps...) ->
+il.begin = (exps...) ->
   length = exps.length
   if length is 0 then throw new Error "begin should have at least one exp"
   result = []
@@ -825,18 +940,17 @@ begin = (klass, exps...) ->
     if e instanceof Begin then result = result.concat(e.exps)
     else result.push e
   if result.length is 1 then return result[0]
-  else new klass(result)
-il.begin = (exps...) -> begin(Begin, exps...)
-il.topbegin = (exps...) -> begin(TopBegin, exps...)
+  else new Begin(result)
 il.print = (exps...) -> new Print(exps)
 il.return = (value) -> new Return(value)
 il.throw = (value) -> new Throw(value)
 il.new = (value) -> new New(value)
-il.lamda = (params, body...) -> new Lamda(params, il.topbegin(body...))
-il.userlamda = (params, body...) -> new UserLamda(params, il.topbegin(body...))
-il.blocklamda = (body...) -> new BlockLamda([], il.topbegin(body...))
-il.clamda = (v, body...) -> new Clamda(v, il.topbegin(body...))
-il.recclamda = (v, body...) -> new RecursiveClamda(v, il.topbegin(body...))
+il.lamda = (params, body...) -> new Lamda(params, il.begin(body...))
+il.taillamda = (params, body...) -> new TailRecursiveLamda(params, il.begin(body...))
+il.userlamda = (params, body...) -> new UserLamda(params, il.begin(body...))
+il.blocklamda = (body...) -> new BlockLamda([], il.begin(body...))
+il.clamda = (v, body...) -> new Clamda(v, il.begin(body...))
+il.recclamda = (v, body...) -> new RecursiveClamda(v, il.begin(body...))
 il.clamdabody = (v, body) -> new ClamdaBody(v, body)
 il.code = (string) -> new Code(string)
 il.jsfun = (fun) -> new JSFun(fun)
