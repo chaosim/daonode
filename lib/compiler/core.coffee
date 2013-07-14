@@ -278,9 +278,9 @@ exports.Compiler = class Compiler
       defaultExits = @exits[''] ?= []  # if no label, go here
       defaultExits.push(cont)
       continues = @continues[label] ?= []
-      f = @newvar('block'+label)
+      f = @newvar(il.blockvar('block'+label))
       f.isRecursive = true
-      fun = il.clamda(@newvar('v'), null)
+      fun = il.blocklamda(null)
       continues.push(f)
       defaultContinues = @continues[''] ?= []   # if no label, go here
       defaultContinues.push(f)
@@ -291,7 +291,7 @@ exports.Compiler = class Compiler
       if continues.length is 0 then delete @continues[label]
       defaultExits.pop()
       defaultContinues.pop()
-      il.begin(il.assign(f, fun), f.apply([null]))
+      il.begin(il.assign(f, fun), f.call())
 
     # break a block
     'break': (cont, label, value) ->
@@ -310,7 +310,7 @@ exports.Compiler = class Compiler
       continues = @continues[label]
       if not continues or continues==[] then throw new  Error(label)
       continueCont = continues[continues.length-1]
-      @protect(continueCont).call(null)
+      @protect(continueCont).call()
 
     # aka. lisp style catch/throw
     'catch': (cont, tag, forms...) ->

@@ -71,6 +71,27 @@ exports.Test =
     test.done()
 
 #exports.Test =
+  "test block lamda": (test) ->
+    a = makeLabel('a')
+    b = makeLabel('b')
+    x = vari('x'); f = vari('f')
+    test.equal  solve(block(a, funcall(lamda([x], break_(a, 2)), 1), 3)), 2
+    test.equal  solve(block(a, block(b, funcall(lamda([x], break_(b, 2)), 1), 1), 3)), 3
+    test.equal  solve(block(a, block(b, funcall(lamda([x], break_(a, 2)), 1), 1), 3)), 2
+    test.done()
+
+#exports.Test =
+  "test block lamda 2": (test) ->
+    a = makeLabel('a')
+    b = makeLabel('b')
+    x = vari('x'); f = vari('f')
+    test.equal  solve(block(a, block(b, assign(f, lamda([x], break_(b, 2))), funcall(f, 1), 1), 3)), 3
+#    test.equal  solve(begin(block(a, block(b, assign(f, lamda([x], break_(b, 2))), 1), 3), funcall(f, 1))), 3
+    test.equal  solve(block(a, block(b, assign(f, lamda([x], break_(a, 2))), funcall(f, 1), 1), 3)), 2
+    test.equal  solve(block(a, assign(f, lamda([x], block(b, break_(a, 2), 1))), funcall(f, 1), 3)), 2
+    test.done()
+
+#xexports.Test =
   "test loop while until": (test) ->
     x = vari('x')
     a = makeLabel('x')
@@ -82,7 +103,7 @@ exports.Test =
     test.equal  solve(begin(assign(x, 1),  until_(a, print_(x), inc(x), eq(x, 5)))), null
     test.done()
 
-#xexports.Test =
+#exports.Test =
   "test block break continue": (test) ->
     a = makeLabel('a')
     b = makeLabel('b')
@@ -93,8 +114,8 @@ exports.Test =
     test.equal  solve(begin(assign(x, 1),  block(a, if_(eq(x, 10000), break_(a, x)), inc(x), continue_(a)))), 10000 #print_(x),
     test.done()
 
-#exports.Test =
-  "test block lamda": (test) ->
+#xexports.Test =
+  "test block lamda 3": (test) ->
     a = makeLabel('a')
     b = makeLabel('b')
     x = vari('x'); f = vari('f'); n = vari('n')

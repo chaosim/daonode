@@ -29,6 +29,8 @@ class Var extends Element
   isValue: () -> @isConst
 class UserVar extends Var
 class InternalVar extends Var
+class BlockVar extends InternalVar
+  constructor: (@name, @suffix='') -> super; @convertable = true
 class Symbol extends Var
 
 class LocalDecl extends Element
@@ -55,19 +57,22 @@ class Assign extends Element
 class AugmentAssign extends Assign
   toString: () -> "#{toString(@left)} #{@operator} #{toString(@exp)}"
 
-class Return extends Element
-  constructor: (@value) -> super
-  toString: () -> "return(#{toString(@value)})"
-class New extends Return
-  toString: () -> "new(#{toString(@value)})"
+class New extends Element
+  constructor: (@value) -> super;
+  toString: () -> "#{@keyword} #{toString(@value)}"
+  keyword: 'new'
+class Return extends New
+  keyword: 'return'
 class Throw extends Return
-  toString: () -> "throw(#{toString(@value)})"
+  keyword: 'throw'
 class Begin extends Element
   constructor: (@exps) -> super
   toString: () -> "begin(#{(toString(e) for e in @exps).join(',')})"
+  separator: ';'
 class ExpressionList extends Begin
   constructor: (@exps) -> super
   toString: () -> "exprlist(#{(toString(e) for e in @exps).join(',')})"
+  separator: ','
 class TopBegin extends Begin
   toString: () -> "topbegin(#{(toString(e) for e in @exps).join(',')})"
 class Print extends Begin
@@ -78,8 +83,8 @@ class Lamda extends Element
   call: (args...) -> new Apply(@, args)
   isValue: () -> true
   apply: (args) -> new Apply(@, args)
-
 il.UserLamda = class UserLamda extends Lamda
+class BlockLamda extends Lamda
 class Clamda extends Lamda
   constructor: (@v, @body) -> @name = @toString(); @params = [v]
   toString: () -> "(#{toString(@v)} -> #{toString(@body)})"
@@ -166,7 +171,7 @@ Break::replace = (param, value) -> @
 Try::replace = (param, value) ->
   catches = ([replace(clause[0], param, value), replace(clause[1], param, value)] for clause in @catches)
   new Try(replace(@test, param, value), replace(catches, param, value), replace(@final, param, value))
-Return::replace = (param, value) -> new @constructor(replace(@value, param, value))
+New::replace = (param, value) -> new @constructor(replace(@value, param, value))
 Lamda::replace = (param, value) -> @ #param should not occur in Lamda
 Clamda::replace = (param, value) -> @  #param should not occur in Clamda
 IdCont::replace = (param, value) -> @
@@ -186,12 +191,12 @@ isParam = (vari, lamda) ->
     return vari.toString() is lamda.v.toString()
   else
     for param in lamda.params
-      if @.toString() is param.toString() then return true
+      if @toString() is param.toString() then return true
     return false
 
 Var::optimize = (env, compiler) ->
   lamda = env.lamda
-  if isParam(@, lamda) then lamda.vars[@] = @
+  if not isParam(@, lamda) then lamda.vars[@] = @
   if @isRecursive then return @
   outerEnv = env.outer
   if outerEnv
@@ -218,7 +223,10 @@ Assign::optimize = (env, compiler) ->
     if left instanceof UserVar
       userlamda = env.userlamda
       if userlamda and not isParam(left, userlamda) then userlamda.locals[left] = left
-    else if not isParam(left, lamda) then lamda.locals[left] = left
+    else
+      if not isParam(left, lamda)
+        lamda.locals[left] = left
+        if left instanceof BlockVar then left.lamda = lamda
   exp = compiler.optimize(@exp, env)
   assign = new @constructor(left, exp)
   if isValue(exp)
@@ -292,9 +300,7 @@ Try::optimize = (env, compiler) ->
   test = optimize(@test, env, compiler)
   new Try(test, @catches, @final)
 
-Return::optimize = (env, compiler) ->
-  env.lamda.haveReturn = true
-  new Return(compiler.optimize(@value, env))
+Return::optimize = (env, compiler) -> throw Error(@)
 Throw::optimize = (env, compiler) -> new Throw(compiler.optimize(@value, env))
 New::optimize = (env, compiler) -> new New(compiler.optimize(@value, env))
 Lamda::optimize = (env, compiler) ->
@@ -326,8 +332,7 @@ Lamda::optimize = (env, compiler) ->
         if not isParam(v, parentLamda) then parentVars[k] = v
         envValue = parentBindings[k]
         if envValue instanceof Assign then envValue._removed = false
-  @body = jsify(body, compiler, newEnv)
-  @_jsified = true
+  @body = postOptimize(body, compiler, newEnv)
   @_optimized = true
   return @
 
@@ -335,7 +340,12 @@ IdCont::optimize = (env, compiler) -> @
 
 Apply::optimize = (env, compiler) ->
   caller =  compiler.optimize(@caller, env)
-  caller.optimizeApply?(@args, env, compiler) or new Apply(caller, (compiler.optimize(a, env) for a in @args))
+  optimizeApply = caller.optimizeApply
+  if optimizeApply then optimizeApply.call(caller, @args, env, compiler)
+  else
+    if caller instanceof BlockVar and env.lamda isnt caller.lamda and env.lamda not instanceof BlockLamda
+      caller.convertable = false
+    new Apply(caller, (compiler.optimize(a, env) for a in @args))
 
 VirtualOperation::optimize = (env, compiler) ->
   args = (compiler.optimize(a, env) for a in @args)
@@ -347,18 +357,11 @@ VirtualOperation::optimize = (env, compiler) ->
 
 Begin::optimize = (env, compiler) ->
   result = []
-  waitPop = false
   for exp in @exps
     e = compiler.optimize(exp, env)
-    if isDeclaration(e) then continue
-    if waitPop then result.pop()
-    if e instanceof Begin
-      exps = e.exps
-      result = result.concat(exps)
-      waitPop = sideEffect(result[result.length-1]) is il.PURE
-    else
-      result.push e
-      waitPop = sideEffect(e) is il.PURE
+    if e instanceof Begin then result = result.concat(e.exps)
+    else result.push e
+    if e instanceof Throw or e instanceof Return then break
   if result.length>1 then  new @constructor(result)
   else result[0]
 Deref::optimize = (env, compiler) ->
@@ -372,12 +375,11 @@ Lamda::optimizeApply = (args, env, compiler) ->
   exps = (il.assign(p, args[i]) for p, i in @params)
   exps.push @body
   body = compiler.optimize(il.topbegin(exps...), env)
-  body = jsify(body, compiler, env)
+  body = postOptimize(body, compiler, env)
   if not isStatement(body) then body
   else
     lamda = new @constructor([], body)
     lamda._optimized = true
-    lamda._jsified = true
     new Apply(lamda, [])
 
 Clamda::optimizeApply = (args, env, compiler) ->
@@ -409,7 +411,7 @@ codeSize = (exp) ->
   else 1
 
 Var::codeSize = () -> 1
-Return::codeSize = () -> codeSize(@value)+1
+New::codeSize = () -> codeSize(@value)+1
 If::codeSize = () -> codeSize(@test) + codeSize(@then_) + codeSize(@else_) + 1
 LabelStatement::codeSize = () -> codeSize(@statement)
 For::codeSize = () -> codeSize(@init) + codeSize(@test) + codeSize(@step) + codeSize(@body)+2
@@ -429,7 +431,6 @@ boolize = (exp) ->
   else !!exp
 
 Var::boolize = () -> undefined
-Return::boolize = () -> boolize(@value)
 If::boolize = () ->
   b = boolize(@test)
   if b is undefined then undefined
@@ -487,7 +488,7 @@ Element::sideEffect = () -> il.IO
 Var::sideEffect = () -> il.PURE
 NonlocalDecl::sideEffect = () -> il.PURE
 Assign::sideEffect = () -> il.EFFECT
-Return::sideEffect = () -> sideEffect(@value)
+New::sideEffect = () -> sideEffect(@value)
 Throw::sideEffect = () -> il.IO
 New::sideEffect = () -> sideEffect(@value)
 If::sideEffect = () -> expsEffect [@test, @then_, @else_]
@@ -523,6 +524,50 @@ IO = (exp) ->
   if exp_IO then exp_IO.call(exp)
   else false
 
+postOptimize = (exp, compiler, env) ->
+  exp_postOptimize = exp?.postOptimize
+  if exp_postOptimize then exp_postOptimize.call(exp, compiler, env)
+  else exp
+
+Assign::postOptimize = (compiler, env) -> @
+If::postOptimize = (compiler, env) ->
+  new If(@test, postOptimize(@then_, compiler, env), postOptimize(@else_, compiler, env))
+LabelStatement::postOptimize = (compiler, env) ->  @
+While::postOptimize = (compiler, env) ->
+  new While(@test, postOptimize(@body, compiler, env))
+For::postOptimize = (compiler, env) ->
+  new For(postOptimize(@init, compiler, env), postOptimize(@test, compiler, env), postOptimize(@step, compiler, env), postOptimize(@body, compiler, env))
+ForIn::postOptimize = (compiler, env) ->
+  new ForIn(@vari, @container, postOptimize(@body, compiler, env))
+Break::postOptimize = (compiler, env) -> @
+Try::postOptimize = (compiler, env) ->
+  new Try(postOptimize(@test, compiler, env), postOptimize(@catches, compiler, env), postOptimize(@final, compiler, env))
+
+Begin::postOptimize = (compiler, env) ->
+  exps = @exps
+  length = exps.length
+  if length is 0 or length is 1
+    throw new  Error "begin should have at least one exp"
+  result = []
+  waitPop = false
+  for e in exps
+    if e instanceof Assign and e.removed() then continue
+    if waitPop then result.pop()
+    e = postOptimize(e, compiler, env)
+    if e instanceof Begin
+      result = result.concat e.exps
+      waitPop = sideEffect(result[result.length-1]) is il.PURE
+#    else if e instanceof LocalDecl then continue # include NonlocalDecl
+    else if e instanceof Throw then result.push e; break
+    else if e instanceof Return then throw new Error(e)
+    else result.push(e); waitPop = sideEffect(e) is il.PURE
+  if result.length==1 then result[0]
+  else new @constructor(result)
+
+Lamda::postOptimize = (compiler, env) -> @
+Apply::postOptimize = (compiler, env) -> @
+VirtualOperation::postOptimize = (compiler, env) -> @
+
 setJsified = (exp) -> exp?._jsified = true; exp
 isJsified = (exp) -> exp?._jsified or false
 
@@ -532,7 +577,13 @@ jsify = (exp, compiler, env) ->
   if exp_jsify then exp_jsify.call(exp, compiler, env)
   else exp
 
-Assign::jsify = (compiler, env) -> @exp = jsify(@exp, compiler, env); @
+Assign::jsify = (compiler, env) ->
+  left = @left; exp = jsify(@exp, compiler, env)
+  if left instanceof BlockVar and left.convertable
+    il.label(left, il.while_(1, convertBlockLamdaBody(exp.body, left)))
+  else new Assign(left, exp)
+
+Throw::jsify = (compiler, env) -> @
 Return::jsify = (compiler, env) -> new @constructor(jsify(@value, compiler, env))
 If::jsify = (compiler, env) ->
   new If(jsify(@test, compiler, env), jsify(@then_, compiler, env), jsify(@else_, compiler, env))
@@ -555,12 +606,12 @@ Begin::jsify = (compiler, env) ->
   result = []
   waitPop = false
   for e in exps
-    if e instanceof Assign and e.removed() then continue
     if waitPop then result.pop()
     e = jsify(e, compiler, env)
     if e instanceof Begin
       result = result.concat e.exps
       waitPop = sideEffect(result[result.length-1]) is il.PURE
+    else if e instanceof LocalDecl then continue # include NonlocalDecl
     else if e instanceof New
       result.push e
       waitPop = sideEffect(e) is il.PURE
@@ -571,7 +622,13 @@ Begin::jsify = (compiler, env) ->
   else new @constructor(result)
 
 Lamda::jsify = (compiler, env) ->
-  if not @_jsifyied then @body = jsify(@body, compiler, env); @_jsifyied = true
+  if not @_jsifyied
+    lamda = env.lamda
+    env.lamda = @
+    body = jsify(@body, compiler, env)
+    env.lamda = lamda
+    @body = insertReturn(body)
+    @_jsifyied = true
   @
 
 Apply::jsify = (compiler, env) ->
@@ -581,9 +638,41 @@ Apply::jsify = (compiler, env) ->
     if not isStatement(body) then body
     else new Apply(new caller.constructor([], body), [])
   else
-    new @constructor(jsify(@caller, compiler, env), (jsify(a, compiler, env) for a in @args))
+    if caller instanceof BlockVar and caller.convertable and caller.lamda is env.lamda
+      caller
+    else new @constructor(jsify(@caller, compiler, env), (jsify(a, compiler, env) for a in @args))
 
 VirtualOperation::jsify = (compiler, env) -> new @constructor(jsify(a, compiler, env) for a in @args)
+
+convertBlockLamdaBody = (exp, blockvar) ->
+  exp_convertBlockLamdaBody = exp?.convertBlockLamdaBody
+  if exp_convertBlockLamdaBody then exp_convertBlockLamdaBody.call(exp, blockvar)
+  else exp
+
+Assign::convertBlockLamdaBody = (blockvar) -> @
+If::convertBlockLamdaBody = (blockvar) -> new If(@test, convertBlockLamdaBody(@then_, blockvar), convertBlockLamdaBody(@else_, blockvar))
+LabelStatement::convertBlockLamdaBody = (blockvar) -> new LabelStatement(@label, convertBlockLamdaBody(@statement, blockvar))
+While::convertBlockLamdaBody = (blockvar) -> new While(@test, convertBlockLamdaBody(@body, blockvar))
+Break::convertBlockLamdaBody = (blockvar) -> @
+Try::convertBlockLamdaBody = (blockvar) ->
+  new Try(convertBlockLamdaBody(@test, blockvar), convertBlockLamdaBody(@catches, blockvar), convertBlockLamdaBody(@final, blockvar))
+Begin::convertBlockLamdaBody = (blockvar) ->
+  exps = []
+  for e in @exps
+    exps.push(convertBlockLamdaBody e, blockvar)
+  new @constructor(exps)
+Throw::convertBlockLamdaBody = (blockvar) -> @
+Return::convertBlockLamdaBody = (blockvar) ->
+  value = @value
+  if value instanceof Apply and value.caller is blockvar
+    il.continue_(blockvar)
+  else if value instanceof BlockVar then @
+  else new Begin([il.assign(blockvar, @value), il.break_(blockvar)])
+
+Lamda::convertBlockLamdaBody = (blockvar) ->
+  @body = convertBlockLamdaBody(@body, blockvar)
+  @
+Apply::convertBlockLamdaBody = (blockvar) -> @
 
 il.insertReturn = insertReturn = (exp) ->
   exp_insertReturn = exp?.insertReturn
@@ -591,8 +680,8 @@ il.insertReturn = insertReturn = (exp) ->
   else new Return(exp)
 
 Assign::insertReturn = () -> il.begin(@, il.return(@left))
-Return::insertReturn = () -> @
 New::insertReturn = () -> new Return(@)
+Return::insertReturn = () -> @
 If::insertReturn = () ->
   if @isStatement() then new If(@test, insertReturn(@then_), insertReturn(@else_))
   else new Return(@)
@@ -600,8 +689,7 @@ LabelStatement::insertReturn = () -> new LabelStatement(@label, insertReturn(@st
 While::insertReturn = () ->
   new Begin(new While(@test, insertReturn(@body)), new Return())
 Break::insertReturn = () -> @
-Try::insertReturn = () ->
-  new Try(@test, insertReturn(@catches), insertReturn(@final))
+Try::insertReturn = () -> new Try(@test, insertReturn(@catches), insertReturn(@final))
 Begin::insertReturn = () ->
   exps = @exps
   length = exps.length
@@ -621,9 +709,7 @@ Lamda::toCode = (compiler) ->
   "function(#{(a.toString() for a in @params).join(', ')}){#{compiler.toCode(body)}}"
 
 Fun::toCode = (compiler) -> @func.toString()
-Return::toCode = (compiler) -> "return #{compiler.toCode(@value)};"
-Throw::toCode = (compiler) -> "throw #{compiler.toCode(@value)};"
-New::toCode = (compiler) -> "new #{compiler.toCode(@value)}"
+New::toCode = (compiler) -> "#{@keyword} #{compiler.toCode(@value)}"
 Var::toCode = (compiler) -> @toString()
 NonlocalDecl::toCode = (compiler) -> ''
 Assign::toCode = (compiler) ->
@@ -657,7 +743,7 @@ If::toCode = (compiler) ->
     else "if (#{compiler.toCode(@test)}) #{compiler.toCode(@then_)} else #{compiler.toCode(@else_)}"
   else
     "(#{compiler.toCode(@test)}) ? (#{compiler.toCode(@then_)}) : (#{compiler.toCode(@else_)})"
-LabelStatement::toCode = (compiler) ->  "#{compiler.toCode(@then_)}:#{compiler.toCode(@statement)}"
+LabelStatement::toCode = (compiler) ->  "#{compiler.toCode(@label)}:#{compiler.toCode(@statement)}"
 For::toCode = (compiler) ->
   "for (#{compiler.toCode(@init)};#{compiler.toCode(@test)};#{compiler.toCode(@step)}) #{compiler.toCode(@body)}"
 ForIn::toCode = (compiler) ->
@@ -678,19 +764,7 @@ Continue::toCode = (compiler) ->
   else "continue"
 Apply::toCode = (compiler) ->
   "#{expressionToCode(compiler, @caller)}(#{(compiler.toCode(arg) for arg in @args).join(', ')})"
-Begin::toCode = (compiler) ->
-  result = '{'
-  exps = @exps
-  length = exps.length
-  i = 0
-  while i<length-1
-    code = compiler.toCode(exps[i++]);
-    if code is '' then continue
-    else result += code + ';'
-  result += compiler.toCode(exps[i])
-  result += '}'
-  result
-TopBegin::toCode = (compiler) ->
+Begin::getCode = (compiler) ->
   result = ''
   exps = @exps
   length = exps.length
@@ -698,20 +772,13 @@ TopBegin::toCode = (compiler) ->
   while i<length-1
     code = compiler.toCode(exps[i++]);
     if code is '' then continue
-    else result += code + ';'
+    else result += code + @separator
   result += compiler.toCode(exps[i])
+  result += ''
   result
-ExpressionList::toCode = (compiler) ->
-  result = ''
-  exps = @exps
-  length = exps.length
-  i = 0
-  while i<length-1
-    code = compiler.toCode(exps[i++]);
-    if code is '' then continue
-    else result += code + ','
-  result += compiler.toCode(exps[i])
-  result
+Begin::toCode = (compiler) -> "{#{@getCode(compiler)}}"
+TopBegin::toCode = (compiler) -> @getCode(compiler)
+ExpressionList::toCode = (compiler) -> @getCode(compiler)
 Deref::toCode = (compiler) ->  "solver.trail.deref(#{compiler.toCode(@exp)})"
 JSFun::toCode = (compiler) ->  if _.isString(@fun) then @fun  else compiler.toCode(@fun)
 
@@ -723,16 +790,17 @@ isStatement = (exp) ->
 If::isStatement = () -> isStatement(@then_) or isStatement(@else_)
 LabelStatement::isStatement = () -> true
 While::isStatement = () -> true
+For::isStatement = () -> true
+ForIn::isStatement = () -> true
+ForOf::isStatement = () -> true
 Try::isStatement = () -> true
 Begin::isStatement = () -> true
-ExpressionList::isStatement = () -> true
 Return::isStatement = () -> true
-New::isStatement = () -> false
-Assign::isStatement = () -> true
 
 vari = (klass, name) -> new klass(name)
 il.uservar = (name) -> new UserVar(name)
 il.internalvar = (name) -> new InternalVar( name)
+il.blockvar = (name) -> new BlockVar( name)
 il.symbol = (name) -> new Symbol(name)
 
 varattr = (klass, name) ->
@@ -766,6 +834,7 @@ il.throw = (value) -> new Throw(value)
 il.new = (value) -> new New(value)
 il.lamda = (params, body...) -> new Lamda(params, il.topbegin(body...))
 il.userlamda = (params, body...) -> new UserLamda(params, il.topbegin(body...))
+il.blocklamda = (body...) -> new BlockLamda([], il.topbegin(body...))
 il.clamda = (v, body...) -> new Clamda(v, il.topbegin(body...))
 il.recclamda = (v, body...) -> new RecursiveClamda(v, il.topbegin(body...))
 il.clamdabody = (v, body) -> new ClamdaBody(v, body)
