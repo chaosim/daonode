@@ -86,17 +86,23 @@ exports.Test =
     test.equal  solve(il.begin(il.assign(f, il.userlamda([], il.clamda(v, il.assign(x, il.add(x, 1)), x))), 1)), 1
     test.done()
 
-xexports.Test =
+#xexports.Test =
   "test optrec idfunc": (test) ->
     x = uservar('x')
     f = internalvar('f')
     test.equal  solve(il.begin(il.assign(f, il.optrec([x],  il.if_(il.eq(x,0), 0, f.call(il.sub(x, 1))))), f.call(3))), 0
     test.done()
 
-exports.Test =
+#exports.Test =
   "test tailrec fibonacci": (test) ->
     n = uservar('n'); a = uservar('a'); b = uservar('b')
     f = internalvar('f')
 #    test.equal  solve(il.add(1,2)), 3
     test.equal  solve(il.begin(il.assign(f, il.tailrec([n, a, b],  il.if_(il.eq(n,0), a, f.call(il.sub(n, 1), b, il.add(a, b))))), f.call(3, 0, 1))), 2
+    test.done()
+
+exports.Test =
+  "test switch": (test) ->
+    a = 0; b = 1; c = 3;
+    `switch (a){ case b: case c: break}`
     test.done()

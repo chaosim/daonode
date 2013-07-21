@@ -34,6 +34,8 @@ exports.iff = iff = (clauses, else_) ->
     if length is 1 then if_(test, then_, else_)
     else if_(test, then_, iff(clauses[1...], else_))
 
+exports.switch_ = (test, clauses, else_) -> ['switch', test, clauses, else_]
+
 exports.funcall = (caller, args...) -> ["funcall", caller].concat(args)
 exports.macall = (caller, args...) -> ["macall", caller].concat(args)
 

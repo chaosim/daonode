@@ -153,8 +153,12 @@ exports.Compiler = class Compiler
     'suffixdecp': (cont, item) ->  @leftValueCont(cont, "suffixdecp", item)
 
     "if": (cont, test, then_, else_) ->
-        v = @newvar('v')
-        @cont(test, @clamda(v, il.if_(v, @cont(then_, cont), @cont(else_, cont))))
+      v = @newvar('v')
+      @cont(test, @clamda(v, il.if_(v, @cont(then_, cont), @cont(else_, cont))))
+
+    "if": (cont, test, clauses, else_) ->
+      v = @newvar('v')
+      @cont(test, @clamda(v, il.switch_(v, @cont(then_, cont), @cont(else_, cont))))
 
     "jsfun": (cont, func) ->
       f = il.jsfun(func)

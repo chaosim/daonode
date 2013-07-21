@@ -19,7 +19,7 @@ optimization:
   ✔ loop, while, dowhile, until convert to javascript's while/do-while statement. @done (13-07-14 14:24)
   ✔ non tail recursive @done (13-07-14 19:18)
     # simple recursive: single recursive call, no mutual recursive.
-  ☐ true tail recursive
+  ✔ true tail recursive @done (13-07-21 15:51)
   ✔ il.clamda can replace parmenter v directly @done (13-07-02 16:09)
   ☐ optimize parser terminal's interlang vop
   ✔ il.equalcont @done (13-06-23 21:03)
