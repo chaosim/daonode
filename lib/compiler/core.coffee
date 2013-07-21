@@ -873,6 +873,8 @@ class CpsEnv extends Env
 
 exports.OptimizationEnv = class OptimizationEnv extends CpsEnv
   constructor: (@outer, @bindings, @lamda) ->
+    if @outer then @indexMap = @outer.indexMap; @vars = @outer.vars
+    else @indexMap = {}; @vars = {}
     if lamda instanceof il.UserLamda then @userlamda = lamda
     else while outer
         if outer.userlamda then @userlamda = outer.userlamda; return

@@ -9,12 +9,6 @@ exports.NotImplement = class NotImplement extends Error
 
 toString = (o) -> o?.toString?() or o
 
-expressionToCode = (compiler, exp) ->
-  if exp instanceof Var or _.isString(exp) or _.isNumber(exp) or _.isArray(exp)\
-     or exp instanceof VirtualOperation and (exp.name=='attr' or exp.name=='index')
-    compiler.toCode(exp)
-  else "(#{compiler.toCode(exp)})"
-
 class Element
   constructor: () ->  @name = @toString()
   call: (args...) -> new Apply(@, args)
@@ -83,7 +77,8 @@ class Lamda extends Element
   apply: (args) -> new Apply(@, args)
 il.UserLamda = class UserLamda extends Lamda
 class BlockLamda extends Lamda
-class TailRecursiveLamda extends Lamda
+class OptimizableRecuisiveLamda extends Lamda
+class TailRecuisiveLamda extends Lamda
 class Clamda extends Lamda
   constructor: (@v, @body) -> @name = @toString(); @params = [v]
   toString: () -> "(#{toString(@v)} -> #{toString(@body)})"
@@ -105,9 +100,11 @@ exports.VirtualOperation = class VirtualOperation extends Element
   toString: () -> "vop_#{@_name}(#{(toString(arg) for arg in @args).join(', ')})"
 class BinaryOperation extends VirtualOperation
   toString: () -> "#{toString(@args[0])}#{@symbol}#{toString(@args[1])}"
+  toCode: (compiler) -> args = @args; "#{expressionToCode(compiler, args[0])} #{@symbol} #{expressionToCode(compiler, args[1])}"
   _effect: false
 class UnaryOperation extends BinaryOperation
   toString: () -> "#{@symbol}#{toString(@args[0])}"
+  toCode: (compiler) -> "#{@symbol}#{expressionToCode(compiler, @args[0])}"
   _effect: false
 class Fun extends Element
   constructor: (@func) -> super
@@ -299,9 +296,7 @@ Try::optimize = (env, compiler) ->
   test = optimize(@test, env, compiler)
   new Try(test, @catches, @final)
 
-Return::optimize = (env, compiler) -> throw Error(@)
-Throw::optimize = (env, compiler) -> new Throw(compiler.optimize(@value, env))
-New::optimize = (env, compiler) -> new New(compiler.optimize(@value, env))
+New::optimize = (env, compiler) -> new @constructor(compiler.optimize(@value, env))
 Lamda::optimize = (env, compiler) ->
   parentLamda = env.lamda
   parentBindings = env.bindings
@@ -582,10 +577,36 @@ Assign::jsify = (compiler, env) ->
   if left instanceof BlockVar and left.convertable
     return il.label(left, il.while_(1, convertBlockLamdaBody(exp.body, left)))
   else
-    if exp instanceof TailRecursiveLamda
+    if exp instanceof OptimizableRecuisiveLamda
+      params = exp.params
+      length = params.length
       exp.vari = left
-      body = convertTailRecursive(exp.body, exp)
+      if length>1
+        exp.tempParams = tempParams = (params[i] for i in [0...length])
+        getConvertParameters(exp.body, compiler, exp)
+        body = convertOptRecursive(exp.body, exp)
+        exps = [body]
+        for i in [0...length]
+          if tempParams[i] isnt params[i]
+            exps.push(il.assign(params[i], tempParams[i]))
+        body = il.begin(exps...)
+      else body = convertOptRecursive(exp.body, exp)
       exp.body = il.begin(exp.init, il.while_(1, body))
+    if exp instanceof TailRecuisiveLamda
+      params = exp.params
+      length = params.length
+      exp.vari = left
+      if length>1
+        exp.tempParams = tempParams = (params[i] for i in [0...length])
+        getConvertParameters(exp.body, compiler, exp)
+        body = convertTailRecursive(exp.body, exp)
+        exps = [body]
+        for i in [0...length]
+          if tempParams[i] isnt params[i]
+            exps.push(il.assign(params[i], tempParams[i]))
+        body = il.begin(exps...)
+      else body = convertTailRecursive(exp.body, exp)
+      exp.body = il.while_(1, body)
   result = new Assign(left, exp)
   result._jsified = true
   result
@@ -682,6 +703,84 @@ Lamda::convertBlockLamdaBody = (blockvar) ->
   @
 Apply::convertBlockLamdaBody = (blockvar) -> @
 
+convertOptRecursive = (exp, lamda) ->
+  exp_convertOptRecursive = exp?.convertOptRecursive
+  if exp_convertOptRecursive then exp_convertOptRecursive.call(exp, lamda)
+  else exp
+
+Assign::convertOptRecursive = (lamda) -> @
+If::convertOptRecursive = (lamda) -> new If(@test, convertOptRecursive(@then_, lamda), convertOptRecursive(@else_, lamda))
+LabelStatement::convertOptRecursive = (lamda) -> new LabelStatement(@label, convertOptRecursive(@statement, lamda))
+While::convertOptRecursive = (lamda) -> new While(@test, convertOptRecursive(@body, lamda))
+Break::convertOptRecursive = (lamda) -> @
+Try::convertOptRecursive = (lamda) ->
+  new Try(convertOptRecursive(@test, lamda), convertOptRecursive(@catches, lamda), convertOptRecursive(@final, lamda))
+Begin::convertOptRecursive = (lamda) ->
+  exps = []
+  for e in @exps
+    exps.push(convertOptRecursive e, lamda)
+  new @constructor(exps)
+Throw::convertOptRecursive = (lamda) -> @
+Return::convertOptRecursive = (lamda) ->
+  value = @value
+  if value instanceof If
+    then_ = insertReturn(value.then_)
+    then_ = convertOptRecursive(then_, lamda)
+    else_ = insertReturn(value.else_)
+    else_ = convertOptRecursive(else_, lamda)
+    new If(value.test, then_, else_)
+  else if hasCallOf(value, lamda.vari)
+    steps = []
+    result = convertOptResursiveCall(value, lamda, steps)
+    if result is lamda.vari
+      il.begin(steps...)
+    else il.begin(il.assign(lamda.vari, result), steps)
+  else
+    lamda.init = il.assign(lamda.vari, value)
+    new Return(lamda.vari)
+
+Lamda::convertOptRecursive = (lamda) -> @
+Apply::convertOptRecursive = (lamda) -> @
+
+convertOptResursiveCall = (exp, lamda, steps)  ->
+  exp_convertOptResursiveCall = exp?.convertOptResursiveCall
+  if exp_convertOptResursiveCall then exp_convertOptResursiveCall.call(exp, lamda, steps) 
+  else false
+
+Assign::convertOptResursiveCall = (lamda, steps)  -> new Assign(@left, convertOptResursiveCall(@exp, lamda, steps))
+If::convertOptResursiveCall = (lamda, steps)  ->
+  new If(@test, convertOptResursiveCall(@then_, lamda, steps), convertOptResursiveCall(@else_, lamda, steps))
+LabelStatement::convertOptResursiveCall = (lamda, steps)  -> throw new Error(@)
+While::convertOptResursiveCall = (lamda, steps)  -> throw new Error(@)
+Break::convertOptResursiveCall = (lamda, steps)  -> throw new Error(@)
+Try::convertOptResursiveCall = (lamda, steps)  ->
+  new Try(convertOptResursiveCall(@test, lamda, steps),\
+          convertOptResursiveCall(@catches, lamda, steps),\
+          convertOptResursiveCall(@final, lamda, steps))
+Begin::convertOptResursiveCall = (lamda, steps)  -> throw new Error(@)
+ExpressionList::convertOptResursiveCall = (lamda, steps)  ->
+  exps = []
+  for e in @exps
+    exps.push(convertOptResursiveCall e, lamda, steps)
+  new @constructor(exps)
+Throw::convertOptResursiveCall = (lamda, steps)  ->  throw new Error(@)
+Return::convertOptResursiveCall = (lamda, steps)  -> throw new Error(@)
+Lamda::convertOptResursiveCall = (lamdavar) -> throw new Error(@)
+Apply::convertOptResursiveCall = (lamda, steps)  ->
+  if @caller is lamda.vari
+    params = lamda.params
+    args = @args
+    for i in [0...args.length]
+      a = args[i]
+      param = params[i]
+      if a.toString() isnt param
+        steps.push(new Assign(param, a))
+    lamda.vari
+  else new Apply(convertOptResursiveCall(a, lamda, steps) for a in @args)
+
+VirtualOperation::convertOptResursiveCall = (lamda, steps)  ->
+  new @constructor(convertOptResursiveCall(a, lamda, steps) for a in @args)
+
 convertTailRecursive = (exp, lamda) ->
   exp_convertTailRecursive = exp?.convertTailRecursive
   if exp_convertTailRecursive then exp_convertTailRecursive.call(exp, lamda)
@@ -713,17 +812,16 @@ Return::convertTailRecursive = (lamda) ->
     result = convertTailResursiveCall(value, lamda, steps)
     if result is lamda.vari
       il.begin(steps...)
-    else il.begin(steps, il.assign(lamda.vari, result))
+    else il.begin(il.assign(lamda.vari, result), steps)
   else
-    lamda.init = il.assign(lamda.vari, value)
-    new Return(lamda.vari)
+    @
 
 Lamda::convertTailRecursive = (lamda) -> @
 Apply::convertTailRecursive = (lamda) -> @
 
 convertTailResursiveCall = (exp, lamda, steps)  ->
   exp_convertTailResursiveCall = exp?.convertTailResursiveCall
-  if exp_convertTailResursiveCall then exp_convertTailResursiveCall.call(exp, lamda, steps) 
+  if exp_convertTailResursiveCall then exp_convertTailResursiveCall.call(exp, lamda, steps)
   else false
 
 Assign::convertTailResursiveCall = (lamda, steps)  -> new Assign(@left, convertTailResursiveCall(@exp, lamda, steps))
@@ -747,7 +845,7 @@ Return::convertTailResursiveCall = (lamda, steps)  -> throw new Error(@)
 Lamda::convertTailResursiveCall = (lamdavar) -> throw new Error(@)
 Apply::convertTailResursiveCall = (lamda, steps)  ->
   if @caller is lamda.vari
-    params = lamda.params
+    params = lamda.tempParams
     args = @args
     for i in [0...args.length]
       a = args[i]
@@ -759,6 +857,76 @@ Apply::convertTailResursiveCall = (lamda, steps)  ->
 
 VirtualOperation::convertTailResursiveCall = (lamda, steps)  ->
   new @constructor(convertTailResursiveCall(a, lamda, steps) for a in @args)
+
+getConvertParameters = (exp, compiler, lamda) ->
+  exp_getConvertParameters = exp?.getConvertParameters
+  if exp_getConvertParameters then exp_getConvertParameters.call(exp, compiler, lamda)
+
+Assign::getConvertParameters = (compiler, lamda) -> getConvertParameters(@exp, compiler, lamda)
+If::getConvertParameters = (compiler, lamda) ->
+  getConvertParameters(@then_, compiler, lamda)
+  getConvertParameters(@else_, compiler, lamda)
+LabelStatement::getConvertParameters = (compiler, lamda) -> getConvertParameters(@body, compiler, lamda)
+While::getConvertParameters = (compiler, lamda) ->
+  getConvertParameters(@test, compiler, lamda)
+  getConvertParameters(@body, compiler, lamda)
+Break::getConvertParameters = (compiler, lamda) -> @
+Try::getConvertParameters = (compiler, lamda) ->
+  getConvertParameters(@test, compiler, lamda)
+  getConvertParameters(@catches, compiler, lamda)
+  getConvertParameters(@final, compiler, lamda)
+Begin::getConvertParameters = (compiler, lamda) -> getConvertParameters e, compiler, lamda
+New::getConvertParameters = (compiler, lamda) -> getConvertParameters @value, compiler, lamda
+Lamda::getConvertParameters = (varivar) ->
+Apply::getConvertParameters = (compiler, lamda) ->
+  caller = @caller
+  if caller is lamda.vari
+    params = lamda.params; tempParams = lamda.tempParams
+    length = params.length
+    args = @args
+    for i in [1...length]
+      useConvertParams(args[i],  params[0...i])
+    for i in [0...length]
+      if params[i].usedConvertParam
+        tempParams[i] = compiler.newvar(params[i])
+        lamda.locals[tempParams[i]] = true
+  else
+    getConvertParameters(caller, compiler, lamda)
+    for a in @args
+      getConvertParameters(a, compiler, lamda)
+
+VirtualOperation::getConvertParameters = (compiler, lamda) ->
+  for a in @args then getConvertParameters(a, compiler, lamda)
+
+useConvertParams = (exp, vars) ->
+  exp_useConvertParams = exp?.useConvertParams
+  if exp_useConvertParams then exp_useConvertParams.call(exp, vars)
+  else false
+
+Assign::useConvertParams = (vars) -> useConvertParams(@exp, vars)
+Var::useConvertParams = (vars) ->
+  for v in vars
+    if v is @ then v.usedConvertParam = true; return
+If::useConvertParams = (vars) ->
+  useConvertParams(@test, vars)
+  useConvertParams(@then_, vars)
+  useConvertParams(@else_, vars)
+LabelStatement::useConvertParams = (vars) -> throw new Error(@)
+While::useConvertParams = (vars) -> throw new Error(@)
+Break::useConvertParams = (vars) -> throw new Error(@)
+Try::useConvertParams = (vars) -> throw new Error(@)
+Begin::useConvertParams = (vars) -> throw new Error(@)
+ExpressionList::useConvertParams = (vars) -> useConvertParams e, vars
+Throw::useConvertParams = (vars) ->  throw new Error(@)
+Return::useConvertParams = (vars) -> throw new Error(@)
+Lamda::useConvertParams = (varivar) ->
+Apply::useConvertParams = (vars) ->
+  useConvertParams(@caller, vars)
+  for a in @args
+    useConvertParams(a, vars)
+VirtualOperation::useConvertParams = (vars) ->
+  for a in @args
+    useConvertParams(a, vars)
 
 hasCallOf = (exp, vari) ->
   exp_hasCallOf = exp?.hasCallOf
@@ -849,7 +1017,7 @@ Assign::toCode = (compiler) ->
         when '*', '/', '%', '|', '&', '^', '||', '&&', '<<', '>>'
           "#{left} #{symbol}= #{args1}"
         else "#{left} = #{args0} #{symbol} #{args1}"
-    else "#{left} = #{args0} #{symbol} #{args1}"
+    else "#{left} = #{args0} #{exp.symbol} #{args1}"
   else "#{left} = #{compiler.toCode(exp)}"
 
 AugmentAssign::toCode = (compiler) -> "#{compiler.toCode(@left)} #{@operator} #{compiler.toCode(@exp)}"
@@ -860,7 +1028,7 @@ If::toCode = (compiler) ->
     if else_ is undefined then "if (#{compiler.toCode(@test)}){#{compiler.toCode(@then_)}}"
     else "if (#{compiler.toCode(@test)}){#{compiler.toCode(@then_)}}else{#{compiler.toCode(@else_)}}"
   else
-    "(#{compiler.toCode(@test)}) ? (#{compiler.toCode(@then_)}) : (#{compiler.toCode(@else_)})"
+    "(#{compiler.toCode(@test)}) ? #{expressionToCode(compiler, @then_)} : #{expressionToCode(compiler, @else_)}"
 LabelStatement::toCode = (compiler) ->  "#{compiler.toCode(@label)}:#{compiler.toCode(@statement)}"
 For::toCode = (compiler) ->
   "for (#{compiler.toCode(@init)};#{compiler.toCode(@test)};#{compiler.toCode(@step)}){#{compiler.toCode(@body)}}"
@@ -881,7 +1049,8 @@ Continue::toCode = (compiler) ->
   if @label then "continue #{compiler.toCode(@label)}"
   else "continue"
 Apply::toCode = (compiler) ->
-  "#{expressionToCode(compiler, @caller)}(#{(compiler.toCode(arg) for arg in @args).join(', ')})"
+  caller = @caller
+  "#{expressionToCode(compiler, caller)}(#{(compiler.toCode(arg) for arg in @args).join(', ')})"
 Begin::toCode = (compiler) ->
   result = ''
   exps = @exps
@@ -896,6 +1065,17 @@ Begin::toCode = (compiler) ->
   result
 Deref::toCode = (compiler) ->  "solver.trail.deref(#{compiler.toCode(@exp)})"
 JSFun::toCode = (compiler) ->  if _.isString(@fun) then @fun  else compiler.toCode(@fun)
+
+Assign::needParenthesis = true
+BinaryOperation::needParenthesis = true
+UnaryOperation::needParenthesis = true
+ExpressionList::needParenthesis = true
+Lamda::needParenthesis = true
+
+expressionToCode = (compiler, exp) ->
+  if not exp.needParenthesis and exp not instanceof Function
+    compiler.toCode(exp)
+  else "(#{compiler.toCode(exp)})"
 
 isStatement = (exp) ->
   exp_isStatement = exp?.isStatement
@@ -946,7 +1126,8 @@ il.return = (value) -> new Return(value)
 il.throw = (value) -> new Throw(value)
 il.new = (value) -> new New(value)
 il.lamda = (params, body...) -> new Lamda(params, il.begin(body...))
-il.taillamda = (params, body...) -> new TailRecursiveLamda(params, il.begin(body...))
+il.optrec = (params, body...) -> new OptimizableRecuisiveLamda(params, il.begin(body...))
+il.tailrec = (params, body...) -> new TailRecuisiveLamda(params, il.begin(body...))
 il.userlamda = (params, body...) -> new UserLamda(params, il.begin(body...))
 il.blocklamda = (body...) -> new BlockLamda([], il.begin(body...))
 il.clamda = (v, body...) -> new Clamda(v, il.begin(body...))
@@ -958,7 +1139,6 @@ il.jsfun = (fun) -> new JSFun(fun)
 binary = (symbol, func, effect=il.PURE) ->
   class Binary extends BinaryOperation
     symbol: symbol
-    toCode: (compiler) -> args = @args; "#{expressionToCode(compiler, args[0])} #{symbol} #{expressionToCode(compiler, args[1])}"
     func: func
     _effect: effect
   (x, y) -> new Binary([x, y])
@@ -967,7 +1147,6 @@ unary = (symbol, func, effect=il.PURE) ->
     symbol: symbol
     func: func
     _effect: effect
-    toCode: (compiler) -> "#{symbol}#{expressionToCode(compiler, @args[0])}"
   (x) -> new Unary([x])
 
 il.eq = binary("===", (x, y) -> x is y)

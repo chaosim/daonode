@@ -31,23 +31,26 @@ compile = (exp, path) ->
   fs.closeSync fd
   path
 
+compiler = new Compiler()
+uservar = (name) -> compiler.newvar(il.uservar(name))
+internalvar = (name) -> compiler.newvar(il.internalvar(name))
+compiler.env = env = new OptimizationEnv(env, {})
+
 compileToCode = (exp) ->
-  compiler = new Compiler()
   lamda = il.userlamda([], exp)
-  env = new OptimizationEnv(env, {})
   lamda = compiler.optimize(lamda, env)
-  lamda = lamda.jsify(@, env)
+  lamda = lamda.jsify(compiler, env)
   f = il.assign(il.uservarattr('exports.main'), lamda)
   f.toCode(compiler)
 
-vari = (name) -> il.internalvar(name)
+vari = (name) -> internalvar(name)
 
 xexports = {}
 
 exports.Test =
   "test1": (test) ->
-    x = il.internalvar('x')
-    x2 = il.internalvar('x2')
+    x = internalvar('x')
+    x2 = internalvar('x2')
     test.equal  solve(1), 1
     test.equal  solve(il.let_([], 1)), 1
     test.equal  solve(il.assign(x, il.let_([], 1))), 1
@@ -59,8 +62,8 @@ exports.Test =
 
 #xexports.Test =
   "test lamda call": (test) ->
-    x = il.internalvar('x')
-    f = il.internalvar('f')
+    x = internalvar('x')
+    f = internalvar('f')
     test.equal  solve(il.if_(1, 2, 3)), 2
     test.equal  solve(il.let_([x, 1], il.if_(1, 2, 3))), 2
     test.equal  solve(il.begin(il.assign(f, il.lamda([], 0)), f.call())), 0
@@ -69,7 +72,7 @@ exports.Test =
     test.equal  solve(il.begin(il.assign(x, 1000),
                                il.assign(f, il.lamda([], il.nonlocal(x), il.if_(il.eq(x,0), 0, il.begin(il.assign(x, il.sub(x, 1)), f.call())))),
                                f.call())), 0
-    x = il.uservar('x')
+    x = uservar('x')
     test.equal  solve(il.begin(il.assign(x, 1000),
                                il.assign(f, il.lamda([], il.if_(il.eq(x,0), 0, il.begin(il.assign(x, il.sub(x, 1)), f.call())))),
                                f.call())), 0
@@ -77,16 +80,23 @@ exports.Test =
 
 #xexports.Test =
   "test uservar": (test) ->
-    x = il.uservar('x')
-    f = il.internalvar('f')
-    v = il.internalvar('v')
+    x = uservar('x')
+    f = internalvar('f')
+    v = internalvar('v')
     test.equal  solve(il.begin(il.assign(f, il.userlamda([], il.clamda(v, il.assign(x, il.add(x, 1)), x))), 1)), 1
     test.done()
 
-exports.Test =
-  "test tailrecursive": (test) ->
-    x = il.uservar('x')
-    f = il.internalvar('f')
-    test.equal  solve(il.begin(il.assign(f, il.taillamda([x],  il.if_(il.eq(x,0), 0, f.call(il.sub(x, 1))))), f.call(3))), 0
+xexports.Test =
+  "test optrec idfunc": (test) ->
+    x = uservar('x')
+    f = internalvar('f')
+    test.equal  solve(il.begin(il.assign(f, il.optrec([x],  il.if_(il.eq(x,0), 0, f.call(il.sub(x, 1))))), f.call(3))), 0
     test.done()
 
+exports.Test =
+  "test tailrec fibonacci": (test) ->
+    n = uservar('n'); a = uservar('a'); b = uservar('b')
+    f = internalvar('f')
+#    test.equal  solve(il.add(1,2)), 3
+    test.equal  solve(il.begin(il.assign(f, il.tailrec([n, a, b],  il.if_(il.eq(n,0), a, f.call(il.sub(n, 1), b, il.add(a, b))))), f.call(3, 0, 1))), 2
+    test.done()

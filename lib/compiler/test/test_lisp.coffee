@@ -61,7 +61,7 @@ exports.Test =
     test.equal(solve(block(foo, protect(break_(foo, 1),  print_(2), print_(3)))), 1)
     test.done()
 
-#xexports.Test =
+#exports.Test =
   "test callcc": (test) ->
     test.equal solve(begin(callcc(jsfun((k) -> k(null))), add(1, 2))), 3
     test.done()
@@ -110,7 +110,7 @@ exports.Test =
     test.equal  solve(begin(assign(x, 1),  block(a, if_(eq(x, 10000), break_(a, x)), inc(x), continue_(a)))), 10000 #print_(x),
     test.done()
 
-#exports.Test =
+#xexports.Test =
   "test block lamda 3": (test) ->
     a = makeLabel('a')
     b = makeLabel('b')

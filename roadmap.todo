@@ -4,6 +4,7 @@ just javascript:
   ✔ javascript while, do/while @done (13-07-12 06:33)
   ✔ javascript for, for/in, for/of @done (13-07-12 08:51)
   ✔ javascript break/continue with label @done (13-07-12 08:51)
+  ☐ switch-case statement
   ✔ javascript try/catch @done (13-07-12 06:33)
   ✔ throw @done (13-06-29 15:03)
   ✔ javascript's new @done (13-06-22 21:27)
@@ -13,10 +14,12 @@ optimization:
   ☐ assign optimization
   ✔ special assign convert to augment assign and inc/dec when toCode. @done (13-07-12 18:24)
   ✔ v = v, unnessary pure expression statement @done (13-07-03 08:35)
+  ☐ il.if_ optimization
   ☐ loop optimization: assign, extract computation
   ✔ loop, while, dowhile, until convert to javascript's while/do-while statement. @done (13-07-14 14:24)
-  ✔ tail recursive @done (13-07-14 19:18)
-    # simple tail recursive: single recursive call, no mutual recursive.
+  ✔ non tail recursive @done (13-07-14 19:18)
+    # simple recursive: single recursive call, no mutual recursive.
+  ☐ true tail recursive
   ✔ il.clamda can replace parmenter v directly @done (13-07-02 16:09)
   ☐ optimize parser terminal's interlang vop
   ✔ il.equalcont @done (13-06-23 21:03)
