@@ -156,7 +156,7 @@ exports.Compiler = class Compiler
       v = @newvar('v')
       @cont(test, @clamda(v, il.if_(v, @cont(then_, cont), @cont(else_, cont))))
 
-    "if": (cont, test, clauses, else_) ->
+    "switch": (cont, test, clauses, else_) ->
       v = @newvar('v')
       @cont(test, @clamda(v, il.switch_(v, @cont(then_, cont), @cont(else_, cont))))
 
