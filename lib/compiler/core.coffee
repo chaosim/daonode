@@ -158,7 +158,12 @@ exports.Compiler = class Compiler
 
     "switch": (cont, test, clauses, else_) ->
       v = @newvar('v')
-      @cont(test, @clamda(v, il.switch_(v, @cont(then_, cont), @cont(else_, cont))))
+      clauses = for clause in clauses
+        values = clause[0]; act = clause[1]
+        values = for value in values then il.lamda([], @cont(value, il.idcont)).call()
+        act = @cont(act, cont)
+        [values, act]
+      @cont(test, @clamda(v, il.switch_(v, clauses, @cont(else_, cont))))
 
     "jsfun": (cont, func) ->
       f = il.jsfun(func)
@@ -207,7 +212,7 @@ exports.Compiler = class Compiler
       @popEnv()
       cont
 
-    "evalarg": (cont, name) -> cont.call(@getvar(name).call(cont))
+    "evalarg": (cont, name) -> cont.call(@getvar(name).call())
 
     "funcall": (cont, caller, args...) ->
       compiler = @

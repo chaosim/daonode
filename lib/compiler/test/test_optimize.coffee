@@ -102,7 +102,9 @@ exports.Test =
     test.done()
 
 exports.Test =
-  "test switch": (test) ->
-    a = 0; b = 1; c = 3;
-    `switch (a){ case b: case c: break}`
+  "test assign in if_": (test) ->
+    n = uservar('n'); a = uservar('a'); b = uservar('b')
+    f = internalvar('f')
+    #    test.equal  solve(il.add(1,2)), 3
+    solve(il.lamda([n],  il.assign(a, 1), il.if_(n, il.assign(a, 2), il.assign(a, 3)), il.add(a, 1)))
     test.done()

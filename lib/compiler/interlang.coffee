@@ -1023,10 +1023,15 @@ Assign::toCode = (compiler) ->
 AugmentAssign::toCode = (compiler) -> "#{compiler.toCode(@left)} #{@operator} #{compiler.toCode(@exp)}"
 If::toCode = (compiler) ->
   compiler.parent = @
-  else_ = @else_
+  then_ = @then_; else_ = @else_
   if @isStatement()
-    if else_ is undefined then "if (#{compiler.toCode(@test)}){#{compiler.toCode(@then_)}}"
-    else "if (#{compiler.toCode(@test)}){#{compiler.toCode(@then_)}}else{#{compiler.toCode(@else_)}}"
+    if then_ instanceof Begin then thenBody = "{#{compiler.toCode(then_)}}"
+    else thenBody = "#{compiler.toCode(then_)};"
+    if else_ is undefined then "if (#{compiler.toCode(@test)}) "+thenBody
+    else
+      if else_ instanceof Begin then elseBody = "{#{compiler.toCode(else_)}}"
+      else elseBody = "#{compiler.toCode(else_)}"
+      "if (#{compiler.toCode(@test)}) #{thenBody}else #{elseBody}"
   else
     "(#{compiler.toCode(@test)}) ? #{expressionToCode(compiler, @then_)} : #{expressionToCode(compiler, @else_)}"
 LabelStatement::toCode = (compiler) ->  "#{compiler.toCode(@label)}:#{compiler.toCode(@statement)}"
