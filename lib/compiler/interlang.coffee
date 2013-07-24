@@ -246,6 +246,9 @@ Assign::optimize = (env, compiler) ->
       assign._removed = false
     else
       env.bindings[left] = assign
+  else if exp instanceof Var and exp.isConst
+    env.bindings[left] = assign
+    assign._removed = false
   else
     env.bindings[left] = left
     assign._removed = false
@@ -310,7 +313,7 @@ New::optimize = (env, compiler) -> new @constructor(compiler.optimize(@value, en
 Lamda::optimize = (env, compiler) ->
   parentLamda = env.lamda
   parentBindings = env.bindings
-  if @_optimized
+  if @_optimized and not @isTransparent
     if parentLamda
       vars = @vars
       for k, v of vars
@@ -321,7 +324,8 @@ Lamda::optimize = (env, compiler) ->
   bindings = {}
   for p in @params then bindings[p] = p
   @locals = locals = {}; @nonlocals = nonlocals = {}; @vars = vars = {}
-  newEnv = env.extendBindings(bindings, @)
+  if @isTransparent then newEnv = newEnv = env.extendBindings(null, @)
+  else newEnv = env.extendBindings(bindings, @)
   body = compiler.optimize(@body, newEnv)
   for k, v of vars
     if hasOwnProperty.call(vars, k) and hasOwnProperty.call(locals, k)
@@ -329,7 +333,7 @@ Lamda::optimize = (env, compiler) ->
   for k, v of nonlocals
     if hasOwnProperty.call(nonlocals, k)
       vars[k] = v
-  if parentLamda
+  if not @isTransparent and parentLamda
     parentVars = parentLamda.vars
     for k, v of vars
       if hasOwnProperty.call(vars, k)
@@ -623,8 +627,7 @@ Assign::jsify = (compiler, env) ->
   result._jsified = true
   result
 
-Throw::jsify = (compiler, env) -> @
-Return::jsify = (compiler, env) -> new @constructor(jsify(@value, compiler, env))
+New::jsify = (compiler, env) ->  new @constructor(jsify(@value, compiler, env))
 If::jsify = (compiler, env) ->
   new If(jsify(@test, compiler, env), jsify(@then_, compiler, env), jsify(@else_, compiler, env))
 LabelStatement::jsify = (compiler, env) ->  new LabelStatement(@label, jsify(@statement, compiler, env))
@@ -980,7 +983,9 @@ il.insertReturn = insertReturn = (exp) ->
 
 Assign::insertReturn = () -> il.begin(@, il.return(@left))
 New::insertReturn = () -> new Return(@)
+Throw::insertReturn = () -> @
 Return::insertReturn = () -> @
+
 If::insertReturn = () ->
   if @isStatement() then new If(@test, insertReturn(@then_), insertReturn(@else_))
   else new Return(@)
@@ -1147,6 +1152,11 @@ il.new = (value) -> new New(value)
 il.lamda = (params, body...) ->
   for p in params then p.isParameter = true
   new Lamda(params, il.begin(body...))
+il.transparentlamda = (params, body...) ->
+  for p in params then p.isParameter = true
+  result = new Lamda(params, il.begin(body...))
+  result.isTransparent = true
+  result
 il.optrec = (params, body...) ->
   for p in params then p.isParameter = true
   new OptimizableRecuisiveLamda(params, il.begin(body...))
@@ -1156,6 +1166,11 @@ il.tailrec = (params, body...) ->
 il.userlamda = (params, body...) ->
   for p in params then p.isParameter = true
   new UserLamda(params, il.begin(body...))
+il.transparentuserlamda = (params, body...) ->
+  for p in params then p.isParameter = true
+  result = new UserLamda(params, il.begin(body...))
+  result.isTransparent = true
+  result
 il.blocklamda = (body...) -> new BlockLamda([], il.begin(body...))
 il.clamda = (v, body...) -> v.isParameter = true; new Clamda(v, il.begin(body...))
 il.recclamda = (v, body...) -> v.isParameter = true; new RecursiveClamda(v, il.begin(body...))

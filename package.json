@@ -27,7 +27,7 @@
     "node": "*"
   },
   "scripts": {
-    "test": "nodeunit lib\\compiler\\test\\testcore.js lib\\compiler\\test\\test_lisp.js lib\\compiler\\test\\test_logic.js lib\\compiler\\test\\test_parser.js lib\\compiler\\test\\test_optimize.js"
+    "test": "nodeunit lib/compiler/test/testcore.js lib/compiler/test/test_lisp.js lib/compiler/test/test_logic.js lib/compiler/test/test_parser.js lib/compiler/test/test_optimize.js"
   },
   "main": "index.js",
   "homepage": "https://github.com/chaosim/daonode",
@@ -44,7 +44,7 @@
     "underscore": "*",
     "nodeunit": "*",
     "js-beautify": "*",
-      "grunt": "~0.4.1"
+    "grunt": "~0.4.1"
   },
   "readme": "readme.md"
 }

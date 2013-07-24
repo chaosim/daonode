@@ -34,7 +34,6 @@ exports.Compiler = class Compiler
   compile: (exp) ->
     @env = new CpsEnv(null, {})
     v = @newconst('v')
-    v2 = @newconst('v')
     done = @clamda(v, il.throw(il.new(il.symbol('SolverFinish').call(v))))
     exps = [ il.assign(il.uservar('_'), il.require('underscore')),
              il.assign(il.uservar('__slice'), il.attr([], il.symbol('slice'))),
@@ -52,7 +51,7 @@ exports.Compiler = class Compiler
              il.assign(il.trail, il.newTrail),
              il.assign(il.failcont, done),
              il.assign(il.cutcont, il.failcont),
-             il.run(il.clamda(v2, @cont(exp, done)))]
+             il.run(il.transparentuserlamda([], @cont(exp, done)))]
     lamda = il.userlamda([], exps...)
     env = new OptimizationEnv(env, {})
     lamda = @optimize(lamda, env)
@@ -901,7 +900,9 @@ class CpsEnv extends Env
         v
 
 exports.OptimizationEnv = class OptimizationEnv extends CpsEnv
-  constructor: (@outer, @bindings, @lamda) ->
+  constructor: (@outer, bindings, @lamda) ->
+    if bindings then @bindings = bindings
+    else @bindings = outer.bindings
     if @outer then @indexMap = @outer.indexMap; @vars = @outer.vars
     else @indexMap = {}; @vars = {}
     if lamda instanceof il.UserLamda then @userlamda = lamda

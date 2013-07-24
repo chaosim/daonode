@@ -7,21 +7,6 @@ exports.SolverFinish = class SolverFinish
 # the solver for dao expression
 class exports.Solver
   constructor: () ->
-    @state
-    # @trail is used to restore varibale's binding for backtracking multiple logic choices
-    @trail=new Trail
-    #@catches is used for lisp style catch/throw
-    @catches = {}
-    @finished = false
-    solver =  @
-    @faildone = (value) ->
-#      solver.finished = true
-#      exports.status = exports.FAIL
-#      [null, value]
-      false
-    @failcont = @faildone
-    # @cutCont is used for cut like in prolog.
-    @cutCont = @failcont
 
   # pushCatch/popCatch/findCatch: utlities for lisp style catch/throw
   pushCatch: (value, cont) ->
@@ -35,48 +20,13 @@ class exports.Solver
     if not catches? or catches.length is 0 then throw new NotCatched
     catches[catches.length-1]
 
-  # in callcc, callfc, callcs, the solver is needed to be faked and restored(save all of content in an object.
-  fake: () ->
-    result = {}
-    state = @state
-    if state? then state = state.slice?(0) or state.copy?() or state.clone?() or state
-    result.state = state
-    result.trail = @trail.copy()
-    result.catches = _.extend({}, @catches)
-    result.purememo = _.extend({}, @purememo)
-    result.memo = _.extend({}, @memo)
-    result.done = @done
-    result.faildone = @faildone
-    result.failcont = @failcont
-    result.cutCont = @cutCont
-    return result
-
-  restore: (faked) ->
-    @state = faked.state
-    @trail = faked.trail
-    @catches = faked.catches
-    @purememo = faked.purememo
-    @memo = faked.memo
-    @done = faked.done
-    @faildone = faked.faildone
-    @failcont = faked.failcont
-    @cutCont = faked.cutCont
-    @finished = false
-
   solveCompiled: (module) ->
     module.solver = @
     value = @run(module.main)[1]
-    @.trail.getvalue(value)
+    @trail.getvalue(value)
 
-  # run the trampoline from cont until @finished is true.
-  xxxrun: (cont, value) ->
-    while not @finished
-      [cont, value] = cont(value)
-    [cont, value]
-
-  # run the trampoline from cont until @finished is true.
-  run: (cont) ->
-    try cont()
+  run: (func) ->
+    try func()
     catch e
       if e instanceof SolverFinish then return e.value
       else throw e
@@ -286,11 +236,3 @@ exports.BindingError = class Error
   toString: () -> "#{@constructor.name}: #{@exp} >>> #{@message}"
 
 exports.TypeError = class TypeError extends Error
-
-# solver's status is set to UNKNOWN when start to solve, <br/>
-#  if solver successfully run to solver'last continuation, status is set SUCCESS,<br/>
-#  else if solver run to solver's failcont, status is set to FAIL.
-exports.SUCCESS = 1
-exports.UNKNOWN = 0
-exports.FAIL = -1
-exports.status = exports.UNKNOWN
