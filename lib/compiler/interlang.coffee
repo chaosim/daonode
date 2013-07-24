@@ -232,8 +232,7 @@ Assign::optimize = (env, compiler) ->
         if left instanceof BlockVar then left.lamda = lamda
   exp = compiler.optimize(@exp, env)
   assign = new @constructor(left, exp)
-  if @root then assign.root = @root
-  else assign.root = @
+  assign.root = root
   if @isParamAssign then assign.isParamAssign = true
   left.assigned = assign.root
   if isValue(exp)

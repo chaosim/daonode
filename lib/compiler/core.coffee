@@ -517,7 +517,7 @@ exports.Compiler = class Compiler
       @cont(text, @clamda(v,
                           il.begin(il.assign(oldState, il.state),
                              il.setstate(il.array(v, 0)),
-                             @cont(exp, @clamda(v, il.paramassign(v1, v), il.setstate(oldState), cont.call(v1))))))
+                             @cont(exp, @clamda(v, il.assign(v1, v), il.setstate(oldState), cont.call(v1))))))
     'setstate': (cont, state) ->
       v = @newconst('v')
       @cont(state, @clamda(v, il.setstate(v), cont.call(true)))
