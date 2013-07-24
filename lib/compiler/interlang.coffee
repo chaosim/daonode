@@ -20,7 +20,7 @@ class Element
 class Var extends Element
   constructor: (@name, @suffix='') ->
   toString: () -> @name+@suffix
-  isValue: () -> @isConst
+
 class UserVar extends Var
 class InternalVar extends Var
 class BlockVar extends InternalVar
@@ -157,7 +157,12 @@ replace = (exp, param, value) ->
   else exp
 
 Var::replace = (param, value) -> if @toString() is param then value else @
-Assign::replace = (param, value) -> new @constructor(@left, replace(@exp, param, value))
+Assign::replace = (param, value) ->
+  assign = new @constructor(@left, replace(@exp, param, value))
+  if @isParamAssign then assign.isParamAssign = true
+  if @root then assign.root = @root
+  else assign.root = @
+  assign
 If::replace = (param, value) ->  new If(replace(@test, param, value), replace(@then_, param, value), replace(@else_, param, value))
 LabelStatement::replace = (param, value) ->  new LabelStatement(@label, replace(@statement, param, value))
 While::replace = (param, value) ->  new While(replace(@test, param, value), replace(@body, param, value))
@@ -213,9 +218,11 @@ Assign::optimize = (env, compiler) ->
   if left instanceof VirtualOperation
     left = new left.constructor(compiler.optimize(a, env) for a in left.args)
   else
-    if left.isConst
-      if left.haveAssigned then throw Error(@, "should not assign to const more than once.")
-      else left.haveAssigned = true
+    if left.isConst and left.assigned
+      if @root then root = @root
+      else root = @
+      if left.assigned isnt root # and not (@isParamAssign and left.assigned.isParamAssign)
+        throw new Error(@, "should not assign to const more than once.")
     if left instanceof UserVar
       userlamda = env.userlamda
       if userlamda and not isParam(left, userlamda) then userlamda.locals[left] = left
@@ -225,6 +232,10 @@ Assign::optimize = (env, compiler) ->
         if left instanceof BlockVar then left.lamda = lamda
   exp = compiler.optimize(@exp, env)
   assign = new @constructor(left, exp)
+  if @root then assign.root = @root
+  else assign.root = @
+  if @isParamAssign then assign.isParamAssign = true
+  left.assigned = assign.root
   if isValue(exp)
     if exp instanceof Lamda and left.isRecursive
       env.bindings[left] = left
@@ -366,7 +377,7 @@ Deref::optimize = (env, compiler) ->
 JSFun::optimize = (env, compiler) ->  new JSFun(compiler.optimize(@fun, env))
 
 Lamda::optimizeApply = (args, env, compiler) ->
-  exps = (il.assign(p, args[i]) for p, i in @params)
+  exps = (il.paramassign(p, args[i]) for p, i in @params)
   exps.push @body
   body = compiler.optimize(il.begin(exps...), env)
   body = postOptimize(body, compiler, env)
@@ -377,10 +388,10 @@ Lamda::optimizeApply = (args, env, compiler) ->
     new Apply(lamda, [])
 
 Clamda::optimizeApply = (args, env, compiler) ->
-  il.begin(il.assign(@v, args[0]), @body).optimize(env, compiler)
+  il.begin(il.paramassign(@v, args[0]), @body).optimize(env, compiler)
 
 RecursiveClamda::optimizeApply = (args, env, compiler) ->
-  il.begin(il.assign(@v, args[0]), @body).optimize(env, compiler)
+  il.begin(il.paramassign(@v, args[0]), @body).optimize(env, compiler)
 
 IdCont::optimizeApply = (args, env, compiler) -> compiler.optimize(args[0], env)
 
@@ -608,6 +619,8 @@ Assign::jsify = (compiler, env) ->
       else body = convertTailRecursive(exp.body, exp)
       exp.body = il.while_(1, body)
   result = new Assign(left, exp)
+  if @root then result.root = @root
+  else result.root = @
   result._jsified = true
   result
 
@@ -1099,7 +1112,8 @@ Return::isStatement = () -> true
 
 vari = (klass, name) -> new klass(name)
 il.uservar = (name) -> new UserVar(name)
-il.internalvar = (name) -> new InternalVar( name)
+il.internalvar = (name) -> v = new InternalVar( name)
+il.internalconst = (name) -> v = new InternalVar( name); v.isConst = true; v
 il.blockvar = (name) -> new BlockVar( name)
 il.symbol = (name) -> new Symbol(name)
 
@@ -1114,6 +1128,7 @@ varattr = (klass, name) ->
 il.uservarattr = (name) -> varattr(UserVar, name)
 
 il.assign = (left, exp) -> new Assign(left, exp)
+il.paramassign = (left, exp) -> assign = new Assign(left, exp); assign.isParamAssign = true; assign
 il.if_ = (test, then_, else_) -> new If(test, then_, else_)
 il.deref = (exp) -> new Deref(exp)
 
@@ -1130,14 +1145,21 @@ il.print = (exps...) -> new Print(exps)
 il.return = (value) -> new Return(value)
 il.throw = (value) -> new Throw(value)
 il.new = (value) -> new New(value)
-il.lamda = (params, body...) -> new Lamda(params, il.begin(body...))
-il.optrec = (params, body...) -> new OptimizableRecuisiveLamda(params, il.begin(body...))
-il.tailrec = (params, body...) -> new TailRecuisiveLamda(params, il.begin(body...))
-il.userlamda = (params, body...) -> new UserLamda(params, il.begin(body...))
+il.lamda = (params, body...) ->
+  for p in params then p.isParameter = true
+  new Lamda(params, il.begin(body...))
+il.optrec = (params, body...) ->
+  for p in params then p.isParameter = true
+  new OptimizableRecuisiveLamda(params, il.begin(body...))
+il.tailrec = (params, body...) ->
+  for p in params then p.isParameter = true
+  new TailRecuisiveLamda(params, il.begin(body...))
+il.userlamda = (params, body...) ->
+  for p in params then p.isParameter = true
+  new UserLamda(params, il.begin(body...))
 il.blocklamda = (body...) -> new BlockLamda([], il.begin(body...))
-il.clamda = (v, body...) -> new Clamda(v, il.begin(body...))
-il.recclamda = (v, body...) -> new RecursiveClamda(v, il.begin(body...))
-il.clamdabody = (v, body) -> new ClamdaBody(v, body)
+il.clamda = (v, body...) -> v.isParameter = true; new Clamda(v, il.begin(body...))
+il.recclamda = (v, body...) -> v.isParameter = true; new RecursiveClamda(v, il.begin(body...))
 il.code = (string) -> new Code(string)
 il.jsfun = (fun) -> new JSFun(fun)
 
@@ -1310,5 +1332,4 @@ il.excludes = ['evalexpr', 'failcont', 'run', 'getvalue', 'fake', 'findCatch', '
 
 augmentOperators = {add: il.addassign, sub: il.subassign, mul: il.mulassign, div: il.divassign, mod: il.modassign,
 'and_': il.andassign, 'or_': il.orassign, bitand: il.bitandassign, bitor:il.bitorassign, bitxor: il.bitxorassign,
-lshift: il.lshiftassign, rshift: il.rshiftassign
-}
+lshift: il.lshiftassign, rshift: il.rshiftassign}

@@ -1,5 +1,5 @@
 {solve, Error} = core = require('../core')
-{string, begin, quote, assign, addassign, print_, jsobject,\
+{variable, string, begin, quote, assign, addassign, print_, jsobject,\
   funcall, macall, lamda, macro, jsfun, \
   if_, add, eq, inc, suffixinc,\
   eval_, qq, uq, uqs} = require('../util')
@@ -13,10 +13,13 @@ exports.Test =
     x = 'x'
     test.equal  solve(begin(assign(x, 1))), 1
     test.equal  solve(begin(assign(x, 1), x)), 1
-    test.equal  solve(begin(assign(x, 1), addassign(x, 2), x)), 3
+    test.equal  solve(begin(variable(x), assign(x, 1), addassign(x, 2), x)), 3
+    test.equal  solve(begin(variable(x), assign(x, 1), inc(x))), 2
+    #    test.equal  solve(begin(inc(x))), 2
+    test.equal  solve(begin(variable(x), assign(x, 1), suffixinc(x))), 1
     test.done()
 
-#exports.Test =
+#xexports.Test =
   "test 1": (test) ->
     test.equal  solve(1), 1
     test.done()
@@ -29,15 +32,6 @@ exports.Test =
 #xexports.Test =
   "test quote": (test) ->
     test.equal  solve(quote(1)), 1
-    test.done()
-
-#xexports.Test =
-  "test vari assign": (test) ->
-    x = 'x'
-    test.equal  solve(begin(assign(x, 1), x)), 1
-    test.equal  solve(begin(assign(x, 1), inc(x))), 2
-##    test.equal  solve(begin(inc(x))), 2
-    test.equal  solve(begin(assign(x, 1), suffixinc(x))), 1
     test.done()
 
 #xexports.Test =
@@ -78,20 +72,10 @@ exports.Test =
     test.throws (-> solve(qq(add(uqs(uqs([1,2])))))), Error
     test.done()
 
-#xexports.Test =
-  "test lambda": (test) ->
-    x = 'x'; y = 'y'
-    f = vari('f')
-    test.equal  solve(funcall(lamda([x], 1), 1)), 1
-    test.equal  solve(funcall(lamda([x], x), 1)), 1
-    test.equal  solve(funcall(lamda([x, y], add(x, y)), 1, 1)), 2
-    test.equal  solve(begin(assign(f, lamda([], 1)), funcall(f))), 1
-    test.done()
-
 #exports.Test =
   "test macro": (test) ->
     x = 'x'; y = 'y'; z = 'z'
-#    test.equal  solve(macall(macro([x], 1), print_(1))), 1
+    test.equal  solve(macall(macro([x], 1), print_(1))), 1
     test.equal  solve(macall(macro([x], x), print_(1))), null
     test.done()
 
@@ -101,4 +85,13 @@ exports.Test =
     test.equal  solve(macall(macro([x, y, z], if_(x, y, z)), eq(1, 1), print_(1), print_(2))), null
     test.done()
 
+#exports.Test =
+  "test lambda": (test) ->
+    x = 'x'; y = 'y'
+    f = vari('f')
+    test.equal  solve(funcall(lamda([x], 1), 1)), 1
+    test.equal  solve(funcall(lamda([x], x), 1)), 1
+    test.equal  solve(funcall(lamda([x, y], add(x, y)), 1, 1)), 2
+    test.equal  solve(begin(assign(f, lamda([], 1)), funcall(f))), 1
+    test.done()
 

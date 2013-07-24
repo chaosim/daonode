@@ -3,6 +3,7 @@ _ = require('underscore')
 vari = (name) -> name
 exports.vars = (names) -> vari(name) for name in split names,  reElements
 exports.nonlocal = (names...) -> ['nonlocal', names...]
+exports.variable = variable = (names...) -> ['variable', names...]
 
 exports.string = string = (s) -> ["string", s]
 
@@ -281,10 +282,10 @@ exports.greedysome = (exp, result, template) ->
 
 exports.times = times = (exp, expectTimes, result, template) ->
   n = internalvar('n')
-  if not result? then begin(assign(n, 0), any(andp(exp, incp(n))), unify(expectTimes, n))
+  if not result? then begin(variable(n), assign(n, 0), any(andp(exp, incp(n))), unify(expectTimes, n))
   else
    result1 = internalvar('result')
-   begin(assign(n, 0), assign(result1, []),
+   begin(variable(n), assign(n, 0), assign(result1, []),
              any(andp(exp, incp(n), pushp(result1, getvalue(template)))),
              unify(expectTimes, n), unify(result, result1))
 
@@ -322,10 +323,10 @@ exports.seplist = (exp, options={}) ->
   else
     n = internalvar('n')
     if result is null
-     orp(andp(exp, assign(n, 1), any(andp(sep, exp, incp(n))), unify(expectTimes, n)),
+     orp(andp(variable(n), exp, assign(n, 1), any(andp(sep, exp, incp(n))), unify(expectTimes, n)),
          unify(expectTimes, 0))
     else
-      orp(andp(exp, assign(n, 1), assign(result1, list(getvalue(template))),
+      orp(andp(variable(n), exp, assign(n, 1), assign(result1, list(getvalue(template))),
                     any(andp(sep, exp, pushp(result1, getvalue(template)), incp(n))),
               unify(expectTimes, n), unify(result, result1)),
          andp(unify(expectTimes, 0), unify(result, [])))
