@@ -218,7 +218,7 @@ exports.Test =
                                 times(char(string('b')), n, result, string('b')), eoi, getvalue(result))), ['b', 'b', 'b']
     test.done()
 
-#xexports.Test =
+#exports.Test =
   "test seplist": (test) ->
     _ = vari('__')
     result = vari('result')
@@ -232,7 +232,7 @@ exports.Test =
     test.equal  solve(begin(assign(_, dummy('__')), parsetext(seplist(char(_), {sep:char(string(',')), times:3}), string('a,a,')))), false
     test.done()
 
-#xexports.Test =
+#exports.Test =
   "test seplist2": (test) ->
     _ = vari('__')
     result = vari('result')

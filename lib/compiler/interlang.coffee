@@ -1,6 +1,11 @@
 _ = require("underscore")
 {Env, solve} = core = require("./core")
 
+solvecore = require("./solve")
+Trail = solvecore.Trail;
+LogicVar = solvecore.Var;
+DummyVar = solvecore.DummyVar;
+
 il = exports
 
 exports.NotImplement = class NotImplement extends Error

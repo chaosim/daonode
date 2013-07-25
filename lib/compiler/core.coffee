@@ -62,6 +62,8 @@ exports.Compiler = class Compiler
   newvar: (v) -> if _.isString(v) then @env.newvar(il.internalvar(v)) else @env.newvar(v)
   newconst: (v) -> if _.isString(v) then @env.newconst(il.internalvar(v)) else @env.newconst(v)
   getvar: (v) -> if _.isString(v) then @env.getvar(il.uservar(v)) else @env.getvar(v)
+  uniquevar: (name, index) -> @env.uniquevar(il.uservar(name), index)
+  uniqueconst: (name, index) -> @env.uniqueconst(il.uservar(name), index)
   lookup: (v) -> if _.isString(v) then @env.lookup(il.uservar(v)) else @env.lookup(v)
   pushEnv: () -> @env = @env.extend()
   popEnv: () -> @env = @env.outer
@@ -130,6 +132,8 @@ exports.Compiler = class Compiler
       obj = @newconst('obj')
       i = @newconst('i')
       @cont(object, il.clamda(obj, @cont(index, il.clamda(i, assignExpCont(il.index(obj, i))))))
+    else if head is 'uniquevar' then return assignExpCont(@uniquevar(item[1], item[2]))
+    else if head is 'uniqueconst' then return assignExpCont(@uniqueconst(item[1], item[2]))
     else throw new Error "Left Value side should be assignable expression."
 
   specials:
@@ -148,6 +152,9 @@ exports.Compiler = class Compiler
         v = @getvar(name)
         delete v.isConst
       cont.call(null)
+    "uniquevar": (cont, name, index) -> cont.call(@uniquevar(name, index))
+    "uniqueconst": (cont, name, index) -> cont.call(@uniqueconst(name, index))
+
     "assign": (cont, left, exp) ->  @leftValueCont(cont, "assign", left, exp)
     "augment-assign": (cont, op, left, exp) ->  @leftValueCont(cont, "augment-assign", left, exp, op)
     'inc': (cont, item) -> @leftValueCont(cont, "inc", item)
@@ -505,16 +512,22 @@ exports.Compiler = class Compiler
     'parse': (cont, exp, state) ->
       v = @newconst('v')
       v1 = @newconst('v')
+#      fc = @newconst('fc')
       oldState = @newconst('state')
       @cont(state, @clamda(v, il.assign(oldState, il.state),
+#                               il.assign(fc, il.failcont),
+#                               il.setfailcont(il.clamda(v, v, il.setstate(oldState), fc.call(false))),
                                il.setstate(v),
                                @cont(exp, @clamda(v, il.assign(v1, v), il.setstate(oldState), cont.call(v1)))))
     'parsetext': (cont, exp, text) ->
       v = @newconst('v')
       v1 = @newconst('v')
+#      fc = @newconst('fc')
       oldState = @newconst('state')
       @cont(text, @clamda(v,
                           il.begin(il.assign(oldState, il.state),
+#                             il.assign(fc, il.failcont),
+#                             il.setfailcont(il.clamda(v, v, il.setstate(oldState), fc.call(false))),
                              il.setstate(il.array(v, 0)),
                              @cont(exp, @clamda(v, il.assign(v1, v), il.setstate(oldState), cont.call(v1))))))
     'setstate': (cont, state) ->
@@ -640,6 +653,7 @@ exports.Compiler = class Compiler
                    cont.call(v1)))
                  @cont(exp, anyCont)))
          anyCont.call(null))
+
     'lazyany': (cont, exp) ->
       fc = @newconst('fc')
       trail = @newconst('trail')
@@ -897,6 +911,20 @@ class CpsEnv extends Env
     catch e
       if e instanceof VarLookupError
         @bindings[vari] = v = @newconst(vari)
+        v
+  uniquevar: (name, index) ->
+    uniquename = '@'+name+index
+    try v = @lookup(uniquename)
+    catch e
+      if e instanceof VarLookupError
+        @bindings[uniquename] = v = @newvar(name)
+        v
+  uniqueconst: (name, index) ->
+    uniquename = '@'+name+index
+    try v = @lookup(uniquename)
+    catch e
+      if e instanceof VarLookupError
+        @bindings[uniquename] = v = @newconst(name)
         v
 
 exports.OptimizationEnv = class OptimizationEnv extends CpsEnv

@@ -74,13 +74,13 @@ runner = (compiler, cont) -> (v) ->
 exports.callfc = callfc
 
 # if x is true then succeed, else fail 
-exports.truep = special(1, 'truep', (compiler, cont, fun, x) ->
+exports.truep = special(1, 'truep', (compiler, cont, x) ->
   compiler.cont(x, (x1) ->
     if x1 then cont(x1)
     else compiler.failcont(x1)))
 
 # if x is false then succeed, else fail 
-exports.falsep = special(1, 'falsep', (compiler, cont, fun, x) ->
+exports.falsep = special(1, 'falsep', (compiler, cont, x) ->
   compiler.cont(x, (x1) ->
     if not x1 then cont(x1)
     else compiler.failcont(x1)))

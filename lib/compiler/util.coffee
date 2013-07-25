@@ -198,7 +198,8 @@ exports.lazymay = (exp) -> ['lazymay', exp]
 exports.greedymay = (exp) -> ['greedymay', exp]
 
 index = 1
-exports.internalvar = internalvar = (name) -> name+'_$0'+index++
+exports.uniquevar = uniquevar = (name) -> ['uniquevar', name, index++]
+exports.uniqueconst = uniqueconst = (name) -> ['uniqueconst', name, index++]
 
 # ##### normal mode, lazy mode, greedy mode
 #normal mode: try the goal at first, <br/>
@@ -216,7 +217,7 @@ exports.internalvar = internalvar = (name) -> name+'_$0'+index++
 exports.any = any = (exp, result, template) ->
   if not result?  then ['any', exp]
   else
-    result1 = internalvar('result')
+    result1 = uniqueconst('result')
     begin(assign(result1, []), any(andp(exp, push(result1, getvalue(template)))),
              unify(result, result1))
 
@@ -226,7 +227,7 @@ exports.any = any = (exp, result, template) ->
 exports.lazyany = lazyany = (exp, result, template) ->
   if not result?  then ['lazyany', exp]
   else
-    result1 = internalvar('result')
+    result1 = uniqueconst('result')
     begin(assign(result1, []),
                 lazyany(andp(exp, push(result1, getvalue(template)))),
                 unify(result, result1))
@@ -237,7 +238,7 @@ exports.lazyany = lazyany = (exp, result, template) ->
 exports.greedyany = greedyany = (exp, result, template) ->
   if not result?  then ['greedyany', exp]
   else
-    result1 = internalvar('result')
+    result1 = uniqueconst('result')
     begin(assign(result1, []),
                 greedyany(andp(exp, push(result1, getvalue(template)))),
                 unify(result, result1))
@@ -249,7 +250,7 @@ exports.greedyany = greedyany = (exp, result, template) ->
 exports.some = (exp, result, template) ->
   if not result?  then andp(exp, ['any', exp])
   else
-    result1 = internalvar('result')
+    result1 = uniqueconst('result')
     begin(['result'],
                 assign(result1, []),
                 exp, push(result1, getvalue(template)),
@@ -262,7 +263,7 @@ exports.some = (exp, result, template) ->
 exports.lazysome = (exp, result, template) ->
   if not result?  then andp(exp, ['lazyany', exp])
   else
-    result1 = internalvar('result')
+    result1 = uniqueconst('result')
     begin(assign(result1, []),
                 exp, push(result1, getvalue(template)),
                 lazyany(andp(exp, push(result1, getvalue(template)))),
@@ -274,17 +275,17 @@ exports.lazysome = (exp, result, template) ->
 exports.greedysome = (exp, result, template) ->
   if not result?  then andp(exp, ['greedyany', exp])
   else
-    result1 = internalvar('result')
+    result1 = uniqueconst('result')
     begin(assign(result1, []),
               exp, push(result1, getvalue(template)),
               greedyany(andp(exp, push(result1, getvalue(template)))),
               unify(result, result1))
 
 exports.times = times = (exp, expectTimes, result, template) ->
-  n = internalvar('n')
+  n = uniquevar('n')
   if not result? then begin(variable(n), assign(n, 0), any(andp(exp, incp(n))), unify(expectTimes, n))
   else
-   result1 = internalvar('result')
+   result1 = uniqueconst('result')
    begin(variable(n), assign(n, 0), assign(result1, []),
              any(andp(exp, incp(n), pushp(result1, getvalue(template)))),
              unify(expectTimes, n), unify(result, result1))
@@ -300,7 +301,7 @@ exports.seplist = (exp, options={}) ->
   expectTimes = options.times or null
   result = options.result or null;
   template = options.template or null
-  if result isnt null then result1 = internalvar('result')
+  if result isnt null then result1 = uniqueconst('result')
   if expectTimes is null
     if result is null
       andp(exp, any(andp(sep, exp)))
@@ -321,7 +322,7 @@ exports.seplist = (exp, options={}) ->
         else andp(assign(result1, []), exp, pushp(result1, getvalue(template)),
                   times(andp(sep, exp, pushp(result1, getvalue(template))), expectTimes-1), unify(result, result1))
   else
-    n = internalvar('n')
+    n = uniquevar('n')
     if result is null
      orp(andp(variable(n), exp, assign(n, 1), any(andp(sep, exp, incp(n))), unify(expectTimes, n)),
          unify(expectTimes, 0))
