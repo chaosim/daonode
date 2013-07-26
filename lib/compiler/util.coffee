@@ -37,9 +37,11 @@ exports.iff = iff = (clauses, else_) ->
 
 exports.switch_ = (test, clauses, else_) -> ['switch', test, clauses, else_]
 
-exports.array = (caller, args...) -> ["array", args...]
-exports.uarray = (caller, args...) -> ["uarray", args...]
+exports.array = (args...) -> ["array", args...]
+exports.uarray = (args...) -> ["uarray", args...]
 exports.cons = (head, tail) -> ["cons", head, tail]
+exports.makeobject = (args...) -> ["makeobject", args...]
+exports.uobject = (args...) -> ["uobject", args...]
 exports.funcall = (caller, args...) -> ["funcall", caller, args...]
 exports.macall = (caller, args...) -> ["macall", caller, args...]
 

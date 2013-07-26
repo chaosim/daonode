@@ -163,7 +163,9 @@ replace = (exp, param, value) ->
 
 Var::replace = (param, value) -> if @toString() is param then value else @
 Assign::replace = (param, value) ->
-  assign = new @constructor(@left, replace(@exp, param, value))
+  left = @left
+  if left instanceof VirtualOperation then left = replace(left, param, value)
+  assign = new @constructor(left, replace(@exp, param, value))
   if @isParamAssign then assign.isParamAssign = true
   if @root then assign.root = @root
   else assign.root = @
@@ -1263,6 +1265,13 @@ il.nonlocal = (vars...) -> new NonlocalDecl(vars)
 il.vardecl = vop('vardecl', (compiler)->args = @args; "var #{(compiler.toCode(e) for e in args).join(', ')}")
 il.array = vop('array', (compiler)->args = @args; "[#{(compiler.toCode(e) for e in args).join(', ')}]")
 il.uarray = vop('uarray', (compiler)->args = @args; "new UArray([#{(compiler.toCode(e) for e in args).join(', ')}])")
+il.setobject = (obj, args) ->
+  exps = []
+  length = args.length
+  for i in [0...length] by 2
+    exps.push(il.assign(il.index(obj, args[i]), args[i+1]))
+  il.begin(exps...)
+il.uobject = vop('uobject', (compiler)->args = @args; "new UObject(#{compiler.toCode(args[0])})")
 il.cons = vop('cons', (compiler)->args = @args; "new Cons(#{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})")
 il.suffixinc = vop('suffixdec', (compiler)->args = @args; "#{expressionToCode(compiler, args[0])}++")
 il.suffixdec = vop('suffixdec', (compiler)->args = @args; "#{expressionToCode(compiler, args[0])}--")
@@ -1349,7 +1358,7 @@ il.idcont = do -> v = il.internalvar('v'); new IdCont(v, v)
 il.excludes = ['evalexpr', 'failcont', 'run', 'getvalue', 'fake', 'findCatch', 'popCatch', 'pushCatch',
                'protect', 'suffixinc', 'suffixdec', 'dec', 'inc', 'unify', 'bind', 'undotrail',
                'newTrail', 'newLogicVar', 'char', 'followChars', 'notFollowChars', 'charWhen',
-               'stringWhile', 'stringWhile0', 'number', 'literal', 'followLiteral', 'quoteString']
+               'stringWhile', 'stringWhile0', 'number', 'literal', 'followLiteral', 'quoteString', 'uobject']
 
 augmentOperators = {add: il.addassign, sub: il.subassign, mul: il.mulassign, div: il.divassign, mod: il.modassign,
 'and_': il.andassign, 'or_': il.orassign, bitand: il.bitandassign, bitor:il.bitorassign, bitxor: il.bitxorassign,

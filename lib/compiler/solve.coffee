@@ -149,13 +149,15 @@ exports.UObject = class UObject
     else @
 
   unify: (y, trail) ->
-    xdata = @data; ydata = y.data
+    xdata = @data
+    if y not instanceof UObject then ydata = y
+    else ydata = y.data
     ykeys = Object.keys(y)
     for key of xdata
       index = ykeys.indexOf(key)
       if index==-1 then return false
       if not trail.unify(xdata[key], ydata[key]) then return false
-      ykeys.splice(index, 1);
+      ykeys.splice(index, 1)
     if ykeys.length isnt 0 then return false
     true
 

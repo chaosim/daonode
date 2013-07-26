@@ -2,8 +2,8 @@ _ = require "underscore"
 
 {solve} = core = require('../core')
 solvebase = require('../solve')
-{begin, assign, print_,
-array, uarray, cons,
+{begin, assign, print_, string,
+array, uarray, cons, makeobject, uobject
 funcall, lamda, macro,
 if_, add, eq, le, inc, not_,
 logicvar, unify, succeed, fail, andp, orp, notp, getvalue
@@ -63,13 +63,17 @@ exports.Test =
     test.done()
 
 #exports.Test =
-  "test unify array, uarray": (test) ->
-    a = vari('a')
-    $a = logicvar('a')
-    test.equal  solve(unify(array($a), [1])), false
-    test.equal  solve(unify(uarray($a), [1])), true
-    test.equal  solve(andp(assign(a, $a), unify(uarray(a), [1]), unify(a, 2))), false
-    test.equal  solve(begin(assign(a, $a), orp(andp(unify(uarray(a), [1]), unify(a, 2)), unify(a, 2)))), true
+  "test findall once": (test) ->
+    x = vari('x')
+    result = vari('result')
+    test.equal  solve(findall(orp(print_(1), print_(2)))), null
+    test.equal  solve(findall(orp(print_(1), print_(2), print_(3)))), null
+    test.deepEqual solve(andp(assign(x, logicvar('x')), assign(result, logicvar('result')),
+                              findall(orp(unify(x, 1), unify(x, 2)), result, x), getvalue(result))), [1,2]
+    test.deepEqual  solve(andp(assign(result, logicvar('result')), findall(fail, result, 1), getvalue(result))), []
+    test.deepEqual  solve(andp(assign(result, logicvar('result')),findall(succeed, result, 1), getvalue(result))), [1]
+    test.deepEqual  solve(andp(assign(result, logicvar('result')),
+                               findall(once(orp(print_(1), print_(2))), result, 1), getvalue(result))), [1]
     test.done()
 
 #exports.Test =
@@ -84,17 +88,25 @@ exports.Test =
     test.done()
 
 #exports.Test =
-  "test findall once": (test) ->
-    x = vari('x')
-    result = vari('result')
-    test.equal  solve(findall(orp(print_(1), print_(2)))), null
-    test.equal  solve(findall(orp(print_(1), print_(2), print_(3)))), null
-    test.deepEqual solve(andp(assign(x, logicvar('x')), assign(result, logicvar('result')),
-                        findall(orp(unify(x, 1), unify(x, 2)), result, x), getvalue(result))), [1,2]
-    test.deepEqual  solve(andp(assign(result, logicvar('result')), findall(fail, result, 1), getvalue(result))), []
-    test.deepEqual  solve(andp(assign(result, logicvar('result')),findall(succeed, result, 1), getvalue(result))), [1]
-    test.deepEqual  solve(andp(assign(result, logicvar('result')),
-                               findall(once(orp(print_(1), print_(2))), result, 1), getvalue(result))), [1]
+  "test unify array, uarray": (test) ->
+    a = vari('a')
+    $a = logicvar('a')
+    test.equal  solve(unify(array($a), [1])), false
+    test.equal  solve(unify(uarray($a), [1])), true
+    test.equal  solve(andp(assign(a, $a), unify(uarray(a), [1]), unify(a, 2))), false
+    test.equal  solve(begin(assign(a, $a), orp(andp(unify(uarray(a), [1]), unify(a, 2)), unify(a, 2)))), true
+    test.done()
+
+#exports.Test =
+  "test unify uobject": (test) ->
+    a = vari('a')
+    $a = logicvar('a')
+    test.equal  solve(unify(makeobject(string('a'), 1), {a:1})), false
+    test.equal  solve(unify(uobject(string('a'), 1), {a:1})), true
+    test.equal  solve(unify(uobject(string('a'), $a), {a:1})), true
+    test.equal  solve(andp(assign(a, $a), unify(uobject(string('a'), a), {a:1}), unify(a, 2))), false
+    test.equal  solve(begin(assign(a, $a), orp(andp(unify(uobject(string('a'), a), {a:1}),
+                                                    unify(a, 2)), unify(a, 2)))), true
     test.done()
 
 xexports.Test =
