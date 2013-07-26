@@ -3,7 +3,8 @@ _ = require "underscore"
 {solve} = core = require('../core')
 solvebase = require('../solve')
 {begin, assign, print_,
-array, uarray, funcall, lamda, macro,
+array, uarray, cons,
+funcall, lamda, macro,
 if_, add, eq, le, inc, not_,
 logicvar, unify, succeed, fail, andp, orp, notp, getvalue
 cutable, cut, findall, once
@@ -62,13 +63,24 @@ exports.Test =
     test.done()
 
 #exports.Test =
-  "test unify array": (test) ->
+  "test unify array, uarray": (test) ->
     a = vari('a')
     $a = logicvar('a')
     test.equal  solve(unify(array($a), [1])), false
     test.equal  solve(unify(uarray($a), [1])), true
     test.equal  solve(andp(assign(a, $a), unify(uarray(a), [1]), unify(a, 2))), false
     test.equal  solve(begin(assign(a, $a), orp(andp(unify(uarray(a), [1]), unify(a, 2)), unify(a, 2)))), true
+    test.done()
+
+#exports.Test =
+  "test unify cons": (test) ->
+    a = vari('a')
+    $a = logicvar('a')
+    test.equal  solve(unify(cons(1, null), cons(1, null))), true
+    test.equal  solve(unify(cons($a, null), cons(1, null))), true
+    test.equal  solve(andp(assign(a, $a), unify(cons(a, null), cons(1, null)), unify(a, 2))), false
+    test.equal  solve(begin(assign(a, $a), orp(andp(unify(cons(a, null), cons(1, null)),
+                                                    unify(a, 2)), unify(a, 2)))), true
     test.done()
 
 #exports.Test =

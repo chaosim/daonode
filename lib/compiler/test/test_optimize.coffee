@@ -15,9 +15,9 @@ solve = (exp) ->
 compile = (exp, path) ->
   code = "_ = require('underscore');\n"\
   +'__slice = [].slice\n'\
-  +"solve = require('f:/daonode/lib/compiler/core.js').solve;\n"\
-  +"parser = require('f:/daonode/lib/compiler/parser.js');\n"\
-  +"solvecore = require('f:/daonode/lib/compiler/solve.js');\n"\
+  +"solve = require('../core.js').solve;\n"\
+  +"parser = require('../parser.js');\n"\
+  +"solvecore = require('../solve.js');\n"\
   +"SolverFinish = solvecore.SolverFinish;\n"\
   +"Solver = solvecore.Solver;\n"\
   +"Trail = solvecore.Trail;\n"\

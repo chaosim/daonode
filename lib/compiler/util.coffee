@@ -39,6 +39,7 @@ exports.switch_ = (test, clauses, else_) -> ['switch', test, clauses, else_]
 
 exports.array = (caller, args...) -> ["array", args...]
 exports.uarray = (caller, args...) -> ["uarray", args...]
+exports.cons = (head, tail) -> ["cons", head, tail]
 exports.funcall = (caller, args...) -> ["funcall", caller, args...]
 exports.macall = (caller, args...) -> ["macall", caller, args...]
 

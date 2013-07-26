@@ -46,6 +46,7 @@ exports.Compiler = class Compiler
              il.assign(il.uservar('DummyVar'), il.attr(il.uservar('solvecore'), il.symbol('DummyVar'))),
              il.assign(il.uservar('solver'), il.new(il.symbol('Solver').call())),
              il.assign(il.uservar('UArray'), il.attr(il.uservar('solvecore'), il.symbol('UArray'))),
+             il.assign(il.uservar('Cons'), il.attr(il.uservar('solvecore'), il.symbol('Cons'))),
              il.assign(il.state, null),
              il.assign(il.catches, {}),
              il.assign(il.trail, il.newTrail),
@@ -246,6 +247,10 @@ exports.Compiler = class Compiler
       for i in [length-1..0] by -1
         cont = do (i=i, cont=cont) ->
           compiler.cont(args[i], compiler.clamda(xs[i], cont))
+
+    "cons": (cont, head, tail) ->
+      v = @newconst('v'); v2 = @newconst('v')
+      @cont(head, @clamda(v, @cont(tail, @clamda(v1, cont.call(il.cons(v, v1))))))
 
     "funcall": (cont, caller, args...) ->
       compiler = @
