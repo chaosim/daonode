@@ -176,9 +176,10 @@ exports.UArray = class UArray
     else @
 
   unify: (y, trail) ->
-    xdata = @data; ydata = y.data
-    length = @length
-    if length!=y.length then return false
+    xdata = @data;
+    ydata =  if y.data then y.data else y
+    length = xdata.length
+    if length!=ydata.length then return false
     for i in [0...length]
       if not trail.unify(xdata[i], ydata[i]) then return false
     true

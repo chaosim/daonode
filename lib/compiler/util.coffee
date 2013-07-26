@@ -37,8 +37,10 @@ exports.iff = iff = (clauses, else_) ->
 
 exports.switch_ = (test, clauses, else_) -> ['switch', test, clauses, else_]
 
-exports.funcall = (caller, args...) -> ["funcall", caller].concat(args)
-exports.macall = (caller, args...) -> ["macall", caller].concat(args)
+exports.array = (caller, args...) -> ["array", args...]
+exports.uarray = (caller, args...) -> ["uarray", args...]
+exports.funcall = (caller, args...) -> ["funcall", caller, args...]
+exports.macall = (caller, args...) -> ["macall", caller, args...]
 
 exports.jsobject = (exp) -> ["jsobject", exp]
 exports.jsfun = jsfun = (exp) -> ["jsfun", exp]

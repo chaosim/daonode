@@ -46,6 +46,7 @@ exports.Compiler = class Compiler
              il.assign(il.uservar('Var'), il.attr(il.uservar('solvecore'), il.symbol('Var'))),
              il.assign(il.uservar('DummyVar'), il.attr(il.uservar('solvecore'), il.symbol('DummyVar'))),
              il.assign(il.uservar('solver'), il.new(il.symbol('Solver').call())),
+             il.assign(il.uservar('UArray'), il.attr(il.uservar('solvecore'), il.symbol('UArray'))),
              il.assign(il.state, null),
              il.assign(il.catches, {}),
              il.assign(il.trail, il.newTrail),
@@ -228,6 +229,24 @@ exports.Compiler = class Compiler
       cont
 
     "evalarg": (cont, name) -> cont.call(@getvar(name).call())
+
+    "array": (cont, args...) ->
+      compiler = @
+      length = args.length
+      xs = (@newconst('x'+i) for i in [0...length])
+      cont = cont.call(il.array(xs))
+      for i in [length-1..0] by -1
+        cont = do (i=i, cont=cont) ->
+          compiler.cont(args[i], compiler.clamda(xs[i], cont))
+
+    "uarray": (cont, args...) ->
+      compiler = @
+      length = args.length
+      xs = (@newconst('x'+i) for i in [0...length])
+      cont = cont.call(il.uarray(xs))
+      for i in [length-1..0] by -1
+        cont = do (i=i, cont=cont) ->
+          compiler.cont(args[i], compiler.clamda(xs[i], cont))
 
     "funcall": (cont, caller, args...) ->
       compiler = @
