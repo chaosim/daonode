@@ -7,7 +7,8 @@ il = require("./interlang")
 hasOwnProperty = Object::hasOwnProperty
 
 exports.solve = (exp, path) ->
-  path = compile(exp, path)
+  path = process.cwd()+'/lib/compiler/test/compiled.js'
+  compile(exp, path)
   delete require.cache[require.resolve(path)]
   compiled = require(path)
   compiled.main()
@@ -16,11 +17,9 @@ compile = (exp, path) ->
   compiler = new Compiler()
   code = compiler.compile(exp) + "\n//exports.main();"
   code = beautify(code, { indent_size: 2})
-  path = path or "f:/daonode/lib/compiler/test/compiled.js"
   fd = fs.openSync(path, 'w')
   fs.writeSync fd, code
   fs.closeSync fd
-  path
 
 # ####class Compiler
 # the compiler for dao expression
@@ -37,9 +36,9 @@ exports.Compiler = class Compiler
     done = @clamda(v, il.throw(il.new(il.symbol('SolverFinish').call(v))))
     exps = [ il.assign(il.uservar('_'), il.require('underscore')),
              il.assign(il.uservar('__slice'), il.attr([], il.symbol('slice'))),
-             il.assign(il.uservar('solve'), il.attr(il.require('f:/daonode/lib/compiler/core.js'), il.symbol('solve'))),
-             il.assign(il.uservar('parser'), il.require('f:/daonode/lib/compiler/parser.js')),
-             il.assign(il.uservar('solvecore'), il.require('f:/daonode/lib/compiler/solve.js')),
+             il.assign(il.uservar('solve'), il.attr(il.require('../core.js'), il.symbol('solve'))),
+             il.assign(il.uservar('parser'), il.require('../parser.js')),
+             il.assign(il.uservar('solvecore'), il.require('../solve.js')),
              il.assign(il.uservar('SolverFinish'), il.attr(il.uservar('solvecore'), il.symbol('SolverFinish'))),
              il.assign(il.uservar('Solver'), il.attr(il.uservar('solvecore'), il.symbol('Solver'))),
              il.assign(il.uservar('Trail'), il.attr(il.uservar('solvecore'), il.symbol('Trail'))),
@@ -514,10 +513,11 @@ exports.Compiler = class Compiler
           il.assign(result1, []),
           il.assign(fc, il.failcont),
           il.setfailcont(il.clamda(v2, il.assign(v1, v2),
-                                   il.if_(il.unify(result, result1), fc.call(v1),
-                                       il.begin(il.setfailcont(fc), cont.call(null))))),
-          @cont(exp, @clamda(v, il.assign(v1, v),
-            il.push(result1, il.getvalue(template)),
+                                   il.if_(il.unify(@interlang(result), result1),
+                                          il.begin(il.setfailcont(fc), cont.call(null)),
+                                          fc.call(v1)))),
+          @cont(goal, @clamda(v, il.assign(v1, v),
+            il.push(result1, il.getvalue(@interlang(template))),
             il.failcont.call(v1))))
 
     # find only one solution to the @goal
@@ -869,7 +869,7 @@ exports.Compiler = class Compiler
     else [exp[0]].concat(@substMacroArgs(e, params) for e in exp[1...])
 
   interlang: (term) ->
-    if _.isString(term) then return il.uservar(term)
+    if _.isString(term) then return @getvar(term)
     if not _.isArray(term) then return term
     length = term.length
     if length is 0 then return term

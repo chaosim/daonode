@@ -61,18 +61,28 @@ exports.Test =
     test.equal  solve(orp(cutable(orp(andp(print_(1), cut, fail), print_(2))), print_(3))), null
     test.done()
 
-#xexports.Test =
+#exports.Test =
+  "test unify array": (test) ->
+    a = vari('a')
+    $a = logicvar('a')
+    test.equal  solve(unify(array($a), [1])), false
+    test.equal  solve(unify(uarray($a), [1])), true
+    test.equal  solve(andp(assign(a, $a), unify(uarray(a), [1]), unify(a, 2))), false
+    test.equal  solve(begin(assign(a, $a), orp(andp(unify(uarray(a), [1]), unify(a, 2)), unify(a, 2)))), true
+    test.done()
+
+#exports.Test =
   "test findall once": (test) ->
     x = vari('x')
     result = vari('result')
     test.equal  solve(findall(orp(print_(1), print_(2)))), null
     test.equal  solve(findall(orp(print_(1), print_(2), print_(3)))), null
-#    test.deepEqual solve(andp(assign(x, logicvar('x')), assign(result, logicvar('result')),
-#                        findall(orp(unify(x, 1), unify(x, 2)), result, x), getvalue(result))), [1,2]
-#    test.deepEqual  solve(andp(findall(fail, result, x), result)), []
-#    test.deepEqual  solve(andp(findall(succeed, result, 1), result)), [1]
-#    test.deepEqual  solve(andp(findall(once(orp(print_(1), print_(2))), result, 1), result)), [1]
-#    test.equal(solvebase.status, solvebase.SUCCESS);
+    test.deepEqual solve(andp(assign(x, logicvar('x')), assign(result, logicvar('result')),
+                        findall(orp(unify(x, 1), unify(x, 2)), result, x), getvalue(result))), [1,2]
+    test.deepEqual  solve(andp(assign(result, logicvar('result')), findall(fail, result, 1), getvalue(result))), []
+    test.deepEqual  solve(andp(assign(result, logicvar('result')),findall(succeed, result, 1), getvalue(result))), [1]
+    test.deepEqual  solve(andp(assign(result, logicvar('result')),
+                               findall(once(orp(print_(1), print_(2))), result, 1), getvalue(result))), [1]
     test.done()
 
 xexports.Test =
@@ -91,21 +101,10 @@ xexports.Test =
     test.equal solvebase.status, solvebase.SUCCESS
     test.done()
 
-
   "test rule2": (test) ->
     r = rule(2, (x, y)->
       [[1,2], print_(1),
        [1,1], print_(2)])
     test.equal  solve(r(1,1)), null
-    test.done()
-
-exports.Test =
-  "test unify array": (test) ->
-    a = vari('a')
-    $a = logicvar('a')
-    test.equal  solve(unify(array($a), [1])), false
-    test.equal  solve(unify(uarray($a), [1])), true
-    test.equal  solve(andp(assign(a, $a), unify(uarray(a), [1]), unify(a, 2))), false
-    test.equal  solve(begin(assign(a, $a), orp(andp(unify(uarray(a), [1]), unify(a, 2)), unify(a, 2)))), true
     test.done()
 

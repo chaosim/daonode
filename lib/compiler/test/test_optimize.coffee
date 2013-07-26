@@ -5,8 +5,9 @@ il = require("../interlang")
 
 {Compiler, OptimizationEnv} = require '../core'
 
-solve = (exp, path) ->
-  path = compile(exp, path)
+solve = (exp) ->
+  path = process.cwd()+'/lib/compiler/test/compiled.js'
+  compile(exp, path)
   delete require.cache[require.resolve(path)]
   compiled = require(path)
   compiled.main()
@@ -25,7 +26,6 @@ compile = (exp, path) ->
   +compileToCode(exp)\
     +"\n//exports.main();"
   code = beautify(code, { indent_size: 2})
-  path = path or "f:/daonode/lib/compiler/test/compiled.js"
   fd = fs.openSync(path, 'w')
   fs.writeSync fd, code
   fs.closeSync fd
