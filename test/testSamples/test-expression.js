@@ -2,17 +2,17 @@
 (function() {
   var andp, atom, begin, bind, cons, core, dummy, expression, getvalue, is_, macro, operator, orp, print_, settext, solve, special, toString, vari, xexports, _ref, _ref1, _ref2, _ref3;
 
-  _ref = core = require("../../lib/core"), solve = _ref.solve, special = _ref.special, vari = _ref.vari, dummy = _ref.dummy, cons = _ref.cons, vari = _ref.vari, macro = _ref.macro;
+  _ref = core = require("../../lib/interpreter/core"), solve = _ref.solve, special = _ref.special, vari = _ref.vari, dummy = _ref.dummy, cons = _ref.cons, vari = _ref.vari, macro = _ref.macro;
 
-  _ref1 = require("../../lib/builtins/general"), print_ = _ref1.print_, getvalue = _ref1.getvalue, toString = _ref1.toString;
+  _ref1 = require("../../lib/interpreter/builtins/general"), print_ = _ref1.print_, getvalue = _ref1.getvalue, toString = _ref1.toString;
 
-  _ref2 = require("../../lib/builtins/logic"), andp = _ref2.andp, orp = _ref2.orp, bind = _ref2.bind, is_ = _ref2.is_;
+  _ref2 = require("../../lib/interpreter/builtins/logic"), andp = _ref2.andp, orp = _ref2.orp, bind = _ref2.bind, is_ = _ref2.is_;
 
-  begin = require("../../lib/builtins/lisp").begin;
+  begin = require("../../lib/interpreter/builtins/lisp").begin;
 
-  settext = require("../../lib/builtins/parser").settext;
+  settext = require("../../lib/interpreter/builtins/parser").settext;
 
-  _ref3 = require("../expression"), expression = _ref3.expression, operator = _ref3.operator, atom = _ref3.atom;
+  _ref3 = require("../../samples/expression"), expression = _ref3.expression, operator = _ref3.operator, atom = _ref3.atom;
 
   xexports = {};
 

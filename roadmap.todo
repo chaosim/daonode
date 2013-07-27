@@ -39,7 +39,7 @@ logic features:
   ✔ logic negation, repeat @done (13-06-19 15:02)
   ✔ findall @done (13-06-20 14:04)
   ✔ once, ifp, etc. @done (13-06-26 21:54)
-    ☐ test
+    ✔ test @done (13-07-27 13:08)
   ✔ callfc @done (13-06-26 21:54)
     ☐ test
   ✔ Cons, UObject, UArray @done (13-07-26 22:27)

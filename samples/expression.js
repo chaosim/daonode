@@ -5,15 +5,15 @@
 
   _ = require('underscore');
 
-  _ref = require("../lib/core"), solve = _ref.solve, special = _ref.special, vari = _ref.vari, dummy = _ref.dummy, cons = _ref.cons, vari = _ref.vari, macro = _ref.macro;
+  _ref = require("../lib/interpreter/core"), solve = _ref.solve, special = _ref.special, vari = _ref.vari, dummy = _ref.dummy, cons = _ref.cons, vari = _ref.vari, macro = _ref.macro;
 
-  _ref1 = require("../lib/builtins/general"), print_ = _ref1.print_, getvalue = _ref1.getvalue, toString = _ref1.toString;
+  _ref1 = require("../lib/interpreter/builtins/general"), print_ = _ref1.print_, getvalue = _ref1.getvalue, toString = _ref1.toString;
 
-  _ref2 = require("../lib/builtins/logic"), andp = _ref2.andp, orp = _ref2.orp, rule = _ref2.rule, bind = _ref2.bind, is_ = _ref2.is_;
+  _ref2 = require("../lib/interpreter/builtins/logic"), andp = _ref2.andp, orp = _ref2.orp, rule = _ref2.rule, bind = _ref2.bind, is_ = _ref2.is_;
 
-  begin = require("../lib/builtins/lisp").begin;
+  begin = require("../lib/interpreter/builtins/lisp").begin;
 
-  _ref3 = require("../lib/builtins/parser"), settext = _ref3.settext, char = _ref3.char, digits = _ref3.digits, spaces = _ref3.spaces, eoi = _ref3.eoi, literal = _ref3.literal, number = _ref3.number, dqstring = _ref3.dqstring, sqstring = _ref3.sqstring;
+  _ref3 = require("../lib/interpreter/builtins/parser"), settext = _ref3.settext, char = _ref3.char, digits = _ref3.digits, spaces = _ref3.spaces, eoi = _ref3.eoi, literal = _ref3.literal, number = _ref3.number, dqstring = _ref3.dqstring, sqstring = _ref3.sqstring;
 
   exports.expression = function(operator) {
     return rule(null, 'expression', function(x) {

@@ -1,8 +1,8 @@
-{solve, special, vari, dummy, cons, vari, macro} = require("../lib/core")
-{print_, getvalue, toString} = require("../lib/builtins/general")
-{andp, orp, rule, bind, is_} = require("../lib/builtins/logic")
-{begin} = require("../lib/builtins/lisp")
-{settext, char, digits, spaces, eoi, memo} = require("../lib/builtins/parser")
+{solve, special, vari, dummy, cons, vari, macro} = require("../lib/interpreter/core")
+{print_, getvalue, toString} = require("../lib/interpreter/builtins/general")
+{andp, orp, rule, bind, is_} = require("../lib/interpreter/builtins/logic")
+{begin} = require("../lib/interpreter/builtins/lisp")
+{settext, char, digits, spaces, eoi, memo} = require("../lib/interpreter/builtins/parser")
 
 exports.flatString = flatString = special(1, 'flatString', (solver, cont, x) ->
   solver.cont(x, (v) -> cont(v.flatString?() or 'null')))

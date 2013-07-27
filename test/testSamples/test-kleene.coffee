@@ -1,9 +1,9 @@
-{solve, special, vari, dummy, cons, vari, macro} = core = require("../../lib/core")
-{print_, getvalue, toString} = require("../../lib/builtins/general")
-{andp, orp, bind, is_} = require("../../lib/builtins/logic")
-{begin} = require("../../lib/builtins/lisp")
-{settext, memo} = require("../../lib/builtins/parser")
-{kleene, leftkleene, kleenePredicate, dightsSpaces, flatString} = require("../kleene")
+{solve, special, vari, dummy, cons, vari, macro} = core = require("../../lib/interpreter/core")
+{print_, getvalue, toString} = require("../../lib/interpreter/builtins/general")
+{andp, orp, bind, is_} = require("../../lib/interpreter/builtins/logic")
+{begin} = require("../../lib/interpreter/builtins/lisp")
+{settext, memo} = require("../../lib/interpreter/builtins/parser")
+{kleene, leftkleene, kleenePredicate, dightsSpaces, flatString} = require("../../samples/kleene")
 
 xexports = {}
 
