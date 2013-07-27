@@ -41,7 +41,7 @@ logic features:
   ✔ once, ifp, etc. @done (13-06-26 21:54)
     ✔ test @done (13-07-27 13:08)
   ✔ callfc @done (13-06-26 21:54)
-    ☐ test
+    ✔ test @done (13-07-27 15:13)
   ✔ Cons, UObject, UArray @done (13-07-26 22:27)
 parser features:
   ✔ parser state @done (13-06-21 21:32)

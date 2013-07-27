@@ -12,7 +12,7 @@
 
   _ref3 = require("../../lib/interpreter/builtins/parser"), settext = _ref3.settext, memo = _ref3.memo;
 
-  _ref4 = require("../../samples/kleene"), kleene = _ref4.kleene, leftkleene = _ref4.leftkleene, kleenePredicate = _ref4.kleenePredicate, dightsSpaces = _ref4.dightsSpaces, flatString = _ref4.flatString;
+  _ref4 = require("../../samples/interpreter/kleene"), kleene = _ref4.kleene, leftkleene = _ref4.leftkleene, kleenePredicate = _ref4.kleenePredicate, dightsSpaces = _ref4.dightsSpaces, flatString = _ref4.flatString;
 
   xexports = {};
 

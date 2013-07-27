@@ -12,7 +12,7 @@
 
   settext = require("../../lib/interpreter/builtins/parser").settext;
 
-  _ref3 = require("../../samples/expression"), expression = _ref3.expression, operator = _ref3.operator, atom = _ref3.atom;
+  _ref3 = require("../../samples/interpreter/expression"), expression = _ref3.expression, operator = _ref3.operator, atom = _ref3.atom;
 
   xexports = {};
 

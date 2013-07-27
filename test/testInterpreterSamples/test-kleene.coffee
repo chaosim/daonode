@@ -3,7 +3,7 @@
 {andp, orp, bind, is_} = require("../../lib/interpreter/builtins/logic")
 {begin} = require("../../lib/interpreter/builtins/lisp")
 {settext, memo} = require("../../lib/interpreter/builtins/parser")
-{kleene, leftkleene, kleenePredicate, dightsSpaces, flatString} = require("../../samples/kleene")
+{kleene, leftkleene, kleenePredicate, dightsSpaces, flatString} = require("../../samples/interpreter/kleene")
 
 xexports = {}
 

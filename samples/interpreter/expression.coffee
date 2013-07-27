@@ -1,9 +1,9 @@
 _ = require('underscore')
-{solve, special, vari, dummy, cons, vari, macro} = require("../lib/interpreter/core")
-{print_, getvalue, toString} = require("../lib/interpreter/builtins/general")
-{andp, orp, rule, bind, is_} = require("../lib/interpreter/builtins/logic")
-{begin} = require("../lib/interpreter/builtins/lisp")
-{settext, char, digits, spaces, eoi, literal, number, dqstring, sqstring} = require("../lib/interpreter/builtins/parser")
+{solve, special, vari, dummy, cons, vari, macro} = require("../../lib/interpreter/core")
+{print_, getvalue, toString} = require("../../lib/interpreter/builtins/general")
+{andp, orp, rule, bind, is_} = require("../../lib/interpreter/builtins/logic")
+{begin} = require("../../lib/interpreter/builtins/lisp")
+{settext, char, digits, spaces, eoi, literal, number, dqstring, sqstring} = require("../../lib/interpreter/builtins/parser")
 
 
 exports.expression = (operator) -> rule(null, 'expression', (x)->

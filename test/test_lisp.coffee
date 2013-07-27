@@ -3,10 +3,10 @@ _ = require "underscore"
 {solve} = core = require('../lib/core')
 {string, begin, quote, assign, print_, jsobject, variable,
 funcall, macall, lamda, macro, jsfun,
-if_, add, eq, le, inc, suffixinc, print_, loop_, until_, while_, not_, dec
+if_, add, eq, le, inc, suffixinc, print_, loop_, until_, while_, not_, dec, orp
 eval_, qq, uq, uqs, iff
 block, break_, continue_, makeLabel,
-catch_, throw_, protect, callcc} = require('../lib/util')
+catch_, throw_, protect, callcc, callfc} = require('../lib/util')
 
 vari = (name) -> name
 
@@ -64,6 +64,12 @@ exports.Test =
 #exports.Test =
   "test callcc": (test) ->
     test.equal solve(begin(callcc(jsfun((k) -> k(null))), add(1, 2))), 3
+    test.done()
+
+#exports.Test =
+  "test callfc": (test) ->
+    test.equal solve(orp(callfc(jsfun((k) -> k(null))), print_(1))), null
+    test.equal solve(orp(callfc(jsfun((k) -> k(null))), add(1, 2))), 3
     test.done()
 
 #xexports.Test =

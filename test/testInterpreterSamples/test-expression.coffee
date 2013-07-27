@@ -3,7 +3,7 @@
 {andp, orp, bind, is_} = require("../../lib/interpreter/builtins/logic")
 {begin} = require("../../lib/interpreter/builtins/lisp")
 {settext} = require("../../lib/interpreter/builtins/parser")
-{expression, operator, atom} = require("../../samples/expression")
+{expression, operator, atom} = require("../../samples/interpreter/expression")
 
 xexports = {}
 
