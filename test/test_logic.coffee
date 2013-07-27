@@ -1,21 +1,30 @@
-I = require "./importer"
+_ = require "underscore"
 
-base  =  "../lib/"
+{solve} = core = require('../lib/core')
+solvebase = require('../lib/solve')
+{begin, assign, print_, string,
+array, uarray, cons, makeobject, uobject
+funcall, lamda, macro,
+if_, add, eq, le, inc, not_,
+logicvar, unify, succeed, fail, andp, orp, notp, getvalue
+cutable, cut, findall, once
+} = require('../lib/util')
 
-core  = require base+"core"
-I.use base+"core: Trail, solve, fun, macro vari"
-I.use base+"builtins/general: add print_"
-I.use base+"builtins/lisp: quote eval_"
-I.use base+"builtins/logic: andp orp notp succeed fail unify findall once rule"
-I.use base+"builtins/parser: char parsetext may any"
+vari = (name) -> name
 
 xexports = {}
 
 exports.Test =
+  "test succeed fail": (test) ->
+    test.equal solve(succeed), true
+    test.equal solve(fail), false
+    test.done()
+
   "test and print": (test) ->
     test.equal  solve(andp(print_(1), print_(2))), null
     test.done()
 
+#exports.Test =
   "test or print": (test) ->
     test.equal  solve(orp(print_(1))), null
     test.equal  solve(orp(print_(1), print_(2))), null
@@ -24,14 +33,10 @@ exports.Test =
     test.equal  solve(orp(fail, fail, print_(3))), null
     test.done()
 
-  "test succeed fail": (test) ->
-    test.equal solve(succeed), null
-    test.equal solve(fail), null
-    test.done()
-
+#xexports.Test =
   "test not succeed fail": (test) ->
-    test.equal  solve(notp(succeed)), null
-    test.equal  solve(notp(fail)), null
+    test.equal  solve(notp(succeed)), true
+    test.equal  solve(notp(fail)), false
     test.done()
 
   "test not print": (test) ->
@@ -43,26 +48,68 @@ exports.Test =
     test.equal  solve(unify(1, 2)), false
     test.done()
 
-  "test unify a 1": (test) ->
-    a = vari('a')
-    test.equal  solve(unify(a, 1)), true
-    a = vari('a')
-    test.equal  solve(andp(unify(a, 1), unify(a, 2))), false
-    a = vari('a')
-    test.equal  solve(orp(andp(unify(a, 1), unify(a, 2)), unify(a, 2))), true
-    test.done()
-
   "test unify logicvar": (test) ->
     a = vari('a')
-    test.equal  solve(unify(a, 1)), true
-    a = vari('a')
-    test.equal  solve(andp(unify(a, 1), unify(a, 2))), false
-    a = vari('a')
-    test.equal  solve(orp(andp(unify(a, 1), unify(a, 2)), unify(a, 2))), true
-    a = vari('a')
-    test.equal  solve(orp(unify(a, 1), unify(a, 2))), true
+    $a = logicvar('a')
+    test.equal  solve(unify($a, 1)), true
+    test.equal  solve(andp(assign(a, $a), unify(a, 1), unify(a, 2))), false
+    test.equal  solve(begin(assign(a, $a), orp(andp(unify(a, 1), unify(a, 2)), unify(a, 2)))), true
     test.done()
 
+  "test cut": (test) ->
+    test.equal  solve(orp(andp(print_(1), fail), print_(2))), null
+    test.equal  solve(orp(andp(print_(1), cut, fail), print_(2))), false
+    test.equal  solve(orp(cutable(orp(andp(print_(1), cut, fail), print_(2))), print_(3))), null
+    test.done()
+
+#exports.Test =
+  "test findall once": (test) ->
+    x = vari('x')
+    result = vari('result')
+    test.equal  solve(findall(orp(print_(1), print_(2)))), null
+    test.equal  solve(findall(orp(print_(1), print_(2), print_(3)))), null
+    test.deepEqual solve(andp(assign(x, logicvar('x')), assign(result, logicvar('result')),
+                              findall(orp(unify(x, 1), unify(x, 2)), result, x), getvalue(result))), [1,2]
+    test.deepEqual  solve(andp(assign(result, logicvar('result')), findall(fail, result, 1), getvalue(result))), []
+    test.deepEqual  solve(andp(assign(result, logicvar('result')),findall(succeed, result, 1), getvalue(result))), [1]
+    test.deepEqual  solve(andp(assign(result, logicvar('result')),
+                               findall(once(orp(print_(1), print_(2))), result, 1), getvalue(result))), [1]
+    test.done()
+
+#exports.Test =
+  "test unify cons": (test) ->
+    a = vari('a')
+    $a = logicvar('a')
+    test.equal  solve(unify(cons(1, null), cons(1, null))), true
+    test.equal  solve(unify(cons($a, null), cons(1, null))), true
+    test.equal  solve(andp(assign(a, $a), unify(cons(a, null), cons(1, null)), unify(a, 2))), false
+    test.equal  solve(begin(assign(a, $a), orp(andp(unify(cons(a, null), cons(1, null)),
+                                                    unify(a, 2)), unify(a, 2)))), true
+    test.done()
+
+#exports.Test =
+  "test unify array, uarray": (test) ->
+    a = vari('a')
+    $a = logicvar('a')
+    test.equal  solve(unify(array($a), [1])), false
+    test.equal  solve(unify(uarray($a), [1])), true
+    test.equal  solve(andp(assign(a, $a), unify(uarray(a), [1]), unify(a, 2))), false
+    test.equal  solve(begin(assign(a, $a), orp(andp(unify(uarray(a), [1]), unify(a, 2)), unify(a, 2)))), true
+    test.done()
+
+#exports.Test =
+  "test unify uobject": (test) ->
+    a = vari('a')
+    $a = logicvar('a')
+    test.equal  solve(unify(makeobject(string('a'), 1), {a:1})), false
+    test.equal  solve(unify(uobject(string('a'), 1), {a:1})), true
+    test.equal  solve(unify(uobject(string('a'), $a), {a:1})), true
+    test.equal  solve(andp(assign(a, $a), unify(uobject(string('a'), a), {a:1}), unify(a, 2))), false
+    test.equal  solve(begin(assign(a, $a), orp(andp(unify(uobject(string('a'), a), {a:1}),
+                                                    unify(a, 2)), unify(a, 2)))), true
+    test.done()
+
+xexports.Test =
   "test macro": (test) ->
     same = macro(1, (x) -> x)
     orpm = macro(2, (x, y) -> orp(x, y))
@@ -71,24 +118,12 @@ exports.Test =
     test.equal  solve(orpm(fail, print_(2))), null
     test.done()
 
-  "test unify var": (test) ->
-    a = vari('a')
-    test.equal  solve(unify(a, 1)), true
-    test.equal  solve(andp(unify(a, 1))), true
-    test.equal  solve(andp(unify(a, 1), unify(a, 2))), false
-    test.equal  solve(andp(unify(a, 1), unify(a, 2), unify(a, 2))), false
-    a.binding = a
-    test.equal  solve(orp(andp(unify(a, 1), unify(a, 2)), unify(a, 2))), true
-    test.equal  solve(orp(andp(unify(a, 1), unify(a, 2)))), false
-    test.done()
-
   "test rule": (test) ->
     r = rule(2, (x, y)->
       [[x,y], 1, null])
     test.equal  solve(r(1,1)), 1
-    test.equal core.status, core.SUCCESS
+    test.equal solvebase.status, solvebase.SUCCESS
     test.done()
-
 
   "test rule2": (test) ->
     r = rule(2, (x, y)->
@@ -97,14 +132,3 @@ exports.Test =
     test.equal  solve(r(1,1)), null
     test.done()
 
-  "test findall once": (test) ->
-    x = vari('x')
-    result = vari('result')
-    test.equal  solve(findall(orp(print_(1), print_(2)))), null
-    test.equal  solve(findall(orp(print_(1), print_(2), print_(3)))), null
-    test.deepEqual  solve(andp(findall(orp(unify(x, 1), unify(x, 2)), result, x), result)), [1,2]
-    test.deepEqual  solve(andp(findall(fail, result, x), result)), []
-    test.deepEqual  solve(andp(findall(succeed, result, 1), result)), [1]
-    test.deepEqual  solve(andp(findall(once(orp(print_(1), print_(2))), result, 1), result)), [1]
-    test.equal(core.status, core.SUCCESS);
-    test.done()

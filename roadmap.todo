@@ -42,7 +42,7 @@ logic features:
     ☐ test
   ✔ callfc @done (13-06-26 21:54)
     ☐ test
-  ☐ Cons, UObject, UArray
+  ✔ Cons, UObject, UArray @done (13-07-26 22:27)
 parser features:
   ✔ parser state @done (13-06-21 21:32)
   ✔ test parsetext, settext @done (13-06-23 20:50)
