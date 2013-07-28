@@ -48,6 +48,8 @@ exports.macall = (caller, args...) -> ["macall", caller, args...]
 exports.jsobject = (exp) -> ["jsobject", exp]
 exports.jsfun = jsfun = (exp) -> ["jsfun", exp]
 
+exports.direct = (exp) -> ['direct', exp]
+
 exports.pure = io = (exp) -> ["pure", exp]
 exports.effect = sideEffect = (exp) -> ["effect", exp]
 exports.io = io = (exp) -> ["io", exp]
@@ -413,7 +415,7 @@ exports.newlines0 = stringIn0('\r\n')
 # float: match a number, which can be float format..<br/>
 #  if arg is free core.Var, arg would be bound to the number <br/>
 #  else arg should equal to the number.
-exports.number = exports.float = (arg) ->  ['number', arg]
+exports.number = exports.float = () ->  ['number']
 
 #literal: match given literal arg,  <br/>
 # arg is a string or a var bound to a string.
@@ -430,11 +432,8 @@ exports.followLiteral = (arg) ->  ['followLiteral', arg]
 exports.notFollowLiteral = (arg) ->  ['notFollowLiteral', arg]
 
 #quoteString: match a quote string quoted by quote, quote can be escapedby \
-exports.quoteString = (arg) ->  ['quoteString', arg]
+exports.quoteString = () ->  ['quoteString']
 
-#dqstring： double quoted string "..." <br/>
-#usage: dqstring  #!!! not dqstring()
-exports.dqstring = exports.quoteString('"')
-#sqstring： single quoted string '...' <br/>
-#usage: sqstring  #!!! not sqstring()
-exports.sqstring = exports.quoteString("'")
+#quoteString: match a quote string quoted by quote, quote can be escapedby \
+exports.identifier = () ->  ['identifier']
+

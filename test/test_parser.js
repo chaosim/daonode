@@ -47,16 +47,13 @@
       return test.done();
     },
     "test number": function(test) {
-      var x;
-
-      x = logicvar('x');
-      test.equal(solve(parsetext(number(x), string('123'))), 3);
-      test.equal(solve(parsetext(number(x), string('123.4'))), 5);
-      test.equal(solve(parsetext(number(x), string('-123.4'))), 6);
-      test.equal(solve(parsetext(number(x), string('.123'))), 4);
-      test.equal(solve(parsetext(number(x), string('123.e-2'))), 7);
-      test.equal(solve(parsetext(number(x), string('123.e'))), 4);
-      test.equal(solve(parsetext(number(x), string('123.e+'))), 4);
+      test.equal(solve(parsetext(number(), string('123'))), 123);
+      test.equal(solve(parsetext(number(), string('123.4'))), 123.4);
+      test.equal(solve(parsetext(number(), string('-123.4'))), -123.4);
+      test.equal(solve(parsetext(number(), string('.123'))), .123);
+      test.equal(solve(parsetext(number(), string('123.e-2'))), 123e-2);
+      test.equal(solve(parsetext(number(), string('123.e'))), 123);
+      test.equal(solve(parsetext(number(), string('123.e+'))), 123);
       return test.done();
     },
     "test literal": function(test) {
@@ -73,8 +70,8 @@
       return test.done();
     },
     "test parallel": function(test) {
-      test.equal(solve(begin(settext(string('1')), parallel(char(string('1')), number(1)))), 1);
-      test.equal(solve(begin(settext(string('12')), parallel(char(string('1')), number(12)))), 2);
+      test.equal(solve(begin(settext(string('1')), parallel(char(string('1')), number()))), 1);
+      test.equal(solve(begin(settext(string('12')), parallel(char(string('1')), number()))), 12);
       test.equal(solve(begin(settext(string('1')), parallel(char(string('1')), char(string('a'))))), false);
       return test.done();
     },

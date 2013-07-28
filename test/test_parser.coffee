@@ -48,16 +48,16 @@ exports.Test =
 
 #exports.Test =
   "test number": (test) ->
-    x = logicvar('x')
-    test.equal  solve(parsetext(number(x), string('123'))), 3
-    test.equal  solve(parsetext(number(x), string('123.4'))), 5
-    test.equal  solve(parsetext(number(x), string('-123.4'))), 6
-    test.equal  solve(parsetext(number(x), string('.123'))), 4
-    test.equal  solve(parsetext(number(x), string('123.e-2'))), 7
-    test.equal  solve(parsetext(number(x), string('123.e'))), 4
-    test.equal  solve(parsetext(number(x), string('123.e+'))), 4
+    test.equal  solve(parsetext(number(), string('123'))), 123
+    test.equal  solve(parsetext(number(), string('123.4'))), 123.4
+    test.equal  solve(parsetext(number(), string('-123.4'))), -123.4
+    test.equal  solve(parsetext(number(), string('.123'))),.123
+    test.equal  solve(parsetext(number(), string('123.e-2'))), 123e-2
+    test.equal  solve(parsetext(number(), string('123.e'))), 123
+    test.equal  solve(parsetext(number(), string('123.e+'))), 123
     test.done()
 
+#xexports.Test =
   "test literal": (test) ->
     test.equal  solve(parsetext(literal(string('daf')), string('daf'))), 3
     test.done()
@@ -72,10 +72,10 @@ exports.Test =
     test.equal  solve(parsetext(may(char(string('a'))), string('b'))), 0
     test.done()
 
-#xexports.Test =
+#exports.Test =
   "test parallel": (test) ->
-    test.equal  solve(begin(settext(string('1')), parallel(char(string('1')), number(1)))), 1
-    test.equal  solve(begin(settext(string('12')), parallel(char(string('1')), number(12)))), 2
+    test.equal  solve(begin(settext(string('1')), parallel(char(string('1')), number()))), 1
+    test.equal  solve(begin(settext(string('12')), parallel(char(string('1')), number()))), 12
     test.equal  solve(begin(settext(string('1')), parallel(char(string('1')),char(string('a'))))), false
     test.done()
 
@@ -101,7 +101,7 @@ exports.Test =
     test.equal  solve(begin(assign(_, dummy('__')), parsetext(findall(lazyany(begin(char(_), print_(getvalue(_))))), string('abc')))), 3
     test.done()
 
-#exports.Test =
+#xexports.Test =
   "test any": (test) ->
     _ = vari('__')
     result = vari('result')
@@ -179,7 +179,7 @@ exports.Test =
     test.equal  solve(parsetext(begin(assign(_, dummy('__')), some(char(string('a'))), eoi), string('b'))), false
     test.done()
 
-#xexports.Test =
+#exports.Test =
   "test times": (test) ->
     _ = vari('__')
     result = vari('result')
@@ -218,7 +218,7 @@ exports.Test =
                                 times(char(string('b')), n, result, string('b')), eoi, getvalue(result))), ['b', 'b', 'b']
     test.done()
 
-#exports.Test =
+#xexports.Test =
   "test seplist": (test) ->
     _ = vari('__')
     result = vari('result')

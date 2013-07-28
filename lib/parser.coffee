@@ -12,59 +12,6 @@ _ = require('underscore')
 
 {Trail, Var,  ExpressionError, TypeError} = require "./solve"
 
-# ####parser control/access
-
-# parse, setstate, getstate have no demand on solver.state <br/> <br/>
-# parsesequence/parsetext, setsequence/settext, getsequence/gettext, getpos, step, lefttext, next: demand that solver.state should look like [sequence, index], and sequence can be indexed by integer. index is an integer.<br/><br/>
-# lefttext, subtext, eoi, boi demand that sequence should have length property  <br/><br/>
-# eol, boil demand that sequence should be an string.
-
-# #### general predicate
-
-defaultPureHash = (name, caller, args...) -> (name or caller.name) + args.join(',')
-
-exports.purememo = (caller, name='', hash=defaultPureHash) ->
-  if not _.isString(name) then hash  = name; name = '';
-  special(null, 'purememo', (solver, cont, args...) ->
-    hashValue = hash(name, caller, args...)
-    if hashValue is undefined then solver.cont(caller(args...), cont)
-    else
-      fromCont = solver.cont(caller(args...), (v) -> solver.finished = true; [cont, v])
-      (v) ->
-        if solver.purememo.hasOwnProperty(hashValue) then cont(solver.purememo[hashValue])
-        else
-          result = [newCont, v] = solver.run(null, fromCont)
-          solver.finished = false
-          solver.purememo[hashValue] =  v
-          result
-       )
-
-exports.clearPureMemo = (solver, cont) ->
-  (v) -> solver._memoPureResult = {}; cont(v)
-
-defaultHash = (name, solver, caller, args...) -> (name or caller.name)+solver.state[1]
-
-exports.memo = (caller, name='', hash=defaultHash) ->
-  if not _.isString(name) then hash  = name; name = '';
-  special(null, name, (solver, cont, args...) ->
-    (v) ->
-      hashValue = hash(name, solver, caller, args...)
-      if hashValue is undefined then solver.cont(caller(args...), cont)
-      else
-        fromCont = solver.cont(caller(args...), (v) -> solver.finished = true; [cont, v])
-        if solver.memo.hasOwnProperty(hashValue)
-          [result, solver.state[1]] = solver.memo[hashValue]
-          cont(result)
-        else
-          result = [newCont, v]  = solver.run(null, fromCont)
-          solver.finished = false
-          solver.memo[hashValue] =  [v, solver.state[1]]
-          result
-    )
-
-exports.clearmemo = (solver, cont) ->
-  (v) -> solver.memo = {}; cont(v)
-
 # char: match one char  <br/>
 #  if x is char or bound to char, then match that given char with next<br/>
 #  else match with next char, and bound x to it.
@@ -210,7 +157,7 @@ exports.stringWhile0 = (solver, test) ->
 # float: match a number, which can be float format..<br/>
 #  if arg is free core.Var, arg would be bound to the number <br/>
 #  else arg should equal to the number.
-exports.number = exports.float = (solver, arg) ->
+exports.number = exports.float = (solver) ->
   [text, pos] = solver.state
   length = text.length
   if pos>=length then return solver.failcont(pos)
@@ -231,17 +178,9 @@ exports.number = exports.float = (solver, arg) ->
     if p<length and (text[p]=='+' or text[p]=='-') then p++
     if p>=length or text[p]<'0' or '9'<text[p] then p = pE-1
     else while p<length and '0'<=text[p]<='9' then p++
-  arg = solver.trail.deref(arg)
   value =  eval(text[pos...p])
-  if (arg instanceof Var)
-    arg.bind(value, solver.trail)
-    solver.state = [text, p]
-    p
-  else
-    if _.isNumber(arg)
-      if arg is value then solver.state = [text, p]; p
-      else solver.failcont(pos)
-    else throw new TypeError(arg)
+  if _.isNumber(value) then solver.state = [text, p]; value
+  else solver.failcont(pos)
 
 #literal: match given literal arg,  <br/>
 # arg is a string or a var bound to a string.
@@ -293,25 +232,30 @@ exports.notFollowLiteral = (solver, arg) ->
   else p
 
 #quoteString: match a quote string quoted by quote, quote can be escapedby \
-exports.quoteString = (solver, quote) ->
-  string = ''
+exports.quoteString = (solver) ->
   [text, pos] = solver.state
   length = text.length
   if pos>=length then return solver.failcont(pos)
-  quote = solver.trail.deref(quote)
-  if (arg instanceof Var) then throw new exports.TypeError(arg)
-  if text[pos]!=quote then return solver.failcont(pos)
+  quote = text[pos]
+  if quote!="'" and quote!='"' then return solver.failcont(pos)
   p = pos+1
   while p<length
     char = text[p]
     p++
     if char=='\\' then p++
     else if char==quote
-      string = text[pos+1...p]
-      break
-  if p is length then return solver.failcont(p)
+      solver.state = [text, p++]
+      return text[pos...p]
+  solver.failcont(p)
+
+exports.identifier = (solver) ->
+  [text, pos] = solver.state
+  length = text.length
+  if pos>=length then return solver.failcont(pos)
+  c = text[pos]
+  if not (c=='_' or 'a'<=c<='z' or 'A'<=c<='Z') then return solver.failcont(pos)
+  p = pos+1
+  while p<length and c=text[p] and (c=='_' or 'a'<=c<='z' or 'A'<=c<='Z' or '0'<=c<='9')
+    p++
   solver.state = [text, p]
-  string
-
-# fsm, for keywords
-
+  text[pos...p]

@@ -8,6 +8,8 @@ hasOwnProperty = Object::hasOwnProperty
 
 exports.solve = (exp, path) ->
   path = process.cwd()+'/lib/compiled.js'
+  try fs.unlinkSync(path)
+  catch e then null
   compile(exp, path)
   delete require.cache[require.resolve(path)]
   compiled = require(path)
@@ -29,9 +31,12 @@ exports.Compiler = class Compiler
     @exits = {}
     @continues = {}
     @protect = (cont) -> cont
+    @nameVarMap = {}
 
   compile: (exp) ->
-    @env = new CpsEnv(null, {})
+    @env = env = new CpsEnv(null, {})
+    exp = @alpha(exp)
+    @env = env
     v = @newconst('v')
     done = @clamda(v, il.throw(il.new(il.symbol('SolverFinish').call(v))))
     exps = [ il.assign(il.uservar('_'), il.require('underscore')),
@@ -61,82 +66,53 @@ exports.Compiler = class Compiler
     exp = il.assign(il.attr(il.uservar('exports'), il.symbol('main')), lamda)
     exp.toCode(@)
 
+  alphaName: (name) -> @env.alphaName(name)
+  alphaMacroParam: (name) -> @env.alphaMacroParam(name)
+  uniqueName: (name, index) -> @env.uniqueName(name, index)
+  uservar: (name) ->
+    map = @nameVarMap
+    v = map[name]
+    if v then v
+    else map[name] = v = il.uservar(name); v
+  userconst: (name) ->
+    map = @nameVarMap
+    v = map[name]
+    if v then v
+    else map[name] = v = il.uservar(name); v.isConst = true; v
   newvar: (v) -> if _.isString(v) then @env.newvar(il.internalvar(v)) else @env.newvar(v)
   newconst: (v) -> if _.isString(v) then @env.newconst(il.internalvar(v)) else @env.newconst(v)
   getvar: (v) -> if _.isString(v) then @env.getvar(il.uservar(v)) else @env.getvar(v)
-  uniquevar: (name, index) -> @env.uniquevar(il.uservar(name), index)
-  uniqueconst: (name, index) -> @env.uniqueconst(il.uservar(name), index)
   lookup: (v) -> if _.isString(v) then @env.lookup(il.uservar(v)) else @env.lookup(v)
   pushEnv: () -> @env = @env.extend()
   popEnv: () -> @env = @env.outer
 
   clamda: (v, body...) -> @globalCont = cont = il.clamda(v, body...); cont
 
+  # alpha convert
+  alpha: (exp) ->
+    if _.isString(exp) then return @alphaName(exp)
+    if not _.isArray(exp) then return exp
+    length = exp.length
+    if length is 0 then return exp
+    if length is 1 then exp
+    head = exp[0]
+    if not _.isString(head) then return exp
+    if hasOwnProperty.call(@specials, head)
+      if hasOwnProperty.call(@specialsAlpha, head) then return @specialsAlpha[head].call(@, head, exp[1...]...)
+      else result = [head]; (for i in [1...length] then result.push(@alpha(exp[i]))); result
+    else return exp
+
   # compile to continuation
   cont: (exp, cont) ->
-    if _.isString(exp) then return cont.call(@getvar(exp))
+    if _.isString(exp) then return cont.call(@uservar(exp))
     if not _.isArray(exp) then return cont.call(exp)
     length = exp.length
     if length is 0 then return cont.call(exp)
     head = exp[0]
     if not _.isString(head) then return cont.call(exp)
-    if not @specials.hasOwnProperty(head) then return cont.call(exp)
-    @specials[head].call(this, cont, exp[1...]...)
+    if hasOwnProperty.call(@specials, head) then @specials[head].call(@, cont, exp[1...]...)
+    else cont.call(exp)
 
-  leftValueCont: (cont, task, item, exp, op) ->
-    assignExpCont = (item) =>
-      v = @newconst('v')
-      temp = @newconst('temp')
-      switch task
-        when 'assign' then return @cont(exp, @clamda(v, il.assign(item, v), cont.call(item)))
-        when 'augment-assign'
-          return @cont(exp, @clamda(v, il.assign(item, il[op](item, v)), cont.call(item)))
-        when 'inc'
-          return il.begin(il.assign(item, il.add(item, 1)), cont.call(item))
-        when 'dec'
-          return il.begin(il.assign(item, il.sub(item, 1)), cont.call(item))
-        when 'suffixinc'
-          return il.begin(il.assign(temp, item), il.assign(item, il.add(item, 1)), cont.call(temp))
-        when 'suffixdec'
-          return il.begin(il.assign(temp, item), il.assign(item, il.sub(item, 1)), cont.call(temp))
-        when 'incp'
-          fc = @newconst('fc')
-          return il.begin(il.assign(fc, il.failcont),
-                          il.setfailcont(il.clamda(v, il.assign(item, il.sub(item, 1)),fc.call(item))),
-                          il.assign(item, il.add(item, 1)),
-                          cont.call(item))
-        when 'decp'
-          fc = @newconst('fc')
-          return il.begin(il.assign(fc, il.failcont),
-                          il.setfailcont(il.clamda(v, il.assign(item, il.add(item, 1)),fc.call(item))),
-                          il.assign(item, il.sub(item, 1)),
-                          cont.call(item))
-        when 'suffixincp'
-          fc = @newconst('fc')
-          return il.begin(il.assign(temp, item), il.assign(fc, il.failcont),
-                          il.setfailcont(il.clamda(v, il.assign(item, il.sub(item, 1)),fc.call(temp))),
-                          il.assign(item, il.add(item, 1)),
-                          cont.call(temp))
-        when 'suffixdecp'
-          fc = @newconst('fc')
-          return il.begin(il.assign(temp, item), il.assign(fc, il.failcont),
-                          il.setfailcont(il.clamda(v, il.assign(item, il.add(item, 1)),fc.call(temp))),
-                          il.assign(item, il.sub(item, 1)),
-                          cont.call(temp))
-    if  _.isString(item) then return assignExpCont(@getvar(item))
-    if not _.isArray(item) then throw new Error "Left value should be an sexpression."
-    length = item.length
-    if length is 0 then throw new Error "Left value side should not be empty list."
-    head = item[0]
-    if not _.isString(head) then throw new Error "Keyword should be a string."
-    if head is "index"
-      object = item[1]; index = item[2]
-      obj = @newconst('obj')
-      i = @newconst('i')
-      @cont(object, il.clamda(obj, @cont(index, il.clamda(i, assignExpCont(il.index(obj, i))))))
-    else if head is 'uniquevar' then return assignExpCont(@uniquevar(item[1], item[2]))
-    else if head is 'uniqueconst' then return assignExpCont(@uniqueconst(item[1], item[2]))
-    else throw new Error "Left Value side should be assignable expression."
 
   specials:
     "quote": (cont, exp) -> cont.call(exp)
@@ -146,16 +122,15 @@ exports.Compiler = class Compiler
       @cont(exp, @clamda(v, @cont(path, @clamda(p, cont.call(il.evalexpr(v, p))))))
     'string': (cont, exp) -> cont.call(exp)
     "begin": (cont, exps...) -> @expsCont(exps, cont)
-    "nonlocal": (cont, vars...) ->
-      vars = (@getvar(name) for name in vars)
-      il.begin(il.nonlocalvar(vars), cont.call(null))
+    "nonlocal": (cont, names...) ->
+       il.begin(il.nonlocal((@uservar(name) for name in names)), cont.call(null))
     "variable": (cont, vars...) ->
       for name in vars
-        v = @getvar(name)
+        v = @uservar(name)
         delete v.isConst
       cont.call(null)
-    "uniquevar": (cont, name, index) -> cont.call(@uniquevar(name, index))
-    "uniqueconst": (cont, name, index) -> cont.call(@uniqueconst(name, index))
+    "uniquevar": (cont, name) -> cont.call(@uservar(name))
+    "uniqueconst": (cont, name) -> cont.call(@userconst(name))
 
     "assign": (cont, left, exp) ->  @leftValueCont(cont, "assign", left, exp)
     "augment-assign": (cont, op, left, exp) ->  @leftValueCont(cont, "augment-assign", left, exp, op)
@@ -163,7 +138,6 @@ exports.Compiler = class Compiler
     'suffixinc': (cont, item) -> @leftValueCont(cont, "suffixinc", item)
     'dec': (cont, item) ->  @leftValueCont(cont, "dec", item)
     'suffixdec': (cont, item) ->  @leftValueCont(cont, "suffixdec", item)
-
     'incp': (cont, item) -> @leftValueCont(cont, "incp", item)
     'suffixincp': (cont, item) -> @leftValueCont(cont, "suffixincp", item)
     'decp': (cont, item) ->  @leftValueCont(cont, "decp", item)
@@ -186,6 +160,9 @@ exports.Compiler = class Compiler
       f = il.jsfun(func)
       f._effect = @_effect
       cont.call(f)
+
+    "direct": (cont, exp) ->
+      il.begin(exp, cont.call())
 
     "pure": (cont, exp) ->
       oldEffect = @_effect
@@ -210,7 +187,7 @@ exports.Compiler = class Compiler
 
     "lambda": (cont, params, body...) ->
       @pushEnv()
-      params = (@getvar(p) for p in params)
+      params = (@uservar(p) for p in params)
       globalCont = @globalCont
       @globalCont = il.idcont
       cont = cont.call(il.userlamda(params, @expsCont(body, il.idcont)))
@@ -220,8 +197,7 @@ exports.Compiler = class Compiler
 
     "macro": (cont, params, body...) ->
       @pushEnv()
-      params1 = (@getvar(p) for p in params)
-      body = (@substMacroArgs(body[i], params) for i in [0...body.length])
+      params1 = (@uservar(p) for p in params)
       globalCont = @globalCont
       @globalCont = il.idcont
       cont = cont.call(il.lamda(params1, @expsCont(body, il.idcont)))
@@ -229,7 +205,7 @@ exports.Compiler = class Compiler
       @popEnv()
       cont
 
-    "evalarg": (cont, name) -> cont.call(@getvar(name).call())
+    "evalarg": (cont, name) -> cont.call(@uservar(name).call())
 
     "array": (cont, args...) ->
       compiler = @
@@ -823,31 +799,70 @@ exports.Compiler = class Compiler
         cont
 
   for name in ['char', 'followChars', 'notFollowChars', 'charWhen', 'stringWhile', 'stringWhile0',
-               'number', 'literal', 'followLiteral', 'quoteString']
+                'literal', 'followLiteral']
     do (name=name, vop=vop) -> Compiler::specials[name] = (cont, item) ->
       compiler = @
       v = @newconst('v')
       compiler.cont(item, compiler.clamda(v, cont.call(il[name](il.solver, v))))
 
-  optimize: (exp, env) ->
-    expOptimize = exp?.optimize
-    if expOptimize then expOptimize.call(exp, env, @)
-    else exp
+  for name in [ 'number','quoteString', 'identifier']
+    do (name=name, vop=vop) -> Compiler::specials[name] = (cont, item) ->
+      cont.call(il[name](il.solver))
 
-  toCode: (exp) ->
-    exptoCode = exp?.toCode
-    if exptoCode then exptoCode.call(exp, @)
-    else
-      if exp is undefined then 'undefined'
-      else if exp is null then 'null'
-      else if _.isNumber(exp) then exp.toString()
-      else if _.isString(exp) then JSON.stringify(exp)
-      else if exp is true then "true"
-      else if exp is false then "false"
-      else if _.isArray(exp) then JSON.stringify(exp)
-      else if typeof exp is 'function' then exp.toString()
-      else if _.isObject(exp) then JSON.stringify(exp)
-      else exp.toString()
+  leftValueCont: (cont, task, item, exp, op) ->
+    assignExpCont = (item) =>
+      v = @newconst('v')
+      temp = @newconst('temp')
+      switch task
+        when 'assign' then return @cont(exp, @clamda(v, il.assign(item, v), cont.call(item)))
+        when 'augment-assign'
+          return @cont(exp, @clamda(v, il.assign(item, il[op](item, v)), cont.call(item)))
+        when 'inc'
+          return il.begin(il.assign(item, il.add(item, 1)), cont.call(item))
+        when 'dec'
+          return il.begin(il.assign(item, il.sub(item, 1)), cont.call(item))
+        when 'suffixinc'
+          return il.begin(il.assign(temp, item), il.assign(item, il.add(item, 1)), cont.call(temp))
+        when 'suffixdec'
+          return il.begin(il.assign(temp, item), il.assign(item, il.sub(item, 1)), cont.call(temp))
+        when 'incp'
+          fc = @newconst('fc')
+          return il.begin(il.assign(fc, il.failcont),
+                          il.setfailcont(il.clamda(v, il.assign(item, il.sub(item, 1)),fc.call(item))),
+                          il.assign(item, il.add(item, 1)),
+                          cont.call(item))
+        when 'decp'
+          fc = @newconst('fc')
+          return il.begin(il.assign(fc, il.failcont),
+                          il.setfailcont(il.clamda(v, il.assign(item, il.add(item, 1)),fc.call(item))),
+                          il.assign(item, il.sub(item, 1)),
+                          cont.call(item))
+        when 'suffixincp'
+          fc = @newconst('fc')
+          return il.begin(il.assign(temp, item), il.assign(fc, il.failcont),
+                          il.setfailcont(il.clamda(v, il.assign(item, il.sub(item, 1)),fc.call(temp))),
+                          il.assign(item, il.add(item, 1)),
+                          cont.call(temp))
+        when 'suffixdecp'
+          fc = @newconst('fc')
+          return il.begin(il.assign(temp, item), il.assign(fc, il.failcont),
+                          il.setfailcont(il.clamda(v, il.assign(item, il.add(item, 1)),fc.call(temp))),
+                          il.assign(item, il.sub(item, 1)),
+                          cont.call(temp))
+    if  _.isString(item) then return assignExpCont(@uservar(item))
+    if not _.isArray(item) then throw new Error "Left value should be an sexpression."
+    length = item.length
+    if length is 0 then throw new Error "Left value side should not be empty list."
+    head = item[0]
+    if not _.isString(head) then throw new Error "Keyword should be a string."
+    if head is "index"
+      object = item[1]; index = item[2]
+      obj = @newconst('obj')
+      i = @newconst('i')
+      @cont(object, il.clamda(obj, @cont(index, il.clamda(i, assignExpCont(il.index(obj, i))))))
+    else if head is 'uniquevar' then return assignExpCont(@uservar(item[1]))
+    else if head is 'uniqueconst' then return assignExpCont(@userconst(item[1]))
+    else throw new Error "Left Value side should be assignable expression."
 
   # used for lisp.begin, logic.andp, etc., to generate the continuation for an expression array
   expsCont: (exps, cont) ->
@@ -883,34 +898,86 @@ exports.Compiler = class Compiler
       il.begin( il.assign(quasilist, il.list(head)),
         cont)
 
-  substMacroArgs: (exp, params) ->
-    if exp in params then return ['evalarg', exp]
-    if not _.isArray(exp) then return exp
-    length = exp.length
-    if length is 0 then return exp
-    head = exp[0]
-    if not _.isString(head) then return exp
-    if not @specials.hasOwnProperty(head) then return exp
-    if head is 'lambda' or head is 'macro'
-      params = (e for e in params if e not in exp[1])
-      exp[0..1].concat(@substMacroArgs(e, params) for e in exp[2...])
-    else if head is 'quote' then exp
-    else if head is 'string' then exp
-    else if head is 'quasiquote' then exp
-    else [exp[0]].concat(@substMacroArgs(e, params) for e in exp[1...])
-
   interlang: (term) ->
-    if _.isString(term) then return @getvar(term)
+    if _.isString(term) then return @uservar(term)
     if not _.isArray(term) then return term
     length = term.length
     if length is 0 then return term
     head = term[0]
     if not _.isString(head) then return term
     if head is 'string' then return term[1]
+    if head is 'uniquevar' then return @uservar(term)
+    if head is 'uniqueconst' then return @userconst(term)
     return term
     # should add stuffs such as 'cons', 'uarray', 'uobject', etc.
 #    @specials.hasOwnProperty(head) then return term
     #    @specials[head].call(this, cont, exp[1...]...)
+
+  specialsAlpha:
+    'string': (head, exp) -> [head,  exp]
+    "begin": (head, exps...) -> result = [head]; (for e in exps then result.push(@alpha(e))); result
+    "nonlocal": (head, vars...) ->
+      result = [head];
+      for name in vars
+        result.push(@alphaName(name))
+      result
+    "variable": (head, vars...) ->
+      result = [head]; result.push(@alphaName(name) for name in vars); result
+    "assign": (head, left, exp) ->
+       [head, @alpha(left), @alpha(exp)]
+    "uniquevar": (head, name, index) -> [head, @uniqueName(name, index)]
+    "uniqueconst": (head, name, index) -> [head, @uniqueName(name, index)]
+    "jsfun": (head, exp) -> [head, exp]
+    "direct": (head, exp) -> [head, exp]
+    "pure": (head, exp) -> [head, exp]
+    "effect": (head, exp) -> [head, exp]
+    "io": (head, exp) -> [head, exp]
+    "lambda": (head, params, body...) ->
+      result = [head]
+      @pushEnv()
+      result.push(@alphaName(p) for p in params)
+      for e in body then result.push(@alpha(e))
+      @popEnv()
+      result
+    "macro": (head, params, body...) ->
+      result = [head]
+      @pushEnv()
+      result.push(@alphaMacroParam(p) for p in params)
+      for e in body then result.push(@alpha(e))
+      @popEnv()
+      result
+    "quasiquote": (head, exp) -> [head, @alpha(exp)]
+    "unquote": (head, exp) ->  [head, @alpha(exp)]
+    "unquote-slice": (head, exp) -> [head, @alpha(exp)]
+    'block': (head, label, body...) ->
+      result = [head, label]
+      for e in body then result.push(@alpha(e))
+      result
+    'break': (head, label, value) -> [head, label, @alpha(value)]
+    'continue': (head, label) -> [head, label]
+    'logicvar': (head, name) -> [head, name]
+    'dummy': (head, name) -> [head, name]
+
+  optimize: (exp, env) ->
+    expOptimize = exp?.optimize
+    if expOptimize then expOptimize.call(exp, env, @)
+    else exp
+
+  toCode: (exp) ->
+    exptoCode = exp?.toCode
+    if exptoCode then exptoCode.call(exp, @)
+    else if typeof exp is 'function' then exp.toString()
+    else  JSON.stringify(exp)
+#      if exp is undefined then 'undefined'
+#      else if exp is null then 'null'
+#      else if _.isNumber(exp) then exp.toString()
+#      else if _.isString(exp) then JSON.stringify(exp)
+#      else if exp is true then "true"
+#      else if exp is false then "false"
+#      else if _.isArray(exp) then JSON.stringify(exp)
+#      else if typeof exp is 'function' then exp.toString()
+#      else if _.isObject(exp) then JSON.stringify(exp)
+#      else exp.toString()
 
 class Env
 
@@ -937,6 +1004,15 @@ class CpsEnv extends Env
         vars[vari] = vari; @indexMap[vari.name] = index; return vari
       vari = new vari.constructor(vari.name, (index++).toString())
 
+  alphaNewName: (name) ->
+    vars = @vars
+    index = @indexMap[name] or 2
+    newName = name
+    while 1
+      if not hasOwnProperty.call(vars, newName)
+        vars[name] = newName; @indexMap[name] = index; return newName
+      newName = name+index
+
   newconst: (vari) ->
     vars = @vars
     index = @indexMap[vari.name] or 2
@@ -957,24 +1033,32 @@ class CpsEnv extends Env
       else throw new VarLookupError(vari)
 
   getvar: (vari) ->
-    try v = @lookup(vari)
+    try @lookup(vari)
     catch e
       if e instanceof VarLookupError
         @bindings[vari] = v = @newconst(vari)
         v
-  uniquevar: (name, index) ->
-    uniquename = '@'+name+index
-    try v = @lookup(uniquename)
+
+  alphaName: (name) ->
+    try name = @lookup(name)
     catch e
       if e instanceof VarLookupError
-        @bindings[uniquename] = v = @newvar(name)
-        v
-  uniqueconst: (name, index) ->
-    uniquename = '@'+name+index
-    try v = @lookup(uniquename)
+        @bindings[name] = name = @alphaNewName(name)
+        name
+
+  alphaMacroParam: (name) ->
+    try name = @lookup(name)
     catch e
       if e instanceof VarLookupError
-        @bindings[uniquename] = v = @newconst(name)
+        @bindings[name] = result = ['evalarg', @alphaNewName(name)]
+        result
+
+  uniqueName: (name, index) ->
+    uniquename = '@'+name+index
+    try @lookup(uniquename)
+    catch e
+      if e instanceof VarLookupError
+        @bindings[uniquename] = v = @alphaNewName(name)
         v
 
 exports.OptimizationEnv = class OptimizationEnv extends CpsEnv

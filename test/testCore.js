@@ -78,6 +78,17 @@
       }), Error);
       return test.done();
     },
+    "test lambda": function(test) {
+      var f, x, y;
+
+      x = 'x';
+      y = 'y';
+      f = vari('f');
+      test.equal(solve(funcall(lamda([x], x), 1)), 1);
+      test.equal(solve(funcall(lamda([x, y], add(x, y)), 1, 1)), 2);
+      test.equal(solve(begin(assign(f, lamda([], 1)), funcall(f))), 1);
+      return test.done();
+    },
     "test macro": function(test) {
       var x, y, z;
 
@@ -95,17 +106,6 @@
       y = 'y';
       z = 'z';
       test.equal(solve(macall(macro([x, y, z], if_(x, y, z)), eq(1, 1), print_(1), print_(2))), null);
-      return test.done();
-    },
-    "test lambda": function(test) {
-      var f, x, y;
-
-      x = 'x';
-      y = 'y';
-      f = vari('f');
-      test.equal(solve(funcall(lamda([x], x), 1)), 1);
-      test.equal(solve(funcall(lamda([x, y], add(x, y)), 1, 1)), 2);
-      test.equal(solve(begin(assign(f, lamda([], 1)), funcall(f))), 1);
       return test.done();
     }
   };

@@ -73,6 +73,15 @@ exports.Test =
     test.done()
 
 #exports.Test =
+  "test lambda": (test) ->
+    x = 'x'; y = 'y'
+    f = vari('f')
+    test.equal  solve(funcall(lamda([x], x), 1)), 1
+    test.equal  solve(funcall(lamda([x, y], add(x, y)), 1, 1)), 2
+    test.equal  solve(begin(assign(f, lamda([], 1)), funcall(f))), 1
+    test.done()
+
+#exports.Test =
   "test macro": (test) ->
     x = 'x'; y = 'y'; z = 'z'
     test.equal  solve(macall(macro([x], 1), print_(1))), 1
@@ -83,14 +92,5 @@ exports.Test =
   "test macro2": (test) ->
     x = 'x'; y = 'y'; z = 'z'
     test.equal  solve(macall(macro([x, y, z], if_(x, y, z)), eq(1, 1), print_(1), print_(2))), null
-    test.done()
-
-#exports.Test =
-  "test lambda": (test) ->
-    x = 'x'; y = 'y'
-    f = vari('f')
-    test.equal  solve(funcall(lamda([x], x), 1)), 1
-    test.equal  solve(funcall(lamda([x, y], add(x, y)), 1, 1)), 2
-    test.equal  solve(begin(assign(f, lamda([], 1)), funcall(f))), 1
     test.done()
 
