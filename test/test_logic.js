@@ -123,42 +123,6 @@
     }
   };
 
-  xexports.Test = {
-    "test macro": function(test) {
-      var orpm, same;
-
-      same = macro(1, function(x) {
-        return x;
-      });
-      orpm = macro(2, function(x, y) {
-        return orp(x, y);
-      });
-      test.equal(solve(same(1)), 1);
-      test.equal(solve(same(print_(1))), null);
-      test.equal(solve(orpm(fail, print_(2))), null);
-      return test.done();
-    },
-    "test rule": function(test) {
-      var r;
-
-      r = rule(2, function(x, y) {
-        return [[x, y], 1, null];
-      });
-      test.equal(solve(r(1, 1)), 1);
-      test.equal(solvebase.status, solvebase.SUCCESS);
-      return test.done();
-    },
-    "test rule2": function(test) {
-      var r;
-
-      r = rule(2, function(x, y) {
-        return [[1, 2], print_(1), [1, 1], print_(2)];
-      });
-      test.equal(solve(r(1, 1)), null);
-      return test.done();
-    }
-  };
-
 }).call(this);
 
 /*

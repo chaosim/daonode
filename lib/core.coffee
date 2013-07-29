@@ -45,6 +45,7 @@ exports.Compiler = class Compiler
              il.assign(il.uservar('parser'), il.require('./parser')),
              il.assign(il.uservar('solvecore'), il.require('./solve')),
              il.assign(il.uservar('SolverFinish'), il.attr(il.uservar('solvecore'), il.symbol('SolverFinish'))),
+             il.assign(il.uservar('SolverFail'), il.attr(il.uservar('solvecore'), il.symbol('SolverFail'))),
              il.assign(il.uservar('Solver'), il.attr(il.uservar('solvecore'), il.symbol('Solver'))),
              il.assign(il.uservar('Trail'), il.attr(il.uservar('solvecore'), il.symbol('Trail'))),
              il.assign(il.uservar('Var'), il.attr(il.uservar('solvecore'), il.symbol('Var'))),
@@ -412,11 +413,11 @@ exports.Compiler = class Compiler
       x1 = @newconst('x'); y1 = @newconst('y')
       @cont(x, @clamda(x1, @cont(y, @clamda(y1,
           il.if_(il.unify(x1, y1), cont.call(true),
-             il.failcont.call(false))))))
+             il.throwFail(false))))))
     'notunify': (cont, x, y) ->
       x1 = @newconst('x'); y1 = @newconst('y')
       @cont(x, @clamda(x1, @cont(y, @clamda(y1,
-          il.if_(il.unify(x, y), il.failcont.call(false),
+          il.if_(il.unify(x, y), il.throwFail(false),
              cont.call(true))))))
     # evaluate @exp and bind it to vari
     'is': (cont, vari, exp) ->
@@ -425,7 +426,7 @@ exports.Compiler = class Compiler
     'bind': (cont, vari, term) -> il.begin(il.bind(vari, il.deref(term)), cont.call(true))
     'getvalue': (cont, term) -> cont.call(il.getvalue(@interlang(term)))
     'succeed': (cont) -> cont.call(true)
-    'fail': (cont) -> il.failcont.call(false)
+    'fail': (cont) -> il.throwFail(false)
 
     # x.push(y), when backtracking here, x.pop()
     'pushp': (cont, list, value) ->
@@ -446,6 +447,7 @@ exports.Compiler = class Compiler
 
     'orp': (cont, x, y) ->
       v = @newconst('v')
+      e = @newconst('e')
       trail = @newconst('trail')
       state = @newconst('state')
       fc = @newconst('fc')
@@ -454,13 +456,16 @@ exports.Compiler = class Compiler
                il.assign(fc, il.failcont),
                il.settrail(il.newTrail),
                il.setfailcont(il.clamda(v,
-                   v,
-                   il.undotrail(il.trail),
-                   il.settrail(trail),
-                   il.setstate(state),
-                   il.setfailcont(fc),
-                   @cont(y, cont))),
-           @cont(x, cont))
+                                        v,
+                                        il.undotrail(il.trail),
+                                        il.settrail(trail),
+                                        il.setstate(state),
+                                        il.setfailcont(fc),
+                                        @cont(y, cont))),
+               il.try(@cont(x, cont),
+                      e, il.if_(il.instanceof(e, il.symbol('SolverFail')),
+                           il.failcont.call(il.attr(e, il.symbol('value'))),
+                           il.throw(e))))
 
     'ifp': (cont, test, action) ->
       #if -> Then; _Else :- If, !, Then.<br/>
@@ -525,7 +530,7 @@ exports.Compiler = class Compiler
                                           fc.call(v1)))),
           @cont(goal, @clamda(v, il.assign(v1, v),
             il.push(result1, il.getvalue(@interlang(template))),
-            il.failcont.call(v1))))
+            il.throwFail(v1))))
 
     # find only one solution to the @goal
     'once': (cont, goal) ->
@@ -571,8 +576,8 @@ exports.Compiler = class Compiler
     'eoi': (cont) ->
       data = @newconst('data'); pos = @newconst('pos')
       il.begin(il.listassign(data, pos, il.state),
-               il.if_(il.ge(pos, il.length(data)), cont.call(true), il.failcont.call(false)))
-    'boi': (cont) -> il.if_(il.eq(il.index(il.state, 1), 0), cont.call(true), il.failcont.call(false))
+               il.if_(il.ge(pos, il.length(data)), cont.call(true), il.throwFail(false)))
+    'boi': (cont) -> il.if_(il.eq(il.index(il.state, 1), 0), cont.call(true), il.throwFail(false))
     # eol: end of line text[pos] in "\r\n"
     'eol': (cont) ->
       text = @newconst('text'); pos = @newconst('pos');  c = @newconst('c')
@@ -583,7 +588,7 @@ exports.Compiler = class Compiler
                        il.assign(c, il.index(text, pos, 1)),
                        il.if_(il.or_(il.eq(c, "\r"), il.eq(c, "\n")),
                             cont.call(true),
-                            il.failcont.call(false)))))
+                            il.throwFail(false)))))
     'bol': (cont) ->
       text = @newconst('text'); pos = @newconst('pos');  c = @newconst('c')
       il.begin(
@@ -593,7 +598,7 @@ exports.Compiler = class Compiler
                              il.assign(c, il.index(text, il.sub(pos, 1))),
                              il.if_(il.or_(il.eq(c, "\r"), il.eq(c, "\n")),
                                     cont.call(true),
-                                    il.failcont.call(false)))))
+                                    il.throwFail(false)))))
 
     'step': (cont, n) ->
       v = @newconst('v'); text = @newconst('text'); pos = @newconst('pos'); pos1 = @newconst('pos')
@@ -726,7 +731,7 @@ exports.Compiler = class Compiler
           il.setstate(state),
           @cont(y, @clamda(v, il.assign(v1, v),
                          il.if_(il.fun(checkFunction).call(il.state, right), cont.call(v1),
-                            il.failcont.call(v1)))))))
+                            il.throwFail(v1)))))))
     # follow: if item is followed, succeed, else fail. after eval, state is restored
     'follow': (cont, item) ->
       state = @newconst('state')
@@ -763,7 +768,7 @@ exports.Compiler = class Compiler
       v = @newconst('v')
       @cont(item, @clamda(v,
           il.listassign(data, pos, il.state),
-          il.if_(il.gt(pos, il.length(data)), il.return(il.failcont.call(v))),
+          il.if_(il.gt(pos, il.length(data)), il.return(il.throwFail(v))),
           il.begin(il.assign(x, il.deref(v)),
                    il.assign(c, il.index(data, pos)),
           il.iff(il.instanceof(x, il.symbol('Var')),
@@ -776,7 +781,7 @@ exports.Compiler = class Compiler
                  il.setstate(il.array(data, il.add(pos,1))),
                  cont.call(il.add(pos,1))),
                  il.attr(il.symbol('_'), il.symbol('isString')).call(x),
-               il.if_(il.eq(il.length(x), 1),il.failcont.call(v),
+               il.if_(il.eq(il.length(x), 1),il.throwFail(v),
                       il.throw(il.new(il.symbol('ExpressionError').call(x)))),
                il.throw(il.new(il.symbol('TypeError').call(x)))))))
 
@@ -942,7 +947,9 @@ exports.Compiler = class Compiler
     "macro": (head, params, body...) ->
       result = [head]
       @pushEnv()
-      result.push(@alphaMacroParam(p) for p in params)
+      result.push(@alphaName(p) for p in params)
+      bindings = @env.bindings
+      for p in params then bindings[p] = ['evalarg', bindings[p]]
       for e in body then result.push(@alpha(e))
       @popEnv()
       result

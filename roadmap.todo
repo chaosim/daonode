@@ -24,6 +24,8 @@ optimization:
   ✔ il.clamda can replace parmenter v directly @done (13-07-02 16:09)
   ☐ optimize parser terminal's interlang vop
   ✔ il.equalcont @done (13-06-23 21:03)
+  ☐ Maybe it is better to do some optimization before cps convert.
+    # cutcont, parse state, orp, etc.
 lisp features:
   ✔ quote, eval @done (13-06-27 18:04)
   ✔ lamda @done (13-06-27 18:05)

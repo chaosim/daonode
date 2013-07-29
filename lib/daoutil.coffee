@@ -1,7 +1,9 @@
+{Trail, Var,  ExpressionError, TypeError, SolverFail} = require "./solve"
+
 exports.operator = (solver) ->
   [text, pos] = solver.state
   length = text.length
-  if pos>=length then return solver.failcont(pos)
+  if pos>=length then throw new SolverFail(pos)
   c = text[pos]
   switch c
     when '+' then solver.state = [text, pos+1]; 'vop_add'

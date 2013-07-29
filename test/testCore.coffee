@@ -72,7 +72,7 @@ exports.Test =
     test.throws (-> solve(qq(add(uqs(uqs([1,2])))))), Error
     test.done()
 
-#exports.Test =
+#xexports.Test =
   "test lambda": (test) ->
     x = 'x'; y = 'y'
     f = vari('f')

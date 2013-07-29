@@ -153,8 +153,8 @@ class Continue extends Break
   toString: () -> "continue #{toString(@label)}"
 
 class Try extends Element
-  constructor: (@test, @catches, @final) -> super
-  toString: () -> "try(#{toString(@test)}, #{toString(@catches)}, #{toString(@final)})"
+  constructor: (@test, @vari, @catchBody, @final) -> super
+  toString: () -> "try(#{toString(@test)}, #{toString(@vari)}, #{toString(@catchBody)}, #{toString(@final)})"
 
 replace = (exp, param, value) ->
   exp_replace = exp?.replace
@@ -177,8 +177,8 @@ For::replace = (param, value) ->  new For(replace(@init, param, value), replace(
 ForIn::replace = (param, value) ->  new ForIn(replace(@vari, param, value), replace(@container, param, value), replace(@body, param, value))
 Break::replace = (param, value) -> @
 Try::replace = (param, value) ->
-  catches = ([replace(clause[0], param, value), replace(clause[1], param, value)] for clause in @catches)
-  new Try(replace(@test, param, value), replace(catches, param, value), replace(@final, param, value))
+  new Try(replace(@test, param, value), @vari,
+          replace(@catchBody, param, value), replace(@final, param, value))
 New::replace = (param, value) -> new @constructor(replace(@value, param, value))
 Lamda::replace = (param, value) -> @ #param should not occur in Lamda
 Clamda::replace = (param, value) -> @  #param should not occur in Clamda
@@ -314,7 +314,9 @@ ForIn::optimize = (env, compiler) ->
 Break::optimize = (env, compiler) -> @
 Try::optimize = (env, compiler) ->
   test = optimize(@test, env, compiler)
-  new Try(test, @catches, @final)
+  catchBody = optimize(@catchBody, env, compiler)
+  final = optimize(@final, env, compiler)
+  new Try(test, @vari, catchBody, final)
 
 New::optimize = (env, compiler) -> new @constructor(compiler.optimize(@value, env))
 Lamda::optimize = (env, compiler) ->
@@ -433,7 +435,7 @@ For::codeSize = () -> codeSize(@init) + codeSize(@test) + codeSize(@step) + code
 ForIn::codeSize = () -> codeSize(@vari) + codeSize(@container) + codeSize(@body)+2
 While::codeSize = () -> codeSize(@test) + codeSize(@body)+2
 Break::codeSize = () -> 1
-Try::codeSize = () -> codeSize(@test) + codeSize(@catches)+codeSize(@final)+2
+Try::codeSize = () -> codeSize(@test) + codeSize(@catchBody)+codeSize(@final)+2
 Begin::codeSize = () -> _.reduce(@exps, ((memo, e) -> memo + codeSize(e)), 0)
 VirtualOperation::codeSize = () -> 1
 Lamda::codeSize = () -> codeSize(@body) + 2
@@ -512,7 +514,7 @@ For::sideEffect = () -> expsEffect [@init, @test, @step, @body]
 ForIn::sideEffect = () -> expsEffect [@container, @body]
 While::sideEffect = () -> expsEffect [@test, @body]
 Break::sideEffect = () -> il.EFFECT
-Try::sideEffect = () -> expsEffect [@test, @catches, @final]
+Try::sideEffect = () -> expsEffect [@test, @catchBody, @final]
 Begin::sideEffect = () -> expsEffect(@exps)
 Lamda::sideEffect = () ->  il.PURE
 JSFun::sideEffect = () ->  il.PURE
@@ -556,7 +558,8 @@ ForIn::postOptimize = (compiler, env) ->
   new ForIn(@vari, @container, postOptimize(@body, compiler, env))
 Break::postOptimize = (compiler, env) -> @
 Try::postOptimize = (compiler, env) ->
-  new Try(postOptimize(@test, compiler, env), postOptimize(@catches, compiler, env), postOptimize(@final, compiler, env))
+  new Try(postOptimize(@test, compiler, env), @vari,
+          postOptimize(@catchBody, compiler, env), postOptimize(@final, compiler, env))
 
 Begin::postOptimize = (compiler, env) ->
   exps = @exps
@@ -646,7 +649,7 @@ ForIn::jsify = (compiler, env) ->
   new ForIn(jsify(@vari, compiler, env), jsify(@container, compiler, env), jsify(@body, compiler, env))
 Break::jsify = (compiler, env) -> @
 Try::jsify = (compiler, env) ->
-  new Try(jsify(@test, compiler, env), jsify(@catches, compiler, env), jsify(@final, compiler, env))
+  new Try(jsify(@test, compiler, env), @vari, jsify(@catchBody, compiler, env), jsify(@final, compiler, env))
 
 Begin::jsify = (compiler, env) ->
   exps = @exps
@@ -706,7 +709,8 @@ LabelStatement::convertBlockLamdaBody = (blockvar) -> new LabelStatement(@label,
 While::convertBlockLamdaBody = (blockvar) -> new While(@test, convertBlockLamdaBody(@body, blockvar))
 Break::convertBlockLamdaBody = (blockvar) -> @
 Try::convertBlockLamdaBody = (blockvar) ->
-  new Try(convertBlockLamdaBody(@test, blockvar), convertBlockLamdaBody(@catches, blockvar), convertBlockLamdaBody(@final, blockvar))
+  new Try(convertBlockLamdaBody(@test, blockvar), @vari,
+          convertBlockLamdaBody(@catchBody, blockvar), convertBlockLamdaBody(@final, blockvar))
 Begin::convertBlockLamdaBody = (blockvar) ->
   exps = []
   for e in @exps
@@ -736,7 +740,7 @@ LabelStatement::convertOptRecursive = (lamda) -> new LabelStatement(@label, conv
 While::convertOptRecursive = (lamda) -> new While(@test, convertOptRecursive(@body, lamda))
 Break::convertOptRecursive = (lamda) -> @
 Try::convertOptRecursive = (lamda) ->
-  new Try(convertOptRecursive(@test, lamda), convertOptRecursive(@catches, lamda), convertOptRecursive(@final, lamda))
+  new Try(convertOptRecursive(@test, lamda), @vari, convertOptRecursive(@catchBody, lamda), convertOptRecursive(@final, lamda))
 Begin::convertOptRecursive = (lamda) ->
   exps = []
   for e in @exps
@@ -776,8 +780,8 @@ LabelStatement::convertOptResursiveCall = (lamda, steps)  -> throw new Error(@)
 While::convertOptResursiveCall = (lamda, steps)  -> throw new Error(@)
 Break::convertOptResursiveCall = (lamda, steps)  -> throw new Error(@)
 Try::convertOptResursiveCall = (lamda, steps)  ->
-  new Try(convertOptResursiveCall(@test, lamda, steps),\
-          convertOptResursiveCall(@catches, lamda, steps),\
+  new Try(convertOptResursiveCall(@test, lamda, steps), @vari,\
+          convertOptResursiveCall(@catchBody, lamda, steps),\
           convertOptResursiveCall(@final, lamda, steps))
 Begin::convertOptResursiveCall = (lamda, steps)  -> throw new Error(@)
 ExpressionList::convertOptResursiveCall = (lamda, steps)  ->
@@ -814,7 +818,8 @@ LabelStatement::convertTailRecursive = (lamda) -> new LabelStatement(@label, con
 While::convertTailRecursive = (lamda) -> new While(@test, convertTailRecursive(@body, lamda))
 Break::convertTailRecursive = (lamda) -> @
 Try::convertTailRecursive = (lamda) ->
-  new Try(convertTailRecursive(@test, lamda), convertTailRecursive(@catches, lamda), convertTailRecursive(@final, lamda))
+  new Try(convertTailRecursive(@test, lamda), @vari,
+          convertTailRecursive(@catchBody, lamda), convertTailRecursive(@final, lamda))
 Begin::convertTailRecursive = (lamda) ->
   exps = []
   for e in @exps
@@ -853,8 +858,8 @@ LabelStatement::convertTailResursiveCall = (lamda, steps)  -> throw new Error(@)
 While::convertTailResursiveCall = (lamda, steps)  -> throw new Error(@)
 Break::convertTailResursiveCall = (lamda, steps)  -> throw new Error(@)
 Try::convertTailResursiveCall = (lamda, steps)  ->
-  new Try(convertTailResursiveCall(@test, lamda, steps),\
-          convertTailResursiveCall(@catches, lamda, steps),\
+  new Try(convertTailResursiveCall(@test, lamda, steps), @vari,\
+          convertTailResursiveCall(@catchBody, lamda, steps),\
           convertTailResursiveCall(@final, lamda, steps))
 Begin::convertTailResursiveCall = (lamda, steps)  -> throw new Error(@)
 ExpressionList::convertTailResursiveCall = (lamda, steps)  ->
@@ -895,7 +900,7 @@ While::getConvertParameters = (compiler, lamda) ->
 Break::getConvertParameters = (compiler, lamda) -> @
 Try::getConvertParameters = (compiler, lamda) ->
   getConvertParameters(@test, compiler, lamda)
-  getConvertParameters(@catches, compiler, lamda)
+  getConvertParameters(@catchBody, compiler, lamda)
   getConvertParameters(@final, compiler, lamda)
 Begin::getConvertParameters = (compiler, lamda) -> getConvertParameters e, compiler, lamda
 New::getConvertParameters = (compiler, lamda) -> getConvertParameters @value, compiler, lamda
@@ -955,19 +960,17 @@ hasCallOf = (exp, vari) ->
   if exp_hasCallOf then exp_hasCallOf.call(exp, vari)
   else false
 
-Assign::hasCallOf = (vari) -> @
+Assign::hasCallOf = (vari) -> hasCallOf(@exp, vari)
 If::hasCallOf = (vari) -> hasCallOf(@then_, vari) or hasCallOf(@else_, vari)
 LabelStatement::hasCallOf = (vari) -> throw new Error(@)
 While::hasCallOf = (vari) -> throw new Error(@)
-Break::hasCallOf = (vari) -> @
-Try::hasCallOf = (vari) ->
-  new Try(hasCallOf(@test, vari), hasCallOf(@catches, vari), hasCallOf(@final, vari))
+Break::hasCallOf = (vari) -> throw new Error(@)
+Try::hasCallOf = (vari) -> throw new Error(@)
 Begin::hasCallOf = (vari) -> throw new Error(@)
 ExpressionList::hasCallOf = (vari) ->
-  exps = []
-  for e in @exps
-    exps.push(hasCallOf e, vari)
-  new @constructor(exps)
+  for e in @exps then if hasCallOf(e, vari) then return true
+  return false
+
 Throw::hasCallOf = (vari) ->  false
 Return::hasCallOf = (vari) -> throw new Error(@)
 Lamda::hasCallOf = (varivar) -> false
@@ -1000,7 +1003,14 @@ LabelStatement::insertReturn = () -> new LabelStatement(@label, insertReturn(@st
 While::insertReturn = () ->
   new Begin(new While(@test, insertReturn(@body)), new Return())
 Break::insertReturn = () -> @
-Try::insertReturn = () -> new Try(@test, insertReturn(@catches), insertReturn(@final))
+Try::insertReturn = () ->
+  catchBody = @catchBody; final = @final
+  if (catchBody is null or catchBody is undefined) and (final is null or final is undefined)
+    final = il.return(final)
+  else
+    if catchBody isnt null and catchBody isnt undefined then catchBody = insertReturn(catchBody)
+    if final isnt null and final isnt undefined then final = insertReturn(final)
+  new Try(insertReturn(@test), @vari, catchBody, final)
 Begin::insertReturn = () ->
   exps = @exps
   length = exps.length
@@ -1070,7 +1080,13 @@ While::toCode = (compiler) ->
 DoWhile::toCode = (compiler) ->
   "do{#{compiler.toCode(@body)}}while(#{compiler.toCode(@test)}) "
 Try::toCode = (compiler) ->
-  "try{ #{compiler.toCode(@test)}} #{compiler.toCode(@catches)} finally{#{compiler.toCode(@final)}}"
+  catchBody = @catchBody; final = @final
+  if catchBody is null or catchBody is undefined
+    "try{ #{compiler.toCode(@test)}} finally {#{compiler.toCode(final)}}"
+  else if final is null or final is undefined
+    "try{ #{compiler.toCode(@test)}} catch (#{@vari}) {#{compiler.toCode(catchBody)}}"
+  else
+    "try{ #{compiler.toCode(@test)}} catch (#{@vari}) {#{compiler.toCode(catchBody)}} finally {#{compiler.toCode(final)}}"
 Break::toCode = (compiler) ->
   if @label then "break #{compiler.toCode(@label)}"
   else "break"
@@ -1303,6 +1319,7 @@ il.solver = il.uservar('solver')
 il.undotrail = vop('undotrail', (compiler)->args = @args; "#{expressionToCode(compiler, args[0])}.undo()")
 il.failcont = il.uservarattr('solver.failcont')
 il.setfailcont = (cont) -> il.assign(il.failcont, cont)
+il.throwFail = (value) -> il.throw(il.new(il.symbol('SolverFail').call(value)))
 il.setcutcont = (cont) -> il.assign(il.cutcont, cont)
 il.appendFailcont = vop('appendFailcont', (compiler)->args = @args; "solver.appendFailcont(#{compiler.toCode(args[0])})")
 il.cutcont = il.uservarattr('solver.cutcont')
@@ -1349,7 +1366,7 @@ il.dowhile = (body..., test) -> new DoWhile(test, il.begin(body...))
 il.for_ = (init,test, step, body) -> new For(test, il.begin(body...))
 il.forin = (vari, container, body...) -> new ForIn(vari, container, il.begin(body...))
 il.forof = (vari, container, body...) -> new ForOf(vari, container, il.begin(body...))
-il.try_ = (test, catches, final) -> new Try(test, catches, final)
+il.try = (test, vari, catchBody, final) -> new Try(test, vari, catchBody, final)
 
 il.break_ = (label) -> new Break(label)
 il.continue_ = (label) -> new Continue(label)

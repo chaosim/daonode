@@ -72,7 +72,7 @@ exports.Test =
     test.equal  solve(parsetext(may(char(string('a'))), string('b'))), 0
     test.done()
 
-#exports.Test =
+#xexports.Test =
   "test parallel": (test) ->
     test.equal  solve(begin(settext(string('1')), parallel(char(string('1')), number()))), 1
     test.equal  solve(begin(settext(string('12')), parallel(char(string('1')), number()))), 12
