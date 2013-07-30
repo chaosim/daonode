@@ -112,7 +112,6 @@
       test.equal(solve(begin(variable(x), assign(x, 1), loop_(a, if_(eq(x, 5), break_(a, x)), print_(x), inc(x)))), 5);
       test.equal(solve(begin(variable(x), assign(x, 1), loop_(a, print_(x), if_(eq(x, 5), break_(x)), inc(x)))), 5);
       test.equal(solve(begin(variable(x), assign(x, 1), while_(a, le(x, 5), print_(x), inc(x)))), null);
-      test.equal(solve(begin(variable(x), assign(x, 1), until_(a, print_(x), inc(x), eq(x, 5)))), null);
       return test.done();
     },
     "test block break continue": function(test) {

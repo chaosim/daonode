@@ -60,15 +60,6 @@
       test.equal(solve(parsetext(literal(string('daf')), string('daf'))), 3);
       return test.done();
     },
-    "test may char": function(test) {
-      test.equal(solve(parsetext(may(char(string('a'))), string('a'))), 1);
-      test.equal(solve(parsetext(begin(may(char(string('a'))), eoi), string('a'))), true);
-      test.equal(solve(parsetext(begin(may(char(string('a'))), char(string('a')), eoi), string('a'))), true);
-      test.equal(solve(parsetext(begin(greedymay(char(string('a'))), char(string('a')), eoi), string('a'))), 1);
-      test.equal(solve(parsetext(begin(lazymay(char(string('a'))), char(string('a')), eoi), string('a'))), 1);
-      test.equal(solve(parsetext(may(char(string('a'))), string('b'))), 0);
-      return test.done();
-    },
     "test parallel": function(test) {
       test.equal(solve(begin(settext(string('1')), parallel(char(string('1')), number()))), 1);
       test.equal(solve(begin(settext(string('12')), parallel(char(string('1')), number()))), 12);
@@ -78,6 +69,15 @@
     "test follow": function(test) {
       test.equal(solve(begin(settext(string('1')), follow(char(string('1'))))), 1);
       test.equal(solve(begin(settext(string('1')), notfollow(char(string('1'))))), 1);
+      return test.done();
+    },
+    "test may char": function(test) {
+      test.equal(solve(parsetext(may(char(string('a'))), string('a'))), 1);
+      test.equal(solve(parsetext(begin(may(char(string('a'))), eoi), string('a'))), true);
+      test.equal(solve(parsetext(begin(may(char(string('a'))), char(string('a')), eoi), string('a'))), true);
+      test.equal(solve(parsetext(begin(greedymay(char(string('a'))), char(string('a')), eoi), string('a'))), 1);
+      test.equal(solve(parsetext(begin(lazymay(char(string('a'))), char(string('a')), eoi), string('a'))), 1);
+      test.equal(solve(parsetext(may(char(string('a'))), string('b'))), 0);
       return test.done();
     },
     "test lazyany": function(test) {
@@ -118,7 +118,6 @@
       test.equal(solve(begin(assign(_, dummy('__')), parsetext(greedyany(char(_)), string('abc')))), 3);
       test.equal(solve(parsetext(begin(assign(_, dummy('__')), greedyany(char(_)), eoi), string('a'))), true);
       test.equal(solve(parsetext(begin(assign(_, dummy('__')), greedyany(char(_)), char(string('c')), eoi), string('ac'))), 2);
-      test.equal(solve(parsetext(findall(begin(assign(_, dummy('__')), greedyany(char(_)), char(string('c')), eoi)), string('abc'))), 3);
       test.deepEqual(solve(begin(assign(_, dummy('__')), assign(result, logicvar('result')), parsetext(greedyany(char(_), result, _), string('a')), getvalue(result))), ['a']);
       test.deepEqual(solve(begin(assign(_, dummy('__')), assign(result, logicvar('result')), settext(string('ab')), greedyany(char(_), result, _), eoi, getvalue(result))), ['a', 'b']);
       return test.done();

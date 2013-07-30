@@ -12,7 +12,7 @@
     "functional programming"
   ],
   "author": "Caoxingming",
-  "version": "0.1.11",
+  "version": "0.2.0",
   "licenses": [
     {
       "type": "MIT",
@@ -34,7 +34,7 @@
   "bugs": "https://github.com/chaosim/daonode/issues",
   "repository": {
     "type": "git",
-    "url": "https://www.github.com/chaosim/daonode.git"
+    "url": "git://github.com/chaosim/daonode.git"
   },
   "dependencies": {
     "underscore": "*",
@@ -47,5 +47,5 @@
     "grunt": "~0.4.1",
     "grunt-contrib-nodeunit": "~0.2.0"
   },
-  "readme": "readme.md"
+  "readme": "README.md"
 }

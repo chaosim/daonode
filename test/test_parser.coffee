@@ -35,7 +35,7 @@ exports.Test =
     test.deepEqual  solve(parsetext(subtext(1, 3), string('\ras\ndf'))), '\n'
     test.done()
 
-#xexports.Test =
+#exports.Test =
   "test char": (test) ->
     x = logicvar('x')
     test.equal  solve(parsetext(1, string('a'))), 1
@@ -46,7 +46,7 @@ exports.Test =
     test.equal  solve(begin(settext(string('ab')), char(string('a')), char(string('b')))), 2
     test.done()
 
-#exports.Test =
+#xexports.Test =
   "test number": (test) ->
     test.equal  solve(parsetext(number(), string('123'))), 123
     test.equal  solve(parsetext(number(), string('123.4'))), 123.4
@@ -63,16 +63,6 @@ exports.Test =
     test.done()
 
 #exports.Test =
-  "test may char": (test) ->
-    test.equal  solve(parsetext(may(char(string('a'))), string('a'))), 1
-    test.equal  solve(parsetext(begin(may(char(string('a'))), eoi), string('a'))), true
-    test.equal  solve(parsetext(begin(may(char(string('a'))), char(string('a')), eoi), string('a'))), true
-    test.equal  solve(parsetext(begin(greedymay(char(string('a'))), char(string('a')), eoi), string('a'))), 1
-    test.equal  solve(parsetext(begin(lazymay(char(string('a'))), char(string('a')), eoi), string('a'))), 1
-    test.equal  solve(parsetext(may(char(string('a'))), string('b'))), 0
-    test.done()
-
-#xexports.Test =
   "test parallel": (test) ->
     test.equal  solve(begin(settext(string('1')), parallel(char(string('1')), number()))), 1
     test.equal  solve(begin(settext(string('12')), parallel(char(string('1')), number()))), 12
@@ -83,6 +73,16 @@ exports.Test =
   "test follow": (test) ->
     test.equal  solve(begin(settext(string('1')), follow(char(string('1'))))), 1
     test.equal  solve(begin(settext(string('1')), notfollow(char(string('1'))))), 1
+    test.done()
+
+#xexports.Test =
+  "test may char": (test) ->
+    test.equal  solve(parsetext(may(char(string('a'))), string('a'))), 1
+    test.equal  solve(parsetext(begin(may(char(string('a'))), eoi), string('a'))), true
+    test.equal  solve(parsetext(begin(may(char(string('a'))), char(string('a')), eoi), string('a'))), true
+    test.equal  solve(parsetext(begin(greedymay(char(string('a'))), char(string('a')), eoi), string('a'))), 1
+    test.equal  solve(parsetext(begin(lazymay(char(string('a'))), char(string('a')), eoi), string('a'))), 1
+    test.equal  solve(parsetext(may(char(string('a'))), string('b'))), 0
     test.done()
 
 #exports.Test =
@@ -124,7 +124,7 @@ exports.Test =
     test.equal  solve(begin(assign(_, dummy('__')), parsetext(greedyany(char(_)), string('abc')))), 3
     test.equal  solve(parsetext(begin(assign(_, dummy('__')), greedyany(char(_)), eoi), string('a'))), true
     test.equal  solve(parsetext(begin(assign(_, dummy('__')), greedyany(char(_)), char(string('c')), eoi), string('ac'))), 2
-    test.equal  solve(parsetext(findall(begin(assign(_, dummy('__')), greedyany(char(_)), char(string('c')), eoi)), string('abc'))), 3
+#    test.equal  solve(parsetext(findall(begin(assign(_, dummy('__')), greedyany(char(_)), char(string('c')), eoi)), string('abc'))), 3
     test.deepEqual  solve(begin(assign(_, dummy('__')), assign(result, logicvar('result')),
                                 parsetext(greedyany(char(_), result, _), string('a')), getvalue(result))), ['a']
     test.deepEqual  solve(begin(assign(_, dummy('__')), assign(result, logicvar('result')),

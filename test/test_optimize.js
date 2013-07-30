@@ -25,7 +25,7 @@
   compile = function(exp, path) {
     var code, fd;
 
-    code = "_ = require('underscore');\n" + '__slice = [].slice\n' + "solve = require('../lib/core').solve;\n" + "parser = require('../lib/parser');\n" + "solvecore = require('../lib/solve');\n" + "SolverFinish = solvecore.SolverFinish;\n" + "Solver = solvecore.Solver;\n" + "Trail = solvecore.Trail;\n" + "Var = solvecore.Var;\n" + "DummyVar = solvecore.DummyVar;\n\n" + compileToCode(exp) + "\n//exports.main();";
+    code = "_ = require('underscore');\n" + '__slice = [].slice\n' + "solve = require('../lib/core').solve;\n" + "parser = require('../lib/parser');\n" + "solvecore = require('../lib/solve');\n" + "Solver = solvecore.Solver;\n" + "Trail = solvecore.Trail;\n" + "Var = solvecore.Var;\n" + "DummyVar = solvecore.DummyVar;\n\n" + compileToCode(exp) + "\n//exports.main();";
     code = beautify(code, {
       indent_size: 2
     });

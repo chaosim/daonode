@@ -19,21 +19,33 @@ exports.compile = compile = (code) ->
 
 exports.solve = solve = (exp) ->
   sexpr = core.solve(parsetext(grammar, string(exp)))
-#  core.solve(sexpr)
+  core.solve(sexpr)
 
-unaryExpr = (exp) -> andp(unaryOperator(op), expression(exp))
+solver = 'solver'
+x = 'x'; y = 'y'; z = 'z'
+op = 'op'
+atomExpr = 'atomExpr'; unaryExpr = 'unaryExpr'; binaryExpr = 'binaryExpr'
 
 grammar = begin(
   direct(il.begin(
     il.assign(il.uservar('daoutil'), il.require('./daoutil')),
-    il.assign(il.uservar('operator'), il.attr(il.uservar('daoutil'), il.symbol('operator')))))
-  assign('atomic', lamda([], orp(identifier(), quoteString(), number()))),
-  assign('binaryExpr', lamda([],
-     andp(assign('x', funcall('atomic')),
-          orp(andp(assign('op', funcall('operator', 'solver')),
-                   assign('y', funcall('atomic')),
-                   array('op', 'x', 'y')),
-              'x')))),
-  funcall('binaryExpr'))
+    il.assign(il.uservar('binaryOperator'), il.attr(il.uservar('daoutil'), il.symbol('binaryOperator'))),
+    il.assign(il.uservar('unaryOperator'), il.attr(il.uservar('daoutil'), il.symbol('unaryOperator'))),
+    il.assign(il.uservar('suffixOperator'), il.attr(il.uservar('daoutil'), il.symbol('suffixOperator'))))),
+  assign(atomExpr, lamda([], orp(identifier(), quoteString(), number()))),
+  assign(unaryExpr, lamda([],
+      orp(andp(assign(op, funcall('unaryOperator', solver)),
+               assign(x, funcall(atomExpr)),
+               array(op, x)),
+          andp(assign(x, funcall(atomExpr)),
+              orp(andp(assign(op, funcall('suffixOperator', solver)), array(op, x)),
+                  x)))))
+  assign(binaryExpr, lamda([],
+     andp(assign(x, funcall(atomExpr)),
+          orp(andp(assign(op, funcall('binaryOperator', solver)),
+                   assign(y, funcall(atomExpr)),
+                   array(op, x, y)),
+              x)))),
+  funcall(binaryExpr))
 
 

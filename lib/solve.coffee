@@ -1,10 +1,5 @@
 _ = require('underscore')
 
-exports.SolverFinish = class SolverFinish
-  constructor: (@value) ->
-exports.SolverFail = class SolverFail
-  constructor: (@value) ->
-
 # ####class Solver
 # the solver for dao expression
 class exports.Solver
@@ -27,16 +22,7 @@ class exports.Solver
     value = @run(module.main)[1]
     @trail.getvalue(value)
 
-  run: (func) ->
-    v = null
-    while 1
-      try return func(v)
-      catch e
-        if e instanceof SolverFinish then return e.value
-        else if e instanceof SolverFail
-          func = @failcont
-          v = e.value
-        else throw e
+  run: (func) -> func(v)
 
   # an utility that is useful for some logic builtins<br/>
   # when backtracking, execute fun at first, and then go to original failcont

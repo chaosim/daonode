@@ -38,14 +38,12 @@ exports.Compiler = class Compiler
     exp = @alpha(exp)
     @env = env
     v = @newconst('v')
-    done = @clamda(v, il.throw(il.new(il.symbol('SolverFinish').call(v))))
+    done = il.idcont()
     exps = [ il.assign(il.uservar('_'), il.require('underscore')),
              il.assign(il.uservar('__slice'), il.attr([], il.symbol('slice'))),
              il.assign(il.uservar('solve'), il.attr(il.require('./core'), il.symbol('solve'))),
              il.assign(il.uservar('parser'), il.require('./parser')),
              il.assign(il.uservar('solvecore'), il.require('./solve')),
-             il.assign(il.uservar('SolverFinish'), il.attr(il.uservar('solvecore'), il.symbol('SolverFinish'))),
-             il.assign(il.uservar('SolverFail'), il.attr(il.uservar('solvecore'), il.symbol('SolverFail'))),
              il.assign(il.uservar('Solver'), il.attr(il.uservar('solvecore'), il.symbol('Solver'))),
              il.assign(il.uservar('Trail'), il.attr(il.uservar('solvecore'), il.symbol('Trail'))),
              il.assign(il.uservar('Var'), il.attr(il.uservar('solvecore'), il.symbol('Var'))),
@@ -59,7 +57,7 @@ exports.Compiler = class Compiler
              il.assign(il.trail, il.newTrail),
              il.assign(il.failcont, done),
              il.assign(il.cutcont, il.failcont),
-             il.run(il.transparentuserlamda([], @cont(exp, done)))]
+             il.userlamda([], @cont(exp, done)).call()]
     lamda = il.userlamda([], exps...)
     env = new OptimizationEnv(env, {})
     lamda = @optimize(lamda, env)
@@ -67,9 +65,9 @@ exports.Compiler = class Compiler
     exp = il.assign(il.attr(il.uservar('exports'), il.symbol('main')), lamda)
     exp.toCode(@)
 
-  alphaName: (name) -> @env.alphaName(name)
-  alphaMacroParam: (name) -> @env.alphaMacroParam(name)
-  uniqueName: (name, index) -> @env.uniqueName(name, index)
+  lookup: (name) ->
+    try @env.lookup(name) catch e then name
+
   uservar: (name) ->
     map = @nameVarMap
     v = map[name]
@@ -82,16 +80,12 @@ exports.Compiler = class Compiler
     else map[name] = v = il.uservar(name); v.isConst = true; v
   newvar: (v) -> if _.isString(v) then @env.newvar(il.internalvar(v)) else @env.newvar(v)
   newconst: (v) -> if _.isString(v) then @env.newconst(il.internalvar(v)) else @env.newconst(v)
-  getvar: (v) -> if _.isString(v) then @env.getvar(il.uservar(v)) else @env.getvar(v)
-  lookup: (v) -> if _.isString(v) then @env.lookup(il.uservar(v)) else @env.lookup(v)
   pushEnv: () -> @env = @env.extend()
   popEnv: () -> @env = @env.outer
 
-  clamda: (v, body...) -> @globalCont = cont = il.clamda(v, body...); cont
-
   # alpha convert
   alpha: (exp) ->
-    if _.isString(exp) then return @alphaName(exp)
+    if _.isString(exp) then return @lookup(exp)
     if not _.isArray(exp) then return exp
     length = exp.length
     if length is 0 then return exp
@@ -120,7 +114,7 @@ exports.Compiler = class Compiler
     "eval": (cont, exp, path) ->
       v = @newconst('v')
       p = @newconst('path')
-      @cont(exp, @clamda(v, @cont(path, @clamda(p, cont.call(il.evalexpr(v, p))))))
+      @cont(exp, il.clamda(v, @cont(path, il.clamda(p, cont.call(il.evalexpr(v, p))))))
     'string': (cont, exp) -> cont.call(exp)
     "begin": (cont, exps...) -> @expsCont(exps, cont)
     "nonlocal": (cont, names...) ->
@@ -146,16 +140,16 @@ exports.Compiler = class Compiler
 
     "if": (cont, test, then_, else_) ->
       v = @newconst('v')
-      @cont(test, @clamda(v, il.if_(v, @cont(then_, cont), @cont(else_, cont))))
+      @cont(test, il.clamda(v, il.if_(v, @cont(then_, cont), @cont(else_, cont))))
 
     "switch": (cont, test, clauses, else_) ->
       v = @newconst('v')
       clauses = for clause in clauses
         values = clause[0]; act = clause[1]
-        values = for value in values then il.lamda([], @cont(value, il.idcont)).call()
+        values = for value in values then il.lamda([], @cont(value, il.idcont())).call()
         act = @cont(act, cont)
         [values, act]
-      @cont(test, @clamda(v, il.switch_(v, clauses, @cont(else_, cont))))
+      @cont(test, il.clamda(v, il.switch_(v, clauses, @cont(else_, cont))))
 
     "jsfun": (cont, func) ->
       f = il.jsfun(func)
@@ -189,20 +183,18 @@ exports.Compiler = class Compiler
     "lambda": (cont, params, body...) ->
       @pushEnv()
       params = (@uservar(p) for p in params)
-      globalCont = @globalCont
-      @globalCont = il.idcont
-      cont = cont.call(il.userlamda(params, @expsCont(body, il.idcont)))
-      @globalCont = globalCont
+      k = @newconst('cont')
+      params.push(k)
+      cont = cont.call(il.userlamda(params, @expsCont(body, k)))
       @popEnv()
       cont
 
     "macro": (cont, params, body...) ->
       @pushEnv()
       params1 = (@uservar(p) for p in params)
-      globalCont = @globalCont
-      @globalCont = il.idcont
-      cont = cont.call(il.lamda(params1, @expsCont(body, il.idcont)))
-      @globalCont = globalCont
+      k = @newconst('cont')
+      params1.push(k)
+      cont = cont.call(il.lamda(params1, @expsCont(body, k)))
       @popEnv()
       cont
 
@@ -215,7 +207,7 @@ exports.Compiler = class Compiler
       cont = cont.call(il.array(xs))
       for i in [length-1..0] by -1
         cont = do (i=i, cont=cont) ->
-          compiler.cont(args[i], compiler.clamda(xs[i], cont))
+          compiler.cont(args[i], il.clamda(xs[i], cont))
       cont
 
     "uarray": (cont, args...) ->
@@ -225,7 +217,7 @@ exports.Compiler = class Compiler
       cont = cont.call(il.uarray(xs))
       for i in [length-1..0] by -1
         cont = do (i=i, cont=cont) ->
-          compiler.cont(args[i], compiler.clamda(xs[i], cont))
+          compiler.cont(args[i], il.clamda(xs[i], cont))
       cont
 
     "makeobject": (cont, args...) ->
@@ -236,7 +228,7 @@ exports.Compiler = class Compiler
       cont = il.begin(il.assign(obj, {}), il.setobject(obj, xs), cont.call(obj))
       for i in [length-1..0] by -1
         cont = do (i=i, cont=cont) ->
-          compiler.cont(args[i], compiler.clamda(xs[i], cont))
+          compiler.cont(args[i], il.clamda(xs[i], cont))
       cont
 
     "uobject": (cont, args...) ->
@@ -248,65 +240,70 @@ exports.Compiler = class Compiler
       cont = il.begin(il.assign(obj, {}), il.setobject(obj, xs), il.assign(uobj, il.uobject(obj)), cont.call(uobj))
       for i in [length-1..0] by -1
         cont = do (i=i, cont=cont) ->
-          compiler.cont(args[i], compiler.clamda(xs[i], cont))
+          compiler.cont(args[i], il.clamda(xs[i], cont))
       cont
 
     "cons": (cont, head, tail) ->
       v = @newconst('v'); v2 = @newconst('v')
-      @cont(head, @clamda(v, @cont(tail, @clamda(v1, cont.call(il.cons(v, v1))))))
+      @cont(head, il.clamda(v, @cont(tail, il.clamda(v1, cont.call(il.cons(v, v1))))))
 
     "funcall": (cont, caller, args...) ->
       compiler = @
       f = @newconst('func')
       length = args.length
       params = (@newconst('arg'+i) for i in [0...length])
-      cont = cont.call(f.apply(params))
+      params.push(cont)
+      body = f.apply(params)
       for i in [length-1..0] by -1
-        cont = do (i=i, cont=cont) ->
-          compiler.cont(args[i], compiler.clamda(params[i], cont))
-      @cont(caller, @clamda(f, cont))
+        body = do (i=i, body=body) ->
+          compiler.cont(args[i], il.clamda(params[i], body))
+      @cont(caller, il.clamda(f, body))
 
     "macall": (cont, caller, args...) ->
       compiler = @
       f = @newconst('func')
       length = args.length
       params = (@newconst('arg'+i) for i in [0...length])
-      cont = f.apply(params)
+      params.push(cont)
+      body = f.apply(params)
       for i in [length-1..0] by -1
-        cont = do (i=i, cont=cont) ->
-          globalCont = compiler.globalCont
-          compiler.globalCont = il.idcont
-          body = compiler.cont(args[i], il.idcont)
-          compiler.globalCont = globalCont
-          compiler.clamda(params[i], cont).call(il.lamda([], body))
-      @cont(caller, @clamda(f, cont))
+        body = do (i=i, body=body) ->
+          il.clamda(params[i], body).call(il.lamda([], compiler.cont(args[i], il.idcont())))
+      @cont(caller, il.clamda(f, body))
+
+    "jsfuncall": (cont, caller, args...) ->
+      compiler = @
+      f = @newconst('func')
+      length = args.length
+      params = (@newconst('arg'+i) for i in [0...length])
+      body = cont.call(f.apply(params))
+      for i in [length-1..0] by -1
+        body = do (i=i, body=body) ->
+          compiler.cont(args[i], il.clamda(params[i], body))
+      @cont(caller, il.clamda(f, body))
 
     "for": (cont, init, test, step, body...) ->
-      init = il.lamda([], compiler.cont(init, il.idcont)).call()
-      test = il.lamda([], compiler.cont(test, il.idcont)).call()
-      step = il.lamda([], compiler.cont(step, il.idcont)).call()
-      body = compiler.expsCont(body, il.idcont)
+      init = il.lamda([], compiler.cont(init, il.idcont())).call()
+      test = il.lamda([], compiler.cont(test, il.idcont())).call()
+      step = il.lamda([], compiler.cont(step, il.idcont())).call()
+      body = compiler.expsCont(body, il.idcont())
       il.begin(il.for_(init, test, step, body), cont.call(null))
 
     "forin": (cont, vari, container, body...) ->
-      vari = @getvar(vari)
-      container = il.lamda([], compiler.cont(container, il.idcont)).call()
-      body = compiler.expsCont(body, il.idcont)
-      il.begin(il.forin(vari, container), cont.call(null))
+      container = il.lamda([], compiler.cont(container, il.idcont())).call()
+      body = compiler.expsCont(body, il.idcont())
+      il.begin(il.forin(@userconst(vari), container), cont.call(null))
 
     "forof": (cont, vari, container, body...) ->
-      vari = @getvar(vari)
-      container = il.lamda([], compiler.cont(container, il.idcont)).call()
-      body = compiler.expsCont(body, il.idcont)
-      il.begin(il.forof(vari, container), cont.call(null))
+      container = il.lamda([], compiler.cont(container, il.idcont())).call()
+      body = compiler.expsCont(body, il.idcont())
+      il.begin(il.forof(@userconst(vari), container), cont.call(null))
 
-    "try": (cont, test, catches, final) ->
-      test = il.lamda([], compiler.cont(test, il.idcont)).call()
-      clauses = []
-      for clause in catches
-        caluses.push([@.getvar(caluse[0]), compiler.cont(clause[1], il.idcont)])
-      final = compiler.cont(final, il.idcont)
-      il.begin(il.try_(test, clauses, final), cont.call(null))
+    "try": (cont, test, vari, catchBody, final) ->
+      test = il.lamda([], compiler.cont(test, il.idcont())).call()
+      catchBody = compiler.cont(catchBody, il.idcont())
+      final = compiler.cont(final, il.idcont())
+      il.begin(il.try(test, @userconst(vari), clauses, final), cont.call(null))
 
     "quasiquote": (cont, exp) -> @quasiquote(exp, cont)
 
@@ -324,7 +321,6 @@ exports.Compiler = class Compiler
       if not _.isString(label) then (label = ''; body = [label].concat(body))
       exits = @exits[label] ?= []
       exits.push(cont)
-      exits.push(@globalCont)
       defaultExits = @exits[''] ?= []  # if no label, go here
       defaultExits.push(cont)
       continues = @continues[label] ?= []
@@ -349,9 +345,7 @@ exports.Compiler = class Compiler
       exits = @exits[label]
       if not exits or exits==[] then throw new  Error(label)
       exitCont = exits[exits.length-1]
-      globalCont = @globalCont
       cont = @cont(value, @protect(exitCont))
-      @globalCont = globalCont
       cont
 
     # continue a block
@@ -366,17 +360,17 @@ exports.Compiler = class Compiler
     'catch': (cont, tag, forms...) ->
       v = @newconst('v'); v2 = @newconst('v')
       temp1 = @newconst('temp'); temp2 = @newconst('temp')
-      @cont(tag, @clamda(v, il.assign(temp1, v),
+      @cont(tag, il.clamda(v, il.assign(temp1, v),
                             il.pushCatch(temp1, cont),
-                            @expsCont(forms, @clamda(v2, il.assign(temp2, v2),
+                            @expsCont(forms, il.clamda(v2, il.assign(temp2, v2),
                                                       il.popCatch(temp1),
                                                       cont.call(temp2)))))
 
     # aka lisp style throw
     "throw": (cont, tag, form) ->
       v = @newconst('v'); v2 = @newconst('v'); temp = @newconst('temp'); temp2 = @newconst('temp')
-      @cont(tag, @clamda(v, il.assign(temp, v),
-                            @cont(form, @clamda(v2, il.assign(temp2, v2),
+      @cont(tag, il.clamda(v, il.assign(temp, v),
+                            @cont(form, il.clamda(v2, il.assign(temp2, v2),
                                                  @protect(il.findCatch(temp)).call(temp2)))))
 
     # aka. lisp's unwind-protect
@@ -384,11 +378,11 @@ exports.Compiler = class Compiler
       oldprotect = @protect
       v1 = @newconst('v'); v2 = @newconst('v'); temp = @newconst('temp'); temp2 = @newconst('temp')
       compiler = @
-      @protect = (cont) -> compiler.clamda(v1, il.assign(temp, v1),
-                                     compiler.expsCont(cleanup, compiler.clamda(v2, v2,
+      @protect = (cont) -> il.clamda(v1, il.assign(temp, v1),
+                                     compiler.expsCont(cleanup, il.clamda(v2, v2,
                                           oldprotect(cont).call(temp))))
-      result = @cont(form,  compiler.clamda(v1, il.assign(temp, v1),
-                              @expsCont(cleanup, @clamda(v2, v2,
+      result = @cont(form,  il.clamda(v1, il.assign(temp, v1),
+                              @expsCont(cleanup, il.clamda(v2, v2,
                                     cont.call(temp)))))
       @protect = oldprotect
       result
@@ -398,35 +392,35 @@ exports.Compiler = class Compiler
     #current continuation @cont can be captured in someFunction
     'callcc': (cont, fun) ->
       v = @newconst('v')
-      @cont(fun, @clamda(v, cont.call(v.call(cont, cont))))
+      @cont(fun, il.clamda(v, cont.call(v.call(cont, cont))))
 
     # aka. lisp's call/fc
     # callfc(someFunction(kont) -> body)
     #current continuation @cont can be captured in someFunction
     'callfc': (cont, fun) ->
       v = @newconst('v')
-      @cont(fun, @clamda(v, cont.call(v.call(il.failcont, cont))))
+      @cont(fun, il.clamda(v, cont.call(v.call(il.failcont, cont))))
 
     'logicvar': (cont, name) -> cont.call(il.newLogicVar(name))
     'dummy': (cont, name) -> cont.call(il.newDummyVar(name))
     'unify': (cont, x, y) ->
       x1 = @newconst('x'); y1 = @newconst('y')
-      @cont(x, @clamda(x1, @cont(y, @clamda(y1,
+      @cont(x, il.clamda(x1, @cont(y, il.clamda(y1,
           il.if_(il.unify(x1, y1), cont.call(true),
-             il.throwFail(false))))))
+             il.failcont.call(false))))))
     'notunify': (cont, x, y) ->
       x1 = @newconst('x'); y1 = @newconst('y')
-      @cont(x, @clamda(x1, @cont(y, @clamda(y1,
-          il.if_(il.unify(x, y), il.throwFail(false),
+      @cont(x, il.clamda(x1, @cont(y, il.clamda(y1,
+          il.if_(il.unify(x, y), il.failcont.call(false),
              cont.call(true))))))
     # evaluate @exp and bind it to vari
     'is': (cont, vari, exp) ->
       v = @newconst('v')
-      @cont(exp, @clamda(v, il.bind(vari, v), cont.call(true)))
+      @cont(exp, il.clamda(v, il.bind(vari, v), cont.call(true)))
     'bind': (cont, vari, term) -> il.begin(il.bind(vari, il.deref(term)), cont.call(true))
     'getvalue': (cont, term) -> cont.call(il.getvalue(@interlang(term)))
     'succeed': (cont) -> cont.call(true)
-    'fail': (cont) -> il.throwFail(false)
+    'fail': (cont) -> il.failcont.call(false)
 
     # x.push(y), when backtracking here, x.pop()
     'pushp': (cont, list, value) ->
@@ -436,9 +430,9 @@ exports.Compiler = class Compiler
       value2 = @newconst('value')
       fc = @newconst('fc')
       v = @newconst('v')
-      @cont(list, @clamda(list1,
+      @cont(list, il.clamda(list1,
           il.assign(list2, list1),
-          @cont(value, @clamda(value1,
+          @cont(value, il.clamda(value1,
             il.assign(value2, value1),
             il.assign(fc, il.failcont),
             il.setfailcont(il.clamda(v, v, il.pop(list2), fc.call(value2)))
@@ -462,10 +456,7 @@ exports.Compiler = class Compiler
                                         il.setstate(state),
                                         il.setfailcont(fc),
                                         @cont(y, cont))),
-               il.try(@cont(x, cont),
-                      e, il.if_(il.instanceof(e, il.symbol('SolverFail')),
-                           il.failcont.call(il.attr(e, il.symbol('value'))),
-                           il.throw(e))))
+               @cont(x, cont))
 
     'ifp': (cont, test, action) ->
       #if -> Then; _Else :- If, !, Then.<br/>
@@ -474,7 +465,7 @@ exports.Compiler = class Compiler
       v = @newconst('v')
       fc = @newconst('fc')
       il.begin(il.assign(fc, il.failcont),
-        @cont(test, @clamda(v,
+        @cont(test, il.clamda(v,
           v,
           il.setfailcont(fc),
           @cont(action, cont))))
@@ -506,7 +497,7 @@ exports.Compiler = class Compiler
       v1 = @newconst('v')
       il.begin(il.assign(cc, il.cutcont),
                il.assign(il.cutcont, il.failcont),
-               @cont(goal, @clamda(v, il.assign(v1, v), il.setcutcont(cc), cont.call(v1))))
+               @cont(goal, il.clamda(v, il.assign(v1, v), il.setcutcont(cc), cont.call(v1))))
     # prolog's cut, aka "!"
     'cut': (cont) -> il.begin(il.setfailcont(il.cutcont), cont.call(null))
     # find all solution to the goal @exp in prolog
@@ -528,9 +519,9 @@ exports.Compiler = class Compiler
                                    il.if_(il.unify(@interlang(result), result1),
                                           il.begin(il.setfailcont(fc), cont.call(null)),
                                           fc.call(v1)))),
-          @cont(goal, @clamda(v, il.assign(v1, v),
+          @cont(goal, il.clamda(v, il.assign(v1, v),
             il.push(result1, il.getvalue(@interlang(template))),
-            il.throwFail(v1))))
+            il.failcont.call(v1))))
 
     # find only one solution to the @goal
     'once': (cont, goal) ->
@@ -538,46 +529,46 @@ exports.Compiler = class Compiler
       v = @newconst('v')
       v1 = @newconst('v')
       il.begin(il.assign(fc, il.failcont),
-        @cont(goal, @clamda(v, il.assign(v1, v), il.setfailcont(fc), cont.call(v1))))
+        @cont(goal, il.clamda(v, il.assign(v1, v), il.setfailcont(fc), cont.call(v1))))
 
     'parse': (cont, exp, state) ->
       v = @newconst('v')
       v1 = @newconst('v')
 #      fc = @newconst('fc')
       oldState = @newconst('state')
-      @cont(state, @clamda(v, il.assign(oldState, il.state),
+      @cont(state, il.clamda(v, il.assign(oldState, il.state),
 #                               il.assign(fc, il.failcont),
 #                               il.setfailcont(il.clamda(v, v, il.setstate(oldState), fc.call(false))),
                                il.setstate(v),
-                               @cont(exp, @clamda(v, il.assign(v1, v), il.setstate(oldState), cont.call(v1)))))
+                               @cont(exp, il.clamda(v, il.assign(v1, v), il.setstate(oldState), cont.call(v1)))))
     'parsetext': (cont, exp, text) ->
       v = @newconst('v')
       v1 = @newconst('v')
 #      fc = @newconst('fc')
       oldState = @newconst('state')
-      @cont(text, @clamda(v,
+      @cont(text, il.clamda(v,
                           il.begin(il.assign(oldState, il.state),
 #                             il.assign(fc, il.failcont),
 #                             il.setfailcont(il.clamda(v, v, il.setstate(oldState), fc.call(false))),
                              il.setstate(il.array(v, 0)),
-                             @cont(exp, @clamda(v, il.assign(v1, v), il.setstate(oldState), cont.call(v1))))))
+                             @cont(exp, il.clamda(v, il.assign(v1, v), il.setstate(oldState), cont.call(v1))))))
     'setstate': (cont, state) ->
       v = @newconst('v')
-      @cont(state, @clamda(v, il.setstate(v), cont.call(true)))
+      @cont(state, il.clamda(v, il.setstate(v), cont.call(true)))
     'settext': (cont, text) ->
       v = @newconst('v')
-      @cont(text, @clamda(v, il.setstate(il.array(v, 0)), cont.call(true)))
+      @cont(text, il.clamda(v, il.setstate(il.array(v, 0)), cont.call(true)))
     'setpos': (cont, pos) ->
       v = @newconst('v')
-      @cont(pos, @clamda(v, il.assign(il.index(il.state, 1), v), cont.call(true)))
+      @cont(pos, il.clamda(v, il.assign(il.index(il.state, 1), v), cont.call(true)))
     'getstate': (cont) -> cont.call(il.state)
     'gettext': (cont) -> cont.call(il.index(il.state, 0))
     'getpos': (cont) -> cont.call(il.index(il.state, 1))
     'eoi': (cont) ->
       data = @newconst('data'); pos = @newconst('pos')
       il.begin(il.listassign(data, pos, il.state),
-               il.if_(il.ge(pos, il.length(data)), cont.call(true), il.throwFail(false)))
-    'boi': (cont) -> il.if_(il.eq(il.index(il.state, 1), 0), cont.call(true), il.throwFail(false))
+               il.if_(il.ge(pos, il.length(data)), cont.call(true), il.failcont.call(false)))
+    'boi': (cont) -> il.if_(il.eq(il.index(il.state, 1), 0), cont.call(true), il.failcont.call(false))
     # eol: end of line text[pos] in "\r\n"
     'eol': (cont) ->
       text = @newconst('text'); pos = @newconst('pos');  c = @newconst('c')
@@ -588,7 +579,7 @@ exports.Compiler = class Compiler
                        il.assign(c, il.index(text, pos, 1)),
                        il.if_(il.or_(il.eq(c, "\r"), il.eq(c, "\n")),
                             cont.call(true),
-                            il.throwFail(false)))))
+                            il.failcont.call(false)))))
     'bol': (cont) ->
       text = @newconst('text'); pos = @newconst('pos');  c = @newconst('c')
       il.begin(
@@ -598,11 +589,11 @@ exports.Compiler = class Compiler
                              il.assign(c, il.index(text, il.sub(pos, 1))),
                              il.if_(il.or_(il.eq(c, "\r"), il.eq(c, "\n")),
                                     cont.call(true),
-                                    il.throwFail(false)))))
+                                    il.failcont.call(false)))))
 
     'step': (cont, n) ->
       v = @newconst('v'); text = @newconst('text'); pos = @newconst('pos'); pos1 = @newconst('pos')
-      @cont(n, @clamda(v,
+      @cont(n, il.clamda(v,
         il.listassign(text, pos, il.state),
         il.assign(pos1, il.add(pos, v)),
         il.setstate(il.array(text, pos1)),
@@ -615,9 +606,9 @@ exports.Compiler = class Compiler
       start1 = @newconst('start'); length1 = @newconst('length')
       start2 = @newconst('start'); length2 = @newconst('length')
       start3 = @newconst('start'); length3 = @newconst('length')
-      @cont(length, @clamda(length1,
+      @cont(length, il.clamda(length1,
         il.assign(length2, length1),
-        @cont(start, @clamda(start1,
+        @cont(start, il.clamda(start1,
           il.assign(start2, start1),
           il.listassign(text, pos, il.state),
           il.begin(il.assign(start3, il.if_(il.ne(start2, null), start2, pos)),
@@ -658,7 +649,7 @@ exports.Compiler = class Compiler
            il.assign(v1, v),
            il.setfailcont(fc),
            cont.call(v1))),
-         @cont(exp, @clamda(v,il.assign(v2, v),
+         @cont(exp, il.clamda(v,il.assign(v2, v),
                     il.setfailcont(fc),
                     cont.call(v2))))
     'any': (cont, exp) ->
@@ -725,13 +716,13 @@ exports.Compiler = class Compiler
       v = @newconst('v')
       v1 = @newconst('v')
       il.begin(il.assign(state, il.state),
-        @cont(x,  @clamda(v,
+        @cont(x,  il.clamda(v,
           v,
           il.assign(right, il.state),
           il.setstate(state),
-          @cont(y, @clamda(v, il.assign(v1, v),
+          @cont(y, il.clamda(v, il.assign(v1, v),
                          il.if_(il.fun(checkFunction).call(il.state, right), cont.call(v1),
-                            il.throwFail(v1)))))))
+                            il.failcont.call(v1)))))))
     # follow: if item is followed, succeed, else fail. after eval, state is restored
     'follow': (cont, item) ->
       state = @newconst('state')
@@ -739,7 +730,7 @@ exports.Compiler = class Compiler
       v1 = @newconst('v')
       state = @newconst('state')
       il.begin(il.assign(state, il.state),
-               @cont(item, @clamda(v, il.assign(v1, v),
+               @cont(item, il.clamda(v, il.assign(v1, v),
                                      il.setstate(state),
                                      cont.call(v))))
 
@@ -753,40 +744,9 @@ exports.Compiler = class Compiler
               il.assign(fc, il.failcont),
               il.assign(state, il.state),
               il.setfailcont(cont),
-              @cont(item, @clamda(v,il.assign(v1, v),
+              @cont(item, il.clamda(v,il.assign(v1, v),
                                      il.setstate(state),
                                      fc.call(v1))))
-
-    # char: match one char  <br/>
-    #  if x is char or bound to char, then match that given char with next<br/>
-    #  else match with next char, and bound x to it.
-    'xxxchar': (cont, item) ->
-      data = @newconst('data')
-      pos = @newconst('pos')
-      x = @newconst('x')
-      c = @newconst('c')
-      v = @newconst('v')
-      @cont(item, @clamda(v,
-          il.listassign(data, pos, il.state),
-          il.if_(il.gt(pos, il.length(data)), il.return(il.throwFail(v))),
-          il.begin(il.assign(x, il.deref(v)),
-                   il.assign(c, il.index(data, pos)),
-          il.iff(il.instanceof(x, il.symbol('Var')),
-               il.begin(
-                 il.bind(x, c),
-                 il.setstate(il.array(data, il.add(pos,1))),
-                 cont.call(il.add(pos,1))),
-               il.eq(x,c),
-               il.begin(
-                 il.setstate(il.array(data, il.add(pos,1))),
-                 cont.call(il.add(pos,1))),
-                 il.attr(il.symbol('_'), il.symbol('isString')).call(x),
-               il.if_(il.eq(il.length(x), 1),il.throwFail(v),
-                      il.throw(il.new(il.symbol('ExpressionError').call(x)))),
-               il.throw(il.new(il.symbol('TypeError').call(x)))))))
-
-    'spaces': (cont, item) -> cont.call(il.spaces(il.solver))
-    'spaces0': (cont, item) -> cont.call(il.spaces0(il.solver))
 
   Compiler = @
   for name, vop of il
@@ -800,28 +760,17 @@ exports.Compiler = class Compiler
         cont = cont.call(vop(params...))
         for i in [length-1..0] by -1
           cont = do (i=i, cont=cont) ->
-            compiler.cont(args[i], compiler.clamda(params[i], cont))
+            compiler.cont(args[i], il.clamda(params[i], cont))
         cont
-
-  for name in ['char', 'followChars', 'notFollowChars', 'charWhen', 'stringWhile', 'stringWhile0',
-                'literal', 'followLiteral']
-    do (name=name, vop=vop) -> Compiler::specials[name] = (cont, item) ->
-      compiler = @
-      v = @newconst('v')
-      compiler.cont(item, compiler.clamda(v, cont.call(il[name](il.solver, v))))
-
-  for name in [ 'number','quoteString', 'identifier']
-    do (name=name, vop=vop) -> Compiler::specials[name] = (cont, item) ->
-      cont.call(il[name](il.solver))
 
   leftValueCont: (cont, task, item, exp, op) ->
     assignExpCont = (item) =>
       v = @newconst('v')
       temp = @newconst('temp')
       switch task
-        when 'assign' then return @cont(exp, @clamda(v, il.assign(item, v), cont.call(item)))
+        when 'assign' then return @cont(exp, il.clamda(v, il.assign(item, v), cont.call(item)))
         when 'augment-assign'
-          return @cont(exp, @clamda(v, il.assign(item, il[op](item, v)), cont.call(item)))
+          return @cont(exp, il.clamda(v, il.assign(item, il[op](item, v)), cont.call(item)))
         when 'inc'
           return il.begin(il.assign(item, il.add(item, 1)), cont.call(item))
         when 'dec'
@@ -876,7 +825,7 @@ exports.Compiler = class Compiler
     else if length is 1 then @cont(exps[0], cont)
     else
       v = @newconst('v')
-      @cont(exps[0], @clamda(v, v, @expsCont(exps[1...], cont)))
+      @cont(exps[0], il.clamda(v, v, @expsCont(exps[1...], cont)))
 
   quasiquote: (exp, cont) ->
     if not _.isArray(exp) then return cont.call(exp)
@@ -897,9 +846,9 @@ exports.Compiler = class Compiler
       for i in [exp.length-1..1] by -1
         e = exp[i]
         if  _.isArray(e) and e.length>0 and e[0] is "unquote-slice"
-          cont = @quasiquote(e, @clamda(v, il.assign(quasilist, il.concat(quasilist, v)), cont))
+          cont = @quasiquote(e, il.clamda(v, il.assign(quasilist, il.concat(quasilist, v)), cont))
         else
-          cont = @quasiquote(e, @clamda(v, il.push(quasilist, v), cont))
+          cont = @quasiquote(e, il.clamda(v, il.push(quasilist, v), cont))
       il.begin( il.assign(quasilist, il.list(head)),
         cont)
 
@@ -924,14 +873,18 @@ exports.Compiler = class Compiler
     "nonlocal": (head, vars...) ->
       result = [head];
       for name in vars
-        result.push(@alphaName(name))
+        result.push(@env.alphaName(name))
       result
     "variable": (head, vars...) ->
-      result = [head]; result.push(@alphaName(name) for name in vars); result
+      result = [head]; result.push(@env.alphaName(name) for name in vars); result
     "assign": (head, left, exp) ->
-       [head, @alpha(left), @alpha(exp)]
-    "uniquevar": (head, name, index) -> [head, @uniqueName(name, index)]
-    "uniqueconst": (head, name, index) -> [head, @uniqueName(name, index)]
+      if _.isString(left) then left = @env.alphaName(left)
+      else left = @alpha(left)
+      [head, left, @alpha(exp)]
+    "augment-assign": (head, op, left, exp) ->
+      [head, op, @alpha(left), @alpha(exp)]
+    "uniquevar": (head, name, index) -> [head, @env.uniqueName(name, index)]
+    "uniqueconst": (head, name, index) -> [head, @env.uniqueName(name, index)]
     "jsfun": (head, exp) -> [head, exp]
     "direct": (head, exp) -> [head, exp]
     "pure": (head, exp) -> [head, exp]
@@ -940,14 +893,14 @@ exports.Compiler = class Compiler
     "lambda": (head, params, body...) ->
       result = [head]
       @pushEnv()
-      result.push(@alphaName(p) for p in params)
+      result.push(@env.alphaName(p) for p in params)
       for e in body then result.push(@alpha(e))
       @popEnv()
       result
     "macro": (head, params, body...) ->
       result = [head]
       @pushEnv()
-      result.push(@alphaName(p) for p in params)
+      result.push(@env.alphaName(p) for p in params)
       bindings = @env.bindings
       for p in params then bindings[p] = ['evalarg', bindings[p]]
       for e in body then result.push(@alpha(e))
@@ -975,16 +928,6 @@ exports.Compiler = class Compiler
     if exptoCode then exptoCode.call(exp, @)
     else if typeof exp is 'function' then exp.toString()
     else  JSON.stringify(exp)
-#      if exp is undefined then 'undefined'
-#      else if exp is null then 'null'
-#      else if _.isNumber(exp) then exp.toString()
-#      else if _.isString(exp) then JSON.stringify(exp)
-#      else if exp is true then "true"
-#      else if exp is false then "false"
-#      else if _.isArray(exp) then JSON.stringify(exp)
-#      else if typeof exp is 'function' then exp.toString()
-#      else if _.isObject(exp) then JSON.stringify(exp)
-#      else exp.toString()
 
 class Env
 

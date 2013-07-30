@@ -42,11 +42,14 @@ exports.uarray = (args...) -> ["uarray", args...]
 exports.cons = (head, tail) -> ["cons", head, tail]
 exports.makeobject = (args...) -> ["makeobject", args...]
 exports.uobject = (args...) -> ["uobject", args...]
-exports.funcall = (caller, args...) -> ["funcall", caller, args...]
+exports.funcall = funcall = (caller, args...) -> ["funcall", caller, args...]
+exports.jsfuncall = (caller, args...) -> ["jsfuncall", caller, args...]
 exports.macall = (caller, args...) -> ["macall", caller, args...]
 
 exports.jsobject = (exp) -> ["jsobject", exp]
 exports.jsfun = jsfun = (exp) -> ["jsfun", exp]
+
+exports.print_ = (exps...) -> ['jsfuncall', io(jsfun('console.log'))].concat(exps)
 
 exports.direct = (exp) -> ['direct', exp]
 
@@ -113,8 +116,6 @@ exports.throw_ = (tag, form) -> ['throw', tag, form]
 exports.protect = (form, cleanup...) -> ['unwind-protect', form, cleanup...]
 exports.callcc = (fun) -> ['callcc', fun]
 exports.callfc = (fun) -> ['callfc', fun]
-
-exports.print_ = (exps...) -> ['funcall', io(jsfun('console.log'))].concat(exps)
 
 exports.vop = vop = (name, args...) -> ["vop_"+name].concat(args)
 
@@ -348,10 +349,15 @@ exports.notfollow = (x) -> ['notfollow', x]
 # char: match one char  <br/>
 #  if x is char or bound to char, then match that given char with next<br/>
 #  else match with next char, and bound x to it.
-exports.char = char = (x) -> ['char', x]
-exports.followChars = (chars) ->  ['followChars', chars]
-exports.notFollowChars = (chars) ->  ['notFollowChars', chars]
-exports.charWhen = charWhen = (test) ->  ['charWhen', test]
+for name in ['char', 'followChars', 'notFollowChars', 'charWhen', 'spaces', 'spaces0',
+             'stringWhile', 'stringWhile0', 'number', 'literal', 'followLiteral',
+             'notFollowLiteral', 'quoteString', 'identifier']
+  exports[name] = do (name = name) -> (args...) -> funcall(jsfun('parser.'+name), 'solver', args...)
+
+char = exports.char
+charWhen = exports.charWhen
+stringWhile = exports.stringWhile
+stringWhile0 = exports.stringWhile0
 
 exports.charBetween = (start, end) -> charWhen((c) -> start<c<end)
 charIn = charIn = (set) -> charWhen((c) ->  c in set)
@@ -367,18 +373,6 @@ exports.tabspace = charIn(' \t')
 exports.whitespace = charIn(' \t\r\n')
 exports.newline = charIn('\r\n')
 
-# spaces: one or more spaces(' ') <br/>
-#usage: spaces # !!! NOT spaces()
-exports.spaces = ['spaces']
-# spaces0: zero or more spaces(' ') <br/>
-#usage: spaces0 # !!! NOT spaces0()
-exports.spaces0 = ['spaces0']
-
-# stringWhile: match a string, every char in the string should pass test <br/>
-# test: a function with single argument <br/>
-#  the string should contain on char at least.
-exports.stringWhile = stringWhile = (test) ->  ['stringWhile', test]
-
 exports.stringBetween = (start, end) -> stringWhile((c) -> start<c<end)
 exports.stringIn = stringIn = (set) -> stringWhile((c) ->  c in set)
 # theses terminal should be used directly, NO suffix with ()
@@ -393,11 +387,6 @@ exports.tabspaces = stringIn(' \t')
 exports.whitespaces = stringIn(' \t\r\n')
 exports.newlinespaces = stringIn('\r\n')
 
-#stringWhile0: match a string, every char in it passes test <br/>
-# test: a function with single argument <br/>
-#  the string can be empty string.
-exports.stringWhile0 = stringWhile0 = (test) ->  ['stringWhile0', test]
-
 exports.stringBetween0 = (start, end) -> stringWhile0((c) -> start<c<end)
 exports.stringIn0 = stringIn0 = (set) -> stringWhile0((c) ->  c in set)
 # theses terminal should be used directly, NO suffix with ()
@@ -411,29 +400,3 @@ exports.underlineLetterDights0 = stringWhile0((c)-> (c is '_') or ('a'<=c<='z') 
 exports.tabspaces0 = stringIn0(' \t')
 exports.whitespaces0 = stringIn0(' \t\r\n')
 exports.newlines0 = stringIn0('\r\n')
-
-# float: match a number, which can be float format..<br/>
-#  if arg is free core.Var, arg would be bound to the number <br/>
-#  else arg should equal to the number.
-exports.number = exports.float = () ->  ['number']
-
-#literal: match given literal arg,  <br/>
-# arg is a string or a var bound to a string.
-exports.literal = (arg) ->  ['literal', arg]
-
-#followLiteral: follow  given literal arg<br/>
-# arg is a string or a var bound to a string. <br/>
-#solver.state is restored after match.
-exports.followLiteral = (arg) ->  ['followLiteral', arg]
-
-#notFollowLiteral: not follow  given literal arg,  <br/>
-# arg is a string or a var bound to a string. <br/>
-#solver.state is restored after match.
-exports.notFollowLiteral = (arg) ->  ['notFollowLiteral', arg]
-
-#quoteString: match a quote string quoted by quote, quote can be escapedby \
-exports.quoteString = () ->  ['quoteString']
-
-#quoteString: match a quote string quoted by quote, quote can be escapedby \
-exports.identifier = () ->  ['identifier']
-

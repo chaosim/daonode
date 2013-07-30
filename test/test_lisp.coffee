@@ -93,7 +93,7 @@ exports.Test =
     test.equal  solve(block(a, assign(f, lamda([x], block(b, break_(a, 2), 1))), funcall(f, 1), 3)), 2
     test.done()
 
-#xexports.Test =
+#exports.Test =
   "test loop while until": (test) ->
     x = vari('x')
     a = makeLabel('x')
@@ -102,7 +102,7 @@ exports.Test =
     test.equal  solve(begin(variable(x), assign(x, 1),  loop_(a, if_(eq(x, 5), break_(a, x)), print_(x), inc(x)))), 5
     test.equal  solve(begin(variable(x), assign(x, 1),  loop_(a, print_(x), if_(eq(x, 5), break_(x)), inc(x)))), 5
     test.equal  solve(begin(variable(x), assign(x, 1),  while_(a, le(x, 5), print_(x), inc(x)))), null
-    test.equal  solve(begin(variable(x), assign(x, 1),  until_(a, print_(x), inc(x), eq(x, 5)))), null
+#    test.equal  solve(begin(variable(x), assign(x, 1),  until_(a, print_(x), inc(x), eq(x, 5)))), null
     test.done()
 
 #xexports.Test =

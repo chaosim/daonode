@@ -87,11 +87,7 @@ class TailRecuisiveLamda extends Lamda
 class Clamda extends Lamda
   constructor: (@v, @body) -> @name = @toString(); @params = [v]
   toString: () -> "(#{toString(@v)} -> #{toString(@body)})"
-  call: (value) ->
-    result = replace(@body, @v.toString(), value)
-    if result.constructor is Begin then result.constructor = Begin
-    result
-
+  call: (value) -> replace(@body, @v.toString(), value)
 class RecursiveClamda extends Clamda
   call: (value) -> new CApply(@, value)
 
@@ -1118,7 +1114,8 @@ ExpressionList::needParenthesis = true
 Lamda::needParenthesis = true
 
 expressionToCode = (compiler, exp) ->
-  if not exp.needParenthesis and exp not instanceof Function
+  if exp is undefined then 'exp'
+  else if not exp.needParenthesis and exp not instanceof Function
     compiler.toCode(exp)
   else "(#{compiler.toCode(exp)})"
 
@@ -1329,21 +1326,6 @@ il.trail = il.uservarattr('solver.trail')
 il.newTrail = vop('newTrail', (compiler)->args = @args; "new Trail()")()
 il.settrail = (trail) -> il.assign(il.trail, trail)
 
-il.char = vop('char', ((compiler)->args = @args; "parser.char(#{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})"), il.EFFECT)
-il.followChars =  vop('followChars', ((compiler)->args = @args; "parser.followChars(#{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})"), il.EFFECT)
-il.notFollowChars = vop('notFollowChars', ((compiler)->args = @args; "parser.notFollowChars(#{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})"), il.EFFECT)
-il.charWhen = vop('charWhen', ((compiler)->args = @args; "parser.charWhen(#{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})"), il.EFFECT)
-il.spaces = vop('spaces', ((compiler)->args = @args; "parser.spaces(#{compiler.toCode(args[0])})"), il.EFFECT)
-il.spaces0 = vop('spaces0', ((compiler)->args = @args; "parser.spaces0(#{compiler.toCode(args[0])})"), il.EFFECT)
-il.stringWhile = vop('stringWhile', ((compiler)->args = @args; "parser.stringWhile(#{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})"), il.EFFECT)
-il.stringWhile0 = vop('stringWhile0', ((compiler)->args = @args; "parser.stringWhile0(#{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})"), il.EFFECT)
-il.number = vop('number', ((compiler)->args = @args; "parser.number(#{compiler.toCode(args[0])})"), il.EFFECT)
-il.literal = vop('literal', ((compiler)->args = @args; "parser.literal(#{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})"), il.EFFECT)
-il.followLiteral = vop('followLiteral', ((compiler)->args = @args; "parser.followLiteral(#{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})"), il.EFFECT)
-il.notFollowLiteral = vop('notFollowLiteral', ((compiler)->args = @args; "parser.notFollowLiteral(#{compiler.toCode(args[0])}, #{compiler.toCode(args[1])})"), il.EFFECT)
-il.quoteString = vop('quoteString', ((compiler)->args = @args; "parser.quoteString(#{compiler.toCode(args[0])})"), il.EFFECT)
-il.identifier = vop('identifier', ((compiler)->args = @args; "parser.identifier(#{compiler.toCode(args[0])})"), il.EFFECT)
-
 il.fun = (f) -> new Fun(f)
 
 il.let_ = (bindings, body...) ->
@@ -1371,7 +1353,7 @@ il.try = (test, vari, catchBody, final) -> new Try(test, vari, catchBody, final)
 il.break_ = (label) -> new Break(label)
 il.continue_ = (label) -> new Continue(label)
 
-il.idcont = do -> v = il.internalvar('v'); new IdCont(v, v)
+il.idcont = -> v = il.internalvar('v'); new IdCont(v, v)
 
 il.excludes = ['evalexpr', 'failcont', 'run', 'getvalue', 'fake', 'findCatch', 'popCatch', 'pushCatch',
                'protect', 'suffixinc', 'suffixdec', 'dec', 'inc', 'unify', 'bind', 'undotrail',

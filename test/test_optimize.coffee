@@ -18,7 +18,6 @@ compile = (exp, path) ->
   +"solve = require('../lib/core').solve;\n"\
   +"parser = require('../lib/parser');\n"\
   +"solvecore = require('../lib/solve');\n"\
-  +"SolverFinish = solvecore.SolverFinish;\n"\
   +"Solver = solvecore.Solver;\n"\
   +"Trail = solvecore.Trail;\n"\
   +"Var = solvecore.Var;\n"\

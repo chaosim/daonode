@@ -1,6 +1,6 @@
 {solve, Error} = core = require('../lib/core')
 {variable, string, begin, quote, assign, addassign, print_, jsobject,\
-  funcall, macall, lamda, macro, jsfun, \
+  funcall, macall, lamda, macro, jsfun, jsfuncall, \
   if_, add, eq, inc, suffixinc,\
   eval_, qq, uq, uqs} = require('../lib/util')
 
@@ -19,12 +19,12 @@ exports.Test =
     test.equal  solve(begin(variable(x), assign(x, 1), suffixinc(x))), 1
     test.done()
 
-#xexports.Test =
+#exports.Test =
   "test 1": (test) ->
     test.equal  solve(1), 1
     test.done()
 
-#xexports.Test =
+#exports.Test =
   "test begin": (test) ->
     test.equal  solve(begin(1, 2)), 2
     test.done()
@@ -40,16 +40,16 @@ exports.Test =
     test.equal  solve(console_log), console.log
     test.done()
 
-#exports.Test =
+#xexports.Test =
   "test jsfun": (test) ->
     console_log = 'console.log'
-    test.equal  solve(funcall(jsfun(console_log), 1)), null
+    test.equal  solve(jsfuncall(jsfun(console_log), 1)), null
     test.equal  solve(print_(1, 2)), null
     x = vari('x')
     test.equal  solve(begin(assign(x, 1),print_(x))), null
     test.done()
 
-#xexports.Test =
+#exports.Test =
   "test vop: add, eq": (test) ->
     test.equal  solve(add(1, 1)), 2
     test.equal  solve(eq(1, 1)), true
@@ -72,7 +72,7 @@ exports.Test =
     test.throws (-> solve(qq(add(uqs(uqs([1,2])))))), Error
     test.done()
 
-#xexports.Test =
+#exports.Test =
   "test lambda": (test) ->
     x = 'x'; y = 'y'
     f = vari('f')

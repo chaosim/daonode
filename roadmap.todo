@@ -6,6 +6,7 @@ just javascript:
   ✔ javascript break/continue with label @done (13-07-12 08:51)
   ✔ switch-case statement @done (13-07-21 18:52)
   ✔ javascript try/catch @done (13-07-12 06:33)
+    ✔ test @done (13-07-29 19:51)
   ✔ throw @done (13-06-29 15:03)
   ✔ javascript's new @done (13-06-22 21:27)
   ✔ toCode: remove unnecessary parenthesis by using precedence of operator @done (13-07-12 06:03)

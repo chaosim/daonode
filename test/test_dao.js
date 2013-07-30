@@ -6,28 +6,17 @@
 
   xexports = {};
 
-  xexports.Test = {
-    "test number": function(test) {
+  exports.Test = {
+    "test atomic": function(test) {
       test.equal(solve('1'), 1);
       test.equal(solve('123'), 123);
       test.equal(solve('-123.56e-3'), -123.56e-3);
-      return test.done();
-    }
-  };
-
-  xexports.Test = {
-    "test string": function(test) {
       test.equal(solve('"1"'), "1");
+      test.equal(solve('3'), 3);
       return test.done();
     },
-    "test identifier": function(test) {
-      return test.done();
-    }
-  };
-
-  exports.Test = {
     "test string": function(test) {
-      test.equal(solve('3'), 3);
+      test.equal(solve('1+1'), 2);
       return test.done();
     }
   };
