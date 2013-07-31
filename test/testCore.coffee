@@ -19,7 +19,7 @@ exports.Test =
     test.equal  solve(begin(variable(x), assign(x, 1), suffixinc(x))), 1
     test.done()
 
-#exports.Test =
+#xexports.Test =
   "test 1": (test) ->
     test.equal  solve(1), 1
     test.done()
@@ -40,7 +40,7 @@ exports.Test =
     test.equal  solve(console_log), console.log
     test.done()
 
-#xexports.Test =
+#exports.Test =
   "test jsfun": (test) ->
     console_log = 'console.log'
     test.equal  solve(jsfuncall(jsfun(console_log), 1)), null
@@ -49,7 +49,7 @@ exports.Test =
     test.equal  solve(begin(assign(x, 1),print_(x))), null
     test.done()
 
-#exports.Test =
+#xexports.Test =
   "test vop: add, eq": (test) ->
     test.equal  solve(add(1, 1)), 2
     test.equal  solve(eq(1, 1)), true
@@ -61,14 +61,15 @@ exports.Test =
     test.equal  solve(eval_(quote(print_(1)), string('f:/daonode/lib/compiler/test/compiled2.js'))), null
     test.done()
 
-#xexports.Test =
+#exports.Test =
   "test quasiquote": (test) ->
-    test.equal solve(qq(1)), 1
     a = add(1, 2)
+    test.equal solve(qq(1)), 1
     test.deepEqual solve(qq(a)), a
     test.deepEqual solve(qq(uq(a))), 3
-    test.deepEqual solve(qq(uqs([1,2]))), [1,2]
-    test.deepEqual solve(qq(add(uqs([1,2])))), a
+    test.deepEqual solve(qq(uqs([1, 2]))), 2
+    test.deepEqual solve(qq(uqs(['a', 'b']))), ['a', 'b']
+    test.deepEqual solve(qq(add(uqs(quote([1,2]))))), a
     test.throws (-> solve(qq(add(uqs(uqs([1,2])))))), Error
     test.done()
 

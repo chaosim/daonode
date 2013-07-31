@@ -67,12 +67,13 @@
     "test quasiquote": function(test) {
       var a;
 
-      test.equal(solve(qq(1)), 1);
       a = add(1, 2);
+      test.equal(solve(qq(1)), 1);
       test.deepEqual(solve(qq(a)), a);
       test.deepEqual(solve(qq(uq(a))), 3);
-      test.deepEqual(solve(qq(uqs([1, 2]))), [1, 2]);
-      test.deepEqual(solve(qq(add(uqs([1, 2])))), a);
+      test.deepEqual(solve(qq(uqs([1, 2]))), 2);
+      test.deepEqual(solve(qq(uqs(['a', 'b']))), ['a', 'b']);
+      test.deepEqual(solve(qq(add(uqs(quote([1, 2]))))), a);
       test.throws((function() {
         return solve(qq(add(uqs(uqs([1, 2])))));
       }), Error);

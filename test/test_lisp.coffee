@@ -93,6 +93,17 @@ exports.Test =
     test.equal  solve(block(a, assign(f, lamda([x], block(b, break_(a, 2), 1))), funcall(f, 1), 3)), 2
     test.done()
 
+
+#exports.Test =
+  "test block lamda 3": (test) ->
+    a = makeLabel('a')
+    b = makeLabel('b')
+    x = vari('x'); f = vari('f'); n = vari('n')
+    test.equal  solve(begin(funcall(lamda([x], variable(x, n), assign(n, 0),
+                                          block(a, if_(eq(x, 0), break_(a, n)), assign(n, add(n, dec(x))),
+                                                continue_(a))), 3), 12)), 12
+    test.done()
+
 #exports.Test =
   "test loop while until": (test) ->
     x = vari('x')
@@ -102,7 +113,7 @@ exports.Test =
     test.equal  solve(begin(variable(x), assign(x, 1),  loop_(a, if_(eq(x, 5), break_(a, x)), print_(x), inc(x)))), 5
     test.equal  solve(begin(variable(x), assign(x, 1),  loop_(a, print_(x), if_(eq(x, 5), break_(x)), inc(x)))), 5
     test.equal  solve(begin(variable(x), assign(x, 1),  while_(a, le(x, 5), print_(x), inc(x)))), null
-#    test.equal  solve(begin(variable(x), assign(x, 1),  until_(a, print_(x), inc(x), eq(x, 5)))), null
+    test.equal  solve(begin(variable(x), assign(x, 1),  until_(a, print_(x), inc(x), eq(x, 5)))), null
     test.done()
 
 #xexports.Test =
@@ -121,15 +132,5 @@ exports.Test =
     a = vari('a')
     blk = makeLabel('x')
     test.equal  solve(begin(variable(a), assign(a, 1),  block(blk, if_(eq(a, 10), break_(blk, a)), inc(a), continue_(blk)))), 10
-    test.done()
-
-#exports.Test =
-  "test block lamda 3": (test) ->
-    a = makeLabel('a')
-    b = makeLabel('b')
-    x = vari('x'); f = vari('f'); n = vari('n')
-    test.equal  solve(begin(funcall(lamda([x], variable(x, n), assign(n, 0),
-                                          block(a, if_(eq(x, 0), break_(a, n)), assign(n, add(n, dec(x))),
-                                                   continue_(a))), 3), 12)), 12
     test.done()
 

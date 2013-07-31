@@ -8,7 +8,7 @@
 
 # Similar to develop parser, dao can be as the base to develop a generator. We can also generate stuff at th same time of parsing.
 
-_ = require('underscore')
+{isInteger, isString, isArray, isNumber} = require("./util")
 
 {Trail, Var,  ExpressionError, TypeError, SolverFail} = require "./solve"
 
@@ -26,7 +26,7 @@ exports.char = (solver, x, cont) ->
     solver.state = [data, pos+1]
     cont(pos+1)
   else if x is c then (solver.state = [data, pos+1]; cont(pos+1))
-  else if _.isString(x)
+  else if isString(x)
     if x.length==1 then return solver.failcont(pos)
     else throw new ExpressionError(x)
   else throw new TypeError(x)
@@ -41,7 +41,7 @@ exports.followChar = (solver, x, cont) ->
   c = data[pos]
   if x instanceof Var then throw new TypeError(x)
   else if x is c then cont(pos)
-  else if _.isString(x)
+  else if isString(x)
     if x.length==1 then return solver.failcont(pos)
     else throw new ValueError(x)
   else throw new TypeError(x)
@@ -56,7 +56,7 @@ exports.notFollowChar =(solver, x, cont) ->
   c = data[pos]
   if x instanceof Var then throw new TypeError(x)
   else if x is c then return solver.failcont(pos)
-  else if _.isString(x)
+  else if isString(x)
     if x.length==1 then cont(pos)
     else throw new ValueError(x)
   else throw new TypeError(x)
@@ -72,7 +72,7 @@ exports.followChars = (solver, chars, cont) ->
   trail = solver.trail
   c = data[pos]
   if c in chars then cont(pos)
-  else if not _.isString(chars)
+  else if not isString(chars)
     throw new TypeError(chars)
   else return solver.failcont(pos)
 
@@ -87,7 +87,7 @@ exports.notFollowChars = (solver, chars, cont) ->
   trail = solver.trail
   c = data[pos]
   if c in chars then return solver.failcont(pos)
-  else if not _.isString(chars)
+  else if not isString(chars)
     throw new TypeError(chars)
   else cont(pos)
 
@@ -179,7 +179,7 @@ exports.number = exports.float = (solver, cont) ->
     if p>=length or text[p]<'0' or '9'<text[p] then p = pE-1
     else while p<length and '0'<=text[p]<='9' then p++
   value =  eval(text[pos...p])
-  if _.isNumber(value) then solver.state = [text, p]; cont(value)
+  if isNumber(value) then solver.state = [text, p]; cont(value)
   else return solver.failcont(pos)
 
 #literal: match given literal arg,  <br/>

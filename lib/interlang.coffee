@@ -1,10 +1,4 @@
-_ = require("underscore")
-{Env, solve} = core = require("./core")
-
-solvecore = require("./solve")
-Trail = solvecore.Trail;
-LogicVar = solvecore.Var;
-DummyVar = solvecore.DummyVar;
+{isInteger, isString, isArray, isObject} = require("./util")
 
 il = exports
 
@@ -210,7 +204,7 @@ Var::optimize = (env, compiler) ->
   if content instanceof Assign
     if @isRecursive then @
     else content.exp
-  else if _.isArray(content) then @
+  else if isArray(content) then @
   else content
 
 Symbol::optimize = (env, compiler) -> @
@@ -379,8 +373,8 @@ Begin::optimize = (env, compiler) ->
   else result[0]
 Deref::optimize = (env, compiler) ->
   exp = @exp
-  if _.isString(exp) then exp
-  else if _.isNumber(exp) then exp
+  if isString(exp) then exp
+  else if isNumber(exp) then exp
   else new Deref(compiler.optimize(exp, env))
 JSFun::optimize = (env, compiler) ->  new JSFun(compiler.optimize(@fun, env))
 
@@ -432,11 +426,11 @@ ForIn::codeSize = () -> codeSize(@vari) + codeSize(@container) + codeSize(@body)
 While::codeSize = () -> codeSize(@test) + codeSize(@body)+2
 Break::codeSize = () -> 1
 Try::codeSize = () -> codeSize(@test) + codeSize(@catchBody)+codeSize(@final)+2
-Begin::codeSize = () -> _.reduce(@exps, ((memo, e) -> memo + codeSize(e)), 0)
+Begin::codeSize = () -> @exps.reduce(((memo, e) -> memo + codeSize(e)), 0)
 VirtualOperation::codeSize = () -> 1
 Lamda::codeSize = () -> codeSize(@body) + 2
 Clamda::codeSize = () -> codeSize(@body) + 1
-Apply::codeSize = () -> _.reduce(@args, ((memo, e) -> memo + codeSize(e)), codeSize(@caller))
+Apply::codeSize = () -> @args.reduce(((memo, e) -> memo + codeSize(e)), codeSize(@caller))
 
 boolize = (exp) ->
   exp_boolize = exp?.boolize
@@ -477,7 +471,7 @@ isValue = (exp) ->
   if exp_isValue then exp_isValue.call(exp)
   else true
 
-isAtomic = (exp) -> not _.isObject(exp)
+isAtomic = (exp) -> not isObject(exp)
 
 il.PURE = 0; il.EFFECT = 1; il.IO = 2
 il.pure = pure = (exp) -> exp._effect = il.PURE; exp
@@ -715,7 +709,13 @@ Begin::convertBlockLamdaBody = (blockvar) ->
 Throw::convertBlockLamdaBody = (blockvar) -> @
 Return::convertBlockLamdaBody = (blockvar) ->
   value = @value
-  if value instanceof Apply and value.caller is blockvar
+  if value instanceof If
+    then_ = insertReturn(value.then_)
+    then_ = convertBlockLamdaBody(then_, blockvar)
+    else_ = insertReturn(value.else_)
+    else_ = convertBlockLamdaBody(else_, blockvar)
+    new If(value.test, then_, else_)
+  else if value instanceof Apply and value.caller is blockvar
     il.continue_(blockvar)
   else if value instanceof BlockVar then @
   else new Begin([il.assign(blockvar, @value), il.break_(blockvar)])
@@ -766,7 +766,7 @@ Apply::convertOptRecursive = (lamda) -> @
 
 convertOptResursiveCall = (exp, lamda, steps)  ->
   exp_convertOptResursiveCall = exp?.convertOptResursiveCall
-  if exp_convertOptResursiveCall then exp_convertOptResursiveCall.call(exp, lamda, steps) 
+  if exp_convertOptResursiveCall then exp_convertOptResursiveCall.call(exp, lamda, steps)
   else false
 
 Assign::convertOptResursiveCall = (lamda, steps)  -> new Assign(@left, convertOptResursiveCall(@exp, lamda, steps))
@@ -1105,7 +1105,7 @@ Begin::toCode = (compiler) ->
   result += ''
   result
 Deref::toCode = (compiler) ->  "solver.trail.deref(#{compiler.toCode(@exp)})"
-JSFun::toCode = (compiler) ->  if _.isString(@fun) then @fun  else compiler.toCode(@fun)
+JSFun::toCode = (compiler) ->  if isString(@fun) then @fun  else compiler.toCode(@fun)
 
 Assign::needParenthesis = true
 BinaryOperation::needParenthesis = true
@@ -1355,11 +1355,23 @@ il.continue_ = (label) -> new Continue(label)
 
 il.idcont = -> v = il.internalvar('v'); new IdCont(v, v)
 
-il.excludes = ['evalexpr', 'failcont', 'run', 'getvalue', 'fake', 'findCatch', 'popCatch', 'pushCatch',
-               'protect', 'suffixinc', 'suffixdec', 'dec', 'inc', 'unify', 'bind', 'undotrail',
-               'newTrail', 'newLogicVar', 'char', 'followChars', 'notFollowChars', 'charWhen',
-               'stringWhile', 'stringWhile0', 'number', 'literal', 'followLiteral', 'quoteString', 'uobject']
+#il.excludes = ['evalexpr', 'failcont', 'run', 'getvalue', 'fake', 'findCatch', 'popCatch', 'pushCatch',
+#               'protect', 'suffixinc', 'suffixdec', 'dec', 'inc', 'unify', 'bind', 'undotrail',
+#               'newTrail', 'newLogicVar', 'char', 'followChars', 'notFollowChars', 'charWhen',
+#               'stringWhile', 'stringWhile0', 'number', 'literal', 'followLiteral', 'quoteString', 'uobject']
 
 augmentOperators = {add: il.addassign, sub: il.subassign, mul: il.mulassign, div: il.divassign, mod: il.modassign,
 'and_': il.andassign, 'or_': il.orassign, bitand: il.bitandassign, bitor:il.bitorassign, bitxor: il.bitxorassign,
 lshift: il.lshiftassign, rshift: il.rshiftassign}
+
+
+il.vopMaps = vopMaps = {}
+util = require("./util")
+for pair in [[util.ADD, il.add], [util.SUB, il.sub], [util.MUL, il.mul], [util.DIV, il.div], [util.MOD, il.mod],
+              [util.AND, il.and_], [util.OR, il.or_], [util.NOT, il.not_],
+              [util.BITAND, il.bitand], [util.BITOR, il.bitor], [util.BITXOR, il.bitxor],\
+              [util.LSHIFT, il.lshift], [util.RSHIFT, il.rshift],
+              [util.EQ, il.eq], [util.NE, il.ne], [util.LE, il.le], [util.LT, il.lt], [util.GT, il.gt], [util.GE, il.ge],
+              [util.NEG, il.neg], [util.BITNOT, il.bitnot],
+              [util.PUSH, il.push], [util.LIST, il.list], [util.INDEX, il.index]]
+  vopMaps[pair[0]] = pair[1]

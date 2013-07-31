@@ -1,8 +1,8 @@
-{solve, compile} = dao = require('../lib/dao')
+#{solve, compile} = dao = require('../lib/dao')
 
 xexports = {}
 
-exports.Test =
+xexports.Test =
   "test atomic": (test) ->
     test.equal  solve('1'), 1
     test.equal  solve('123'), 123

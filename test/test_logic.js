@@ -88,17 +88,6 @@
       test.equal(solve(begin(assign(a, $a), orp(andp(unify(cons(a, null), cons(1, null)), unify(a, 2)), unify(a, 2)))), true);
       return test.done();
     },
-    "test unify array, uarray": function(test) {
-      var $a, a;
-
-      a = vari('a');
-      $a = logicvar('a');
-      test.equal(solve(unify(array($a), [1])), false);
-      test.equal(solve(unify(uarray($a), [1])), true);
-      test.equal(solve(andp(assign(a, $a), unify(uarray(a), [1]), unify(a, 2))), false);
-      test.equal(solve(begin(assign(a, $a), orp(andp(unify(uarray(a), [1]), unify(a, 2)), unify(a, 2)))), true);
-      return test.done();
-    },
     "test unify uobject": function(test) {
       var $a, a;
 
@@ -119,6 +108,17 @@
       test.equal(solve(begin(assign(a, $a), orp(andp(unify(uobject(string('a'), a), {
         a: 1
       }), unify(a, 2)), unify(a, 2)))), true);
+      return test.done();
+    },
+    "test unify array, uarray": function(test) {
+      var $a, a;
+
+      a = vari('a');
+      $a = logicvar('a');
+      test.equal(solve(unify(array($a), [])), false);
+      test.equal(solve(unify(uarray($a), ['1'])), true);
+      test.equal(solve(andp(assign(a, $a), unify(uarray(a), ['1']), unify(a, 2))), false);
+      test.equal(solve(begin(assign(a, $a), orp(andp(unify(uarray(a), ['1']), unify(a, 2)), unify(a, 2)))), true);
       return test.done();
     }
   };

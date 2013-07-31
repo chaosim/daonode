@@ -69,7 +69,7 @@ exports.Test =
     test.equal  solve(begin(settext(string('1')), parallel(char(string('1')),char(string('a'))))), false
     test.done()
 
-#xexports.Test =
+#exports.Test =
   "test follow": (test) ->
     test.equal  solve(begin(settext(string('1')), follow(char(string('1'))))), 1
     test.equal  solve(begin(settext(string('1')), notfollow(char(string('1'))))), 1

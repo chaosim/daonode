@@ -79,7 +79,7 @@ exports.Test =
                                findall(once(orp(print_(1), print_(2))), result, 1), getvalue(result))), [1]
     test.done()
 
-#xexports.Test =
+#exports.Test =
   "test unify cons": (test) ->
     a = vari('a')
     $a = logicvar('a')
@@ -88,16 +88,6 @@ exports.Test =
     test.equal  solve(andp(assign(a, $a), unify(cons(a, null), cons(1, null)), unify(a, 2))), false
     test.equal  solve(begin(assign(a, $a), orp(andp(unify(cons(a, null), cons(1, null)),
                                                     unify(a, 2)), unify(a, 2)))), true
-    test.done()
-
-#exports.Test =
-  "test unify array, uarray": (test) ->
-    a = vari('a')
-    $a = logicvar('a')
-    test.equal  solve(unify(array($a), [1])), false
-    test.equal  solve(unify(uarray($a), [1])), true
-    test.equal  solve(andp(assign(a, $a), unify(uarray(a), [1]), unify(a, 2))), false
-    test.equal  solve(begin(assign(a, $a), orp(andp(unify(uarray(a), [1]), unify(a, 2)), unify(a, 2)))), true
     test.done()
 
 #exports.Test =
@@ -111,3 +101,14 @@ exports.Test =
     test.equal  solve(begin(assign(a, $a), orp(andp(unify(uobject(string('a'), a), {a:1}),
                                                     unify(a, 2)), unify(a, 2)))), true
     test.done()
+
+#exports.Test =
+  "test unify array, uarray": (test) ->
+    a = vari('a')
+    $a = logicvar('a')
+    test.equal  solve(unify(array($a), [])), false
+    test.equal  solve(unify(uarray($a), ['1'])), true
+    test.equal  solve(andp(assign(a, $a), unify(uarray(a), ['1']), unify(a, 2))), false
+    test.equal  solve(begin(assign(a, $a), orp(andp(unify(uarray(a), ['1']), unify(a, 2)), unify(a, 2)))), true
+    test.done()
+

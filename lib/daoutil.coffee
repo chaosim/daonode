@@ -63,3 +63,29 @@ exports.suffixOperator = (solver, cont) ->
       if c1=='+' then solver.state = [text, pos+2]; cont('vop_dec')
       else solver.failcont(pos)
     else solver.failcont(pos)
+
+exports.program = (solver, cont) ->
+  [text, pos] = solver.state
+  length = text.length
+  if pos>=length then return cont(null)
+  else programBody(solver, cont)
+
+exports.programBody = (solver, cont) ->
+  exps = []
+  while 1
+    stmt = statement(solver, cont)
+    if stmt[0]==sexpression.COMMENT then continue
+    [text, pos] = solver.state
+    if pos==text.length then break
+  if exps.length is 0 then null
+  else exps.unshift sexpression.BEGIN; exps
+
+exports.statement = (solver, cont) ->
+  solver.token = token = readStartToken(solver, cont)
+  switch token
+    when RETURN then  returnStatement(solver, cont)
+    when PASS then passStatement(solver, cont)
+    when BLOCKCOMMENT then blockComment(solver, cont)
+    when LINECOMMENT then lineComment(solver, cont)
+    else expression(solver, cont)
+

@@ -23,10 +23,41 @@ exports.solve = solve = (exp) ->
 
 solver = 'solver'
 x = 'x'; y = 'y'; z = 'z'
-op = 'op'
+op = 'op'; left = 'left'
 atomExpr = 'atomExpr'; unaryExpr = 'unaryExpr'; binaryExpr = 'binaryExpr'
+leftValueExpr = 'leftValueExpr'
+assignExpr = 'assignExpr'
+expression = 'expression'
+exprList = 'exprList'
+rootExpr = 'daoExpr'
 
 grammar = begin(
+ assign(program, lamda([],
+  orp(andp(eoi, null),
+      andp(assign(body, funcall(programBody), headConcatList('begin', body)))))),
+  assign(statement, lamda([],
+    assign(startToken, funcall(readToken)),
+    switch_(startToken,
+      attr(daoutil, jscode('return')),
+        funcall(returnStatement),
+      attr(daoutil, jscode('pass')),
+        funcall(passStatement),
+      attr(daoutil, jscode('commentbegin')),
+        funcall(comment),
+      attr(daoutil, jscode('expr')),
+       funcall(expression))
+    )),
+  assign(expression, lamda([],
+    funcall(valueExpr),
+    funcall(invocationExpr),
+    funcall(code),
+    funcall(operationExpr),
+    funcall(assignExpr),
+    funcall(ifExpr),
+    funcall(tryExpr),
+    funcall(forExpr),
+    funcall(switchExpr),
+    funcall(throwExpr))),
   direct(il.begin(
     il.assign(il.uservar('daoutil'), il.require('./daoutil')),
     il.assign(il.uservar('binaryOperator'), il.attr(il.uservar('daoutil'), il.symbol('binaryOperator'))),
@@ -41,11 +72,11 @@ grammar = begin(
               orp(andp(assign(op, funcall('suffixOperator', solver)), array(op, x)),
                   x)))))
   assign(binaryExpr, lamda([],
-     andp(assign(x, funcall(atomExpr)),
+     andp(assign(x, funcall(unaryExpr)),
           orp(andp(assign(op, funcall('binaryOperator', solver)),
-                   assign(y, funcall(atomExpr)),
+                   assign(y, funcall(unaryExpr)),
                    array(op, x, y)),
               x)))),
-  funcall(binaryExpr))
+  funcall(daoExpr))
 
 
