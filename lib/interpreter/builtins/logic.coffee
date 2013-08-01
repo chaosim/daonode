@@ -56,7 +56,7 @@ exports.orp = orp = special(null, 'orp', orpFun)
 exports.cutable = special(1, 'cutable', (solver, cont, x) ->
   cc = null
   xcont = solver.cont(x, (v) -> solver.cutCont = cc; [cont, v])
-  (v) -> cc = solver.cutCont;  xcont null)
+  (v) -> cc = solver.cutCont;  solver.cutCont = solver.failcont; xcont null)
 
 # prolog's cut, aka "!"
 exports.cut = special(0, 'cut', (solver, cont) -> (v) ->

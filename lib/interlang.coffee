@@ -1320,8 +1320,10 @@ il.throwFail = (value) -> il.throw(il.new(il.symbol('SolverFail').call(value)))
 il.setcutcont = (cont) -> il.assign(il.cutcont, cont)
 il.appendFailcont = vop('appendFailcont', (compiler)->args = @args; "solver.appendFailcont(#{compiler.toCode(args[0])})")
 il.cutcont = il.uservarattr('solver.cutcont')
-il.state = il.uservarattr('solver.state')
-il.setstate = (state) -> il.assign(il.state, state)
+il.parserdata = il.uservarattr('solver.parserdata')
+il.parsercursor = il.uservarattr('solver.parsercursor')
+il.setparserdata = (data) -> il.assign(il.parserdata, data)
+il.setparsercursor = (cursor) -> il.assign(il.parsercursor, cursor)
 il.trail = il.uservarattr('solver.trail')
 il.newTrail = vop('newTrail', (compiler)->args = @args; "new Trail()")()
 il.settrail = (trail) -> il.assign(il.trail, trail)
@@ -1355,15 +1357,9 @@ il.continue_ = (label) -> new Continue(label)
 
 il.idcont = -> v = il.internalvar('v'); new IdCont(v, v)
 
-#il.excludes = ['evalexpr', 'failcont', 'run', 'getvalue', 'fake', 'findCatch', 'popCatch', 'pushCatch',
-#               'protect', 'suffixinc', 'suffixdec', 'dec', 'inc', 'unify', 'bind', 'undotrail',
-#               'newTrail', 'newLogicVar', 'char', 'followChars', 'notFollowChars', 'charWhen',
-#               'stringWhile', 'stringWhile0', 'number', 'literal', 'followLiteral', 'quoteString', 'uobject']
-
 augmentOperators = {add: il.addassign, sub: il.subassign, mul: il.mulassign, div: il.divassign, mod: il.modassign,
 'and_': il.andassign, 'or_': il.orassign, bitand: il.bitandassign, bitor:il.bitorassign, bitxor: il.bitxorassign,
 lshift: il.lshiftassign, rshift: il.rshiftassign}
-
 
 il.vopMaps = vopMaps = {}
 util = require("./util")
@@ -1373,5 +1369,6 @@ for pair in [[util.ADD, il.add], [util.SUB, il.sub], [util.MUL, il.mul], [util.D
               [util.LSHIFT, il.lshift], [util.RSHIFT, il.rshift],
               [util.EQ, il.eq], [util.NE, il.ne], [util.LE, il.le], [util.LT, il.lt], [util.GT, il.gt], [util.GE, il.ge],
               [util.NEG, il.neg], [util.BITNOT, il.bitnot],
-              [util.PUSH, il.push], [util.LIST, il.list], [util.INDEX, il.index]]
+              [util.PUSH, il.push], [util.LIST, il.list], [util.INDEX, il.index],
+              [util.ATTR, il.attr], [util.LENGTH, il.length], [util.SLICE, il.slice], [util.POP, il.pop], [util.INSTANCEOF, il.instanceof]]
   vopMaps[pair[0]] = pair[1]

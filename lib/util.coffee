@@ -14,14 +14,17 @@ exports.isObject = isObject = (x) -> x is Object(x)
  exports.MAKEOBJECT, exports.UOBJECT, exports.CONS, exports.FUNCALL, exports.MACROCALL, exports.JSFUNCALL,
  exports.FOR, exports.FORIN, exports.FOROF, exports.TRY, exports.BLOCK, exports.BREAK, exports.CONTINUE,
  exports.CATCH, exports.THROW,  exports.UNWINDPROTECT, exports.CALLCC, exports.CALLFC,
- exports.QUASIQUOTE, exports.UNQUOTE, exports.UNQUOTESLICE, exports.PUSH, exports.LIST, INDEX
+ exports.QUASIQUOTE, exports.UNQUOTE, exports.UNQUOTESLICE, exports.PUSH, exports.LIST, INDEX,
+ exports.ATTR, exports.LENGTH,exports.SLICE,exports.POP, exports.INSTANCEOF,
  exports.LOGICVAR, exports.DUMMYVAR , exports.UNIFY, exports.NOTUNIFY,
  exports.IS, exports.BIND, exports.GETVALUE,
- exports.SUCCEED, exports.FAIL, exports.PUSHP, exports.ORP,
- exports.IFP, exports.NOTP, exports.REPEAT, exports.CUTABLE, exports.CUT, exports.FINDALL, exports.ONCE,
- exports.PARSE, exports.PARSETEXT, exports.SETSTATE, exports.SETTEXT, exports.SETPOS, exports.GETSTATE,
- exports.GETTEXT, exports.GETPOS, exports.EOI, exports.BOI, exports.EOL,
- exports.BOL, exports.STEP, exports.LEFTTEXT, exports.SUBTEXT, exports.NEXTCHAR,
+ exports.SUCCEED, exports.FAIL, exports.PUSHP,
+ exports.ORP, exports.ORP2, exports.ORP3, exports.NOTP, exports.NOTP2, exports.NOTP3
+ exports.IFP, exports.REPEAT, exports.CUTABLE, exports.CUT, exports.FINDALL, exports.ONCE,
+ exports.PARSE, exports.PARSEDATA, exports.SETPARSERSTATE,
+ exports.SETPARSERDATA, exports.SETPARSERCURSOR, exports.GETPARSERSTATE,
+ exports.GETPARSERDATA, exports.GETPARSERCURSOR, exports.EOI, exports.BOI, exports.EOL,
+ exports.BOL, exports.STEP, exports.LEFTPARSERDATA, exports.SUBPARSERDATA, exports.NEXTCHAR,
  exports.MAY, exports.LAZYMAY, exports.GREEDYMAY, exports.ANY, exports.LAZYANY, exports.GREEDYANY,
  exports.PARALLEL, exports.FOLLOW, exports.NOTFOLLOW,
  exports.ADD, exports.SUB, exports.MUL, exports.DIV, exports.MOD, exports.AND, exports.OR, exports.NOT,
@@ -180,7 +183,12 @@ exports.bitnot = (args...) -> [exports.BITNOT, args...]
 exports.index = index = (args...) -> [exports.INDEX, args...]
 exports.push = push = (args...) -> [exports.PUSH, args...]
 exports.list = list = (args...) -> [exports.LIST, args...]
-exports.pushp = pushp = (list, value) -> [exports.PUSHP, list, value]
+exports.pushp = pushp = (args...) -> [exports.PUSHP, args...]
+exports.attr =(args...) -> [exports.ATTR, args...]
+exports.length = (args...) -> [exports.LENGTH, args...]
+exports.slice = (args...) -> [exports.SLICE, args...]
+exports.pop = (args...) -> [exports.POP, args...]
+exports.instanceof = (args...) -> [exports.INSTANCEOF, args...]
 
 # logic
 
@@ -200,7 +208,21 @@ exports.orp = orp = (exps...) ->
   else if length is 1 then exps[0]
   else if length is 2 then [exports.ORP, exps...]
   else [exports.ORP, exps[0], orp(exps[1...]...)]
+exports.orp2 = orp2 = (exps...) ->
+  length = exps.length
+  if length is 0 then throw new ArgumentError(exps)
+  else if length is 1 then exps[0]
+  else if length is 2 then [exports.ORP2, exps...]
+  else [exports.ORP2, exps[0], orp2(exps[1...]...)]
+exports.orp3 = orp3 = (exps...) ->
+  length = exps.length
+  if length is 0 then throw new ArgumentError(exps)
+  else if length is 1 then exps[0]
+  else if length is 2 then [exports.ORP3, exps...]
+  else [exports.ORP3, exps[0], orp3(exps[1...]...)]
 exports.notp = (goal) -> [exports.NOTP, goal]
+exports.notp2 = (goal) -> [exports.NOTP2, goal]
+exports.notp3 = (goal) -> [exports.NOTP3, goal]
 exports.repeat = [exports.REPEAT]
 exports.cutable = (goal) -> [exports.CUTABLE, goal]
 exports.cut = [exports.CUT]
@@ -212,25 +234,25 @@ exports.getvalue = getvalue = (term) -> [exports.GETVALUE, term]
 
 # parser
 exports.parse =  (exp, state) -> [exports.PARSE, exp, state]
-exports.parsetext =  (exp, text) -> [exports.PARSETEXT, exp, text]
-exports.settext =  (text) -> [exports.SETTEXT, text]
-exports.setpos =  (pos) -> [exports.SETPOS, pos]
-exports.setstate =  (state) -> [exports.SETSTATE, state]
-exports.getstate =  [exports.GETSTATE]
-exports.gettext =  [exports.GETTEXT]
-exports.getpos =  [exports.GETPOS]
+exports.parsedata =  (exp, data) -> [exports.PARSEDATA, exp, data]
+exports.setdata =  (data) -> [exports.SETPARSERDATA, data]
+exports.setcursor =  (cursor) -> [exports.SETPARSERCURSOR, cursor]
+exports.setstate =  (state) -> [exports.SETPARSERSTATE, state]
+exports.getstate =  [exports.GETPARSERSTATE]
+exports.getdata =  [exports.GETPARSERDATA]
+exports.getcursor =  [exports.GETPARSERCURSOR]
 exports.eoi = [exports.EOI]
 exports.boi =  [exports.BOI]
-# eol: end of line text[exports.pos] in "\r\n"
+# eol: end of line text[exports.cursor] in "\r\n"
 exports.eol =  [exports.EOL]
-# bol: bein of line text[exports.pos-1] in "\r\n"
+# bol: bein of line text[exports.cursor-1] in "\r\n"
 exports.bol =  [exports.BOL]
 exports.step = (n) -> [exports.STEP, n]
-# lefttext: return left text
-exports.lefttext =  [exports.LEFTTEXT]
-# subtext: return text[exports.start...start+length]
-exports.subtext =  (length, start) -> [exports.SUBTEXT, length, start]
-# nextchar: text[exports.pos]
+# leftdata: return left data
+exports.leftdata =  [exports.LEFTPARSERDATA]
+# subdata: return data[exports.start...start+length]
+exports.subdata =  (length, start) -> [exports.SUBPARSERDATA, length, start]
+# nextchar: data[cursor]
 exports.nextchar =  [exports.NEXTCHAR]
 
 # ##### may, lazymay, greedymay

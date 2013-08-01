@@ -89,3 +89,37 @@ exports.statement = (solver, cont) ->
     when LINECOMMENT then lineComment(solver, cont)
     else expression(solver, cont)
 
+class StateMachine
+  constructor = (words=[]) ->
+    @index = 0
+    @dict = {}
+    @dict[0] = {}
+    for w in words then @add(w)
+
+  add = (word) ->
+    length = word.length
+    for c in word[0...length-1]
+      if c in @dict[state]
+        state = Math.abs(@dict[state][c])
+      else
+        newState = @index++
+        @dict[state][c] = newState
+        @dict[newState] = {}
+        state = newState
+    c = word[-1]
+    if c in @dict[state]
+      if @dict[state][c]>0 then @dict[state][c] = -@dict[state][c]
+    else
+      newState = @new_state++
+      @dict[state][c] = -newState
+      @dict[newState] = {}
+
+  match = (string) ->
+    result = 0
+    state = 0
+    for c, i in string
+      state = @dict[state][c]
+      if state is null then return result
+      if state<0
+        result = i+1
+        state = -state

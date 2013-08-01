@@ -6,7 +6,7 @@ solvebase = require('../lib/solve')
 array, uarray, cons, makeobject, uobject
 funcall, lamda, macro,
 if_, add, eq, le, inc, not_,
-logicvar, unify, succeed, fail, andp, orp, notp, getvalue
+logicvar, unify, succeed, fail, andp, orp, orp2, notp, getvalue
 cutable, cut, findall, once
 } = require('../lib/util')
 
@@ -55,7 +55,7 @@ exports.Test =
     $a = logicvar('a')
     test.equal  solve(unify($a, 1)), true
     test.equal  solve(andp(assign(a, $a), unify(a, 1), unify(a, 2))), false
-    test.equal  solve(begin(assign(a, $a), orp(andp(unify(a, 1), unify(a, 2)), unify(a, 2)))), true
+    test.equal  solve(begin(assign(a, $a), orp2(andp(unify(a, 1), unify(a, 2)), unify(a, 2)))), true
     test.done()
 
 #exports.Test =
@@ -72,7 +72,7 @@ exports.Test =
     test.equal  solve(findall(orp(print_(1), print_(2)))), null
     test.equal  solve(findall(orp(print_(1), print_(2), print_(3)))), null
     test.deepEqual solve(andp(assign(x, logicvar('x')), assign(result, logicvar('result')),
-                              findall(orp(unify(x, 1), unify(x, 2)), result, x), getvalue(result))), [1,2]
+                              findall(orp2(unify(x, 1), unify(x, 2)), result, x), getvalue(result))), [1,2]
     test.deepEqual  solve(andp(assign(result, logicvar('result')), findall(fail, result, 1), getvalue(result))), []
     test.deepEqual  solve(andp(assign(result, logicvar('result')),findall(succeed, result, 1), getvalue(result))), [1]
     test.deepEqual  solve(andp(assign(result, logicvar('result')),
@@ -86,7 +86,7 @@ exports.Test =
     test.equal  solve(unify(cons(1, null), cons(1, null))), true
     test.equal  solve(unify(cons($a, null), cons(1, null))), true
     test.equal  solve(andp(assign(a, $a), unify(cons(a, null), cons(1, null)), unify(a, 2))), false
-    test.equal  solve(begin(assign(a, $a), orp(andp(unify(cons(a, null), cons(1, null)),
+    test.equal  solve(begin(assign(a, $a), orp2(andp(unify(cons(a, null), cons(1, null)),
                                                     unify(a, 2)), unify(a, 2)))), true
     test.done()
 
@@ -98,7 +98,7 @@ exports.Test =
     test.equal  solve(unify(uobject(string('a'), 1), {a:1})), true
     test.equal  solve(unify(uobject(string('a'), $a), {a:1})), true
     test.equal  solve(andp(assign(a, $a), unify(uobject(string('a'), a), {a:1}), unify(a, 2))), false
-    test.equal  solve(begin(assign(a, $a), orp(andp(unify(uobject(string('a'), a), {a:1}),
+    test.equal  solve(begin(assign(a, $a), orp2(andp(unify(uobject(string('a'), a), {a:1}),
                                                     unify(a, 2)), unify(a, 2)))), true
     test.done()
 
@@ -109,6 +109,6 @@ exports.Test =
     test.equal  solve(unify(array($a), [])), false
     test.equal  solve(unify(uarray($a), ['1'])), true
     test.equal  solve(andp(assign(a, $a), unify(uarray(a), ['1']), unify(a, 2))), false
-    test.equal  solve(begin(assign(a, $a), orp(andp(unify(uarray(a), ['1']), unify(a, 2)), unify(a, 2)))), true
+    test.equal  solve(begin(assign(a, $a), orp2(andp(unify(uarray(a), ['1']), unify(a, 2)), unify(a, 2)))), true
     test.done()
 

@@ -16,16 +16,16 @@
 #  if x is char or bound to char, then match that given char with next<br/>
 #  else match with next char, and bound x to it.
 exports.char = (solver, x, cont) ->
-  [data, pos] = solver.state
+  data = solver.parserdata; pos = solver.parsercursor
   if pos>=data.length then return solver.failcont(pos)
   trail = solver.trail
   x = trail.deref(x)
   c = data[pos]
   if x instanceof Var
     x.bind(c, solver.trail)
-    solver.state = [data, pos+1]
+    solver.parsercursor = pos+1
     cont(pos+1)
-  else if x is c then (solver.state = [data, pos+1]; cont(pos+1))
+  else if x is c then (solver.parsercursor = pos+1; cont(pos+1))
   else if isString(x)
     if x.length==1 then return solver.failcont(pos)
     else throw new ExpressionError(x)
@@ -34,7 +34,7 @@ exports.char = (solver, x, cont) ->
 # followChar: follow given char? <br/>
 #  x should be char or be bound to char, then match that given char
 exports.followChar = (solver, x, cont) ->
-  [data, pos] = solver.state
+  data = solver.parserdata; pos = solver.parsercursor
   if pos>=data.length then return solver.failcont(pos)
   trail = solver.trail
   x = trail.deref(x)
@@ -49,7 +49,7 @@ exports.followChar = (solver, x, cont) ->
 # notFollowChar: not follow given char? <br/>
 #  x should be char or be bound to char, then match that given char
 exports.notFollowChar =(solver, x, cont) ->
-  [data, pos] = solver.state
+  data = solver.parserdata; pos = solver.parsercursor
   if pos>=data.length then return solver.failcont(pos)
   trail = solver.trail
   x = trail.deref(x)
@@ -67,7 +67,7 @@ exports.followChars = (solver, chars, cont) ->
   # follow one of char in chars
   chars = trail.deref(chars)
   if chars instanceof Var then throw new TypeError(chars)
-  [data, pos] = solver.state
+  data = solver.parserdata; pos = solver.parsercursor
   if pos>=data.length then return solver.failcont(pos)
   trail = solver.trail
   c = data[pos]
@@ -82,7 +82,7 @@ exports.notFollowChars = (solver, chars, cont) ->
   # not follow one of char in chars
   chars = trail.deref(chars)
   if chars instanceof Var then throw new TypeError(chars)
-  [data, pos] = solver.state
+  data = solver.parserdata; pos = solver.parsercursor
   if pos>=data.length then return solver.failcont(pos)
   trail = solver.trail
   c = data[pos]
@@ -94,71 +94,71 @@ exports.notFollowChars = (solver, chars, cont) ->
 # charWhen: next char pass @test? <br/>
 #  @test should be an function with single argument
 exports.charWhen = (solver, test, cont) ->
-  [data, pos] = solver.state
+  data = solver.parserdata; pos = solver.parsercursor
   if pos>=data.length then return solver.failcont(pos)
   c = data[pos]
-  if test(c) then solver.state = [data, pos+1]; cont(pos)
+  if test(c) then solver.parsercursor = pos+1; cont(pos)
   else return solver.failcont(pos)
 
 # spaces: one or more spaces(' ') <br/>
 #usage: spaces # !!! NOT spaces()
 exports.spaces = (solver, cont) ->
-  [data, pos] = solver.state
+  data = solver.parserdata; pos = solver.parsercursor
   length = data.length
   if pos>=length then return solver.failcont(pos)
   c = data[pos]
   if c isnt ' ' then return solver.failcont(pos)
   p = pos+1
-  while p< length and data[p] is ' ' then p++
-  solver.state = [data, p]
+  while p<length and data[p] is ' ' then p++
+  solver.parsercursor = p
   cont(p)
 
 # spaces0: zero or more spaces(' ') <br/>
 #usage: spaces0 # !!! NOT spaces0()
 exports.spaces0 = (solver, cont) ->
-  [data, pos] = solver.state
+  data = solver.parserdata; pos = solver.parsercursor
   length = data.length
   if pos>=length then return pos
   c = data[pos]
   if c isnt ' ' then return pos
   p = pos+1
   while p< length and data[p] is ' ' then p++
-  solver.state = [data, p]
+  solver.parsercursor = p
   cont(pos)
 
 # stringWhile: match a string, every char in the string should pass test <br/>
 # test: a function with single argument <br/>
 #  the string should contain on char at least.
 exports.stringWhile = (solver, test, cont) ->
-  [data, pos] = solver.state
+  data = solver.parserdata; pos = solver.parsercursor
   length = data.length
   if pos is length then return solver.failcont(pos)
   c = data[pos]
   unless test(c) then return solver.failcont(pos)
   p = pos+1
   while p<length and test(data[p]) then p++
-  solver.state = [data, p]
+  solver.parsercursor = p
   cont(data[pos...p])
 
 #stringWhile0: match a string, every char in it passes test <br/>
 # test: a function with single argument <br/>
 #  the string can be empty string.
 exports.stringWhile0 = (solver, test, cont) ->
-  [data, pos] = solver.state
+  data = solver.parserdata; pos = solver.parsercursor
   length = data.length
   if pos is length then return ''
   c = data[pos]
   unless test(c) then return ''
   p = pos+1
   while p<length and test(data[p]) then p++
-  solver.state = [data, p]
+  solver.parsercursor = p
   cont(data[pos...p])
 
 # float: match a number, which can be float format..<br/>
 #  if arg is free core.Var, arg would be bound to the number <br/>
 #  else arg should equal to the number.
 exports.number = exports.float = (solver, cont) ->
-  [text, pos] = solver.state
+  text = solver.parserdata; pos = solver.parsercursor
   length = text.length
   if pos>=length then return solver.failcont(pos)
   p = pos
@@ -179,7 +179,7 @@ exports.number = exports.float = (solver, cont) ->
     if p>=length or text[p]<'0' or '9'<text[p] then p = pE-1
     else while p<length and '0'<=text[p]<='9' then p++
   value =  eval(text[pos...p])
-  if isNumber(value) then solver.state = [text, p]; cont(value)
+  if isNumber(value) then solver.parsercursor = p; cont(value)
   else return solver.failcont(pos)
 
 #literal: match given literal arg,  <br/>
@@ -187,7 +187,7 @@ exports.number = exports.float = (solver, cont) ->
 exports.literal = (solver, arg, cont) ->
   arg = solver.trail.deref(arg)
   if (arg instanceof Var) then throw new exports.TypeError(arg)
-  [text, pos] = solver.state
+  text = solver.parserdata; pos = solver.parsercursor
   length = text.length
   if pos>=length then return solver.failcont(pos)
   i = 0
@@ -195,7 +195,7 @@ exports.literal = (solver, arg, cont) ->
   length2 = arg.length
   while i<length2 and p<length and arg[i] is text[p] then i++; p++
   if i is length2
-    solver.state = [text, p]
+    solver.parsercursor = p
     cont(p)
   else return solver.failcont(p)
 
@@ -205,7 +205,7 @@ exports.literal = (solver, arg, cont) ->
 exports.followLiteral = (solver, arg, cont) ->
   arg = solver.trail.deref(arg)
   if (arg instanceof Var) then throw new exports.TypeError(arg)
-  [text, pos] = solver.state
+  text = solver.parserdata; pos = solver.parsercursor
   length = text.length
   if pos>=length then return solver.failcont(pos)
   i = 0
@@ -221,7 +221,7 @@ exports.followLiteral = (solver, arg, cont) ->
 exports.notFollowLiteral = (solver, arg, cont) ->
   arg = solver.trail.deref(arg)
   if (arg instanceof Var) then throw new exports.TypeError(arg)
-  [text, pos] = solver.state
+  text = solver.parserdata; pos = solver.parsercursor
   length = text.length
   if pos>=length then return solver.failcont(pos)
   i = 0
@@ -233,7 +233,7 @@ exports.notFollowLiteral = (solver, arg, cont) ->
 
 #quoteString: match a quote string quoted by quote, quote can be escapedby \
 exports.quoteString = (solver, cont) ->
-  [text, pos] = solver.state
+  text = solver.parserdata; pos = solver.parsercursor
   length = text.length
   if pos>=length then return solver.failcont(pos)
   quote = text[pos]
@@ -244,12 +244,12 @@ exports.quoteString = (solver, cont) ->
     p++
     if char=='\\' then p++
     else if char==quote
-      solver.state = [text, p++]
+      solver.parsercursor = p++
       return cont(text[pos...p])
   return solver.failcont(p)
 
 exports.identifier = (solver, cont) ->
-  [text, pos] = solver.state
+  text = solver.parserdata; pos = solver.parsercursor
   length = text.length
   if pos>=length then return solver.failcont(pos)
   c = text[pos]
@@ -257,5 +257,5 @@ exports.identifier = (solver, cont) ->
   p = pos+1
   while p<length and c=text[p] and (c=='_' or 'a'<=c<='z' or 'A'<=c<='Z' or '0'<=c<='9')
     p++
-  solver.state = [text, p]
+  solver.parsercursor = p
   cont(text[pos...p])

@@ -11,13 +11,14 @@ il = require("./interlang")
   FOR, FORIN, FOROF, TRY, BLOCK, BREAK, CONTINUE, CATCH, THROW,  UNWINDPROTECT, CALLCC, CALLFC,\
   QUASIQUOTE, UNQUOTE, UNQUOTESLICE,\
   LOGICVAR, DUMMYVAR , UNIFY, NOTUNIFY, IS, BIND, GETVALUE,\
-  SUCCEED, FAIL, PUSHP, ORP, IFP, NOTP, REPEAT, CUTABLE, CUT, FINDALL, ONCE,\
-  PARSE, PARSETEXT, SETSTATE, SETTEXT, SETPOS, GETSTATE, GETTEXT, GETPOS, EOI, BOI, EOL,\
-  BOL, STEP, LEFTTEXT, SUBTEXT, NEXTCHAR,\
+  SUCCEED, FAIL, PUSHP, ORP, ORP2, ORP3, NOTP, NOTP2, NOTP3, IFP, REPEAT, CUTABLE, CUT, FINDALL, ONCE,\
+  PARSE, PARSEDATA, SETPARSERSTATE, SETPARSERDATA, SETPARSERCURSOR, GETPARSERSTATE, GETPARSERDATA, GETPARSERCURSOR, EOI, BOI, EOL,\
+  BOL, STEP, LEFTPARSERDATA, SUBPARSERDATA, NEXTCHAR,\
   MAY, LAZYMAY, GREEDYMAY, ANY, LAZYANY, GREEDYANY, PARALLEL, FOLLOW, NOTFOLLOW, \
   ADD, SUB, MUL, DIV, MOD, AND, OR, NOT, BITAND, BITOR, BITXOR, \
   LSHIFT, RSHIFT, EQ, NE, LE, LT, GT, GE, NEG, BITNOT,\
-  SEXPR_HEAD_FIRST, SEXPR_HEAD_LAST, PUSH, LIST, INDEX
+  SEXPR_HEAD_FIRST, SEXPR_HEAD_LAST, PUSH, LIST, INDEX, \
+  ATTR, LENGTH, SLICE, POP, INSTANCEOF
 } = require './util'
 
 hasOwnProperty = Object::hasOwnProperty
@@ -68,7 +69,7 @@ exports.Compiler = class Compiler
              il.assign(il.uservar('UArray'), il.attr(il.uservar('solvecore'), il.symbol('UArray'))),
              il.assign(il.uservar('UObject'), il.attr(il.uservar('solvecore'), il.symbol('UObject'))),
              il.assign(il.uservar('Cons'), il.attr(il.uservar('solvecore'), il.symbol('Cons'))),
-             il.assign(il.state, null),
+             il.assign(il.parsercursor, null),
              il.assign(il.catches, {}),
              il.assign(il.trail, il.newTrail),
              il.assign(il.failcont, done),
@@ -459,19 +460,41 @@ exports.Compiler = class Compiler
 
       when ORP
         v = @newconst('v')
-        e = @newconst('e')
+        fc = @newconst('fc')
+        il.begin(il.assign(fc, il.failcont),
+                 il.setfailcont(il.clamda(v,
+                                          v,
+                                          il.setfailcont(fc),
+                                          @cont(exp[2], cont))),
+                 @cont(exp[1], cont))
+      when ORP2
+        v = @newconst('v')
         trail = @newconst('trail')
-        state = @newconst('state')
         fc = @newconst('fc')
         il.begin(il.assign(trail, il.trail),
-                 il.assign(state, il.state),
                  il.assign(fc, il.failcont),
                  il.settrail(il.newTrail),
                  il.setfailcont(il.clamda(v,
                                           v,
                                           il.undotrail(il.trail),
                                           il.settrail(trail),
-                                          il.setstate(state),
+                                          il.setfailcont(fc),
+                                          @cont(exp[2], cont))),
+                 @cont(exp[1], cont))
+      when ORP3
+        v = @newconst('v')
+        trail = @newconst('trail')
+        parsercursor = @newconst('parsercursor')
+        fc = @newconst('fc')
+        il.begin(il.assign(trail, il.trail),
+                 il.assign(parsercursor, il.parsercursor),
+                 il.assign(fc, il.failcont),
+                 il.settrail(il.newTrail),
+                 il.setfailcont(il.clamda(v,
+                                          v,
+                                          il.undotrail(il.trail),
+                                          il.settrail(trail),
+                                          il.setparsercursor(parsercursor),
                                           il.setfailcont(fc),
                                           @cont(exp[2], cont))),
                  @cont(exp[1], cont))
@@ -488,21 +511,43 @@ exports.Compiler = class Compiler
             @cont(exp[2], cont))))
       when NOTP
         v = @newconst('v')
-        v1 = @newconst('v')
+        fc = @newconst('fc')
+        il.begin(il.assign(fc, il.failcont),
+                 il.setfailcont(il.clamda(v,
+                                          v,
+                                          il.setfailcont(fc),
+                                          cont.call(false))),
+                 @cont(exp[1], fc))
+      when NOTP2
+        v = @newconst('v')
         trail = @newconst('trail')
-        state = @newconst('state')
+        fc = @newconst('fc')
+        il.begin(il.assign(trail, il.trail),
+                 il.settrail(il.newTrail),
+                 il.assign(fc, il.failcont),
+                 il.setfailcont(il.clamda(v,
+                                          v,
+                                          il.undotrail(il.trail),
+                                          il.settrail(trail),
+                                          il.setfailcont(fc),
+                                          cont.call(false))),
+                 @cont(exp[1], fc))
+      when NOTP3
+        v = @newconst('v')
+        trail = @newconst('trail')
+        parsercursor = @newconst('parsercursor')
         fc = @newconst('fc')
         il.begin(il.assign(trail, il.trail),
                  il.assign(fc, il.failcont),
-                 il.assign(state, il.state),
+                 il.assign(parsercursor, il.parsercursor),
                  il.settrail(il.newTrail),
                  il.setfailcont(il.clamda(v,
-                    il.assign(v1, v),
-                    il.undotrail(il.trail),
-                    il.settrail(trail),
-                    il.setstate(state),
-                    il.setfailcont(fc),
-                    cont.call(v1))),
+                                          v,
+                                          il.undotrail(il.trail),
+                                          il.settrail(trail),
+                                          il.setparsercursor(parsercursor),
+                                          il.setfailcont(fc),
+                                          cont.call(false))),
                  @cont(exp[1], fc))
       when REPEAT then il.begin(il.setfailcont(cont), cont.call(null))
       when CUTABLE
@@ -548,46 +593,46 @@ exports.Compiler = class Compiler
       when PARSE
         v = @newconst('v')
         v1 = @newconst('v')
-  #      fc = @newconst('fc')
-        oldState = @newconst('state')
-        @cont(exp[2], il.clamda(v, il.assign(oldState, il.state),
-  #                               il.assign(fc, il.failcont),
-  #                               il.setfailcont(il.clamda(v, v, il.setstate(oldState), fc.call(false))),
-                                 il.setstate(v),
-                                 @cont(exp[1], il.clamda(v, il.assign(v1, v), il.setstate(oldState), cont.call(v1)))))
-      when PARSETEXT
+        @cont(exp[2], il.clamda(v, il.assign(v1, v),
+                                il.setparserdata(il.index(v1, 0))
+                                il.setparsercursor(il.index(v1, 1))
+                                @cont(exp[1], il.clamda(v, cont.call(v)))))
+      when PARSEDATA
         v = @newconst('v')
-        v1 = @newconst('v')
-  #      fc = @newconst('fc')
-        oldState = @newconst('state')
+        data = @newconst('data')
         @cont(exp[2], il.clamda(v,
-                            il.begin(il.assign(oldState, il.state),
-  #                             il.assign(fc, il.failcont),
-  #                             il.setfailcont(il.clamda(v, v, il.setstate(oldState), fc.call(false))),
-                               il.setstate(il.array(v, 0)),
-                               @cont(exp[1], il.clamda(v, il.assign(v1, v), il.setstate(oldState), cont.call(v1))))))
-      when SETSTATE
+                            il.begin(il.assign(data, il.parserdata),
+                               il.setparserdata(v),
+                               il.setparsercursor(0),
+                               @cont(exp[1], il.clamda(v, il.setparserdata(v), cont.call(il.parserdata))))))
+      when SETPARSERSTATE
+        v = @newconst('v'); v1 = @newconst('v')
+        @cont(exp[1], il.clamda(v,
+          il.assign(v1, v),
+          il.setparserdata(il.index(v,0)),
+          il.setparsercursor(il.index(v,1)),
+          cont.call(true)))
+      when SETPARSERDATA
         v = @newconst('v')
-        @cont(exp[1], il.clamda(v, il.setstate(v), cont.call(true)))
-      when SETTEXT
+        @cont(exp[1], il.clamda(v, il.setparserdata(v), il.setparsercursor(0), cont.call(true)))
+      when SETPARSERCURSOR
         v = @newconst('v')
-        @cont(exp[1], il.clamda(v, il.setstate(il.array(v, 0)), cont.call(true)))
-      when SETPOS
-        v = @newconst('v')
-        @cont(exp[1], il.clamda(v, il.assign(il.index(il.state, 1), v), cont.call(true)))
-      when GETSTATE then cont.call(il.state)
-      when GETTEXT then cont.call(il.index(il.state, 0))
-      when GETPOS then cont.call(il.index(il.state, 1))
+        @cont(exp[1], il.clamda(v, il.setparsercursor(v), cont.call(true)))
+      when GETPARSERSTATE then cont.call(il.array(il.parserdata, il.parsercursor))
+      when GETPARSERDATA then cont.call(il.parserdata)
+      when GETPARSERCURSOR then cont.call(il.parsercursor)
       when EOI
         data = @newconst('data'); pos = @newconst('pos')
-        il.begin(il.listassign(data, pos, il.state),
+        il.begin(il.assign(data, il.parserdata),
+                 il.assign(pos, il.parsercursor),
                  il.if_(il.ge(pos, il.length(data)), cont.call(true), il.failcont.call(false)))
-      when BOI then il.if_(il.eq(il.index(il.state, 1), 0), cont.call(true), il.failcont.call(false))
+      when BOI then il.if_(il.eq(il.parsercursor, 0), cont.call(true), il.failcont.call(false))
       # eol: end of line text[pos] in "\r\n"
       when EOL
         text = @newconst('text'); pos = @newconst('pos');  c = @newconst('c')
         il.begin(
-                  il.listassign(text, pos, il.state),
+                  il.assign(text, il.parserdata),
+                  il.assign(pos, il.parsercursor),
                   il.if_(il.ge(pos, il.length(text)), cont.call(true),
                        il.begin(
                          il.assign(c, il.index(text, pos, 1)),
@@ -597,7 +642,8 @@ exports.Compiler = class Compiler
       when BOL
         text = @newconst('text'); pos = @newconst('pos');  c = @newconst('c')
         il.begin(
-                  il.listassign(text, pos, il.state),
+                  il.assign(text, il.parserdata),
+                  il.assign(pos, il.parsercursor),
                   il.if_(il.eq(pos, 0), cont.call(true),
                            il.begin(
                                il.assign(c, il.index(text, il.sub(pos, 1))),
@@ -606,15 +652,13 @@ exports.Compiler = class Compiler
                                       il.failcont.call(false)))))
 
       when STEP
-        v = @newconst('v'); text = @newconst('text'); pos = @newconst('pos'); pos1 = @newconst('pos')
+        v = @newconst('v')
         @cont(exp[1], il.clamda(v,
-          il.listassign(text, pos, il.state),
-          il.assign(pos1, il.add(pos, v)),
-          il.setstate(il.array(text, pos1)),
-          cont.call(pos1)))
-      when LEFTTEXT then cont.call(il.slice(il.index(il.state, 0), il.index(il.state, 1)))
+          il.setparsercursor(il.add(il.parsercursor, v))
+          cont.call(il.parsercursor)))
+      when LEFTPARSERDATA then cont.call(il.slice(il.parserdata, il.parsercursor))
       # subtext: text[start...start+length]
-      when SUBTEXT
+      when SUBPARSERDATA
         text = @newconst('text'); pos = @newconst('pos')
         start1 = @newconst('start'); length1 = @newconst('length')
         start2 = @newconst('start'); length2 = @newconst('length')
@@ -623,17 +667,13 @@ exports.Compiler = class Compiler
           il.assign(length2, length1),
           @cont(exp[2], il.clamda(start1,
             il.assign(start2, start1),
-            il.listassign(text, pos, il.state),
+            il.assign(text, il.parserdata),
+            il.assign(pos, il.parsercursor),
             il.begin(il.assign(start3, il.if_(il.ne(start2, null), start2, pos)),
                      il.assign(length3, il.if_(il.ne(length2, null), length2, il.length(text))),
                      cont.call(il.slice(text, start3, il.add(start3, length3))))))))
 
-      when NEXTCHAR
-        text = @newconst('text')
-        pos = @newconst('pos')
-        il.begin(
-            il.listassign(text, pos, il.state),
-            cont.call(il.index(text, pos)))
+      when NEXTCHAR then cont.call(il.index(il.parserdata, il.parsercursor))
       # ##### may, lazymay, greedymay
       # may: aka optional
       when MAY
@@ -667,7 +707,7 @@ exports.Compiler = class Compiler
       when ANY
         fc = @newconst('fc')
         trail = @newconst('trail')
-        state = @newconst('state')
+        parsercursor = @newconst('parsercursor')
         anyCont = @newconst('anyCont')
         anyCont.isRecursive = true
         v = @newconst('v')
@@ -676,36 +716,29 @@ exports.Compiler = class Compiler
           il.assign(anyCont, il.recclamda(v,
                    il.assign(fc, il.failcont),
                    il.assign(trail, il.trail),
-                   il.assign(state, il.state),
+                   il.assign(parsercursor, il.parsercursor),
                    il.settrail(il.newTrail),
                    il.setfailcont(il.clamda(v,
                      il.assign(v1, v),
                      il.undotrail(il.trail),
                      il.settrail(trail),
-                     il.setstate(state),
+                     il.setparsercursor(parsercursor),
                      il.setfailcont(fc),
                      cont.call(v1)))
                    @cont(exp[1], anyCont)))
            anyCont.call(null))
       when LAZYANY
         fc = @newconst('fc')
-        trail = @newconst('trail')
         v = @newconst('v')
         anyCont = @newconst('anyCont')
         anyFcont = @newconst('anyFcont')
         anyCont.isRecursive = true
         anyFcont.isRecursive = true
         il.begin(
-          il.local(trail),
           il.assign(anyCont, il.recclamda(v,
-            il.nonlocal(trail),
-            il.assign(trail, il.trail),
-            il.settrail(il.newTrail),
             il.setfailcont(anyFcont),
             cont.call(null))),
           il.assign(anyFcont, il.recclamda(v,
-             il.undotrail(il.trail),
-             il.settrail(trail),
              il.setfailcont(fc),
              @cont(exp[1], anyCont))),
           il.assign(fc, il.failcont),
@@ -722,42 +755,43 @@ exports.Compiler = class Compiler
             il.setfailcont(il.clamda(v, il.assign(v1, v), il.setfailcont(fc), cont.call(v1))),
             anyCont.call(null))
       when PARALLEL
-        checkFunction = exp[3] or ((state, baseState) -> state[1] is baseState[1])
-        state = @newconst('state')
+        checkFunction = exp[3] or ((parsercursor, baseParserCursor) -> parsercursor is baseParserCursor)
+        parsercursor = @newconst('parsercursor')
         right = @newconst('right')
         v = @newconst('v')
         v1 = @newconst('v')
-        il.begin(il.assign(state, il.state),
+        il.begin(il.assign(parsercursor, il.parsercursor),
           @cont(exp[1],  il.clamda(v,
             v,
-            il.assign(right, il.state),
-            il.setstate(state),
+            il.assign(right, il.parsercursor),
+            il.setparsercursor(parsercursor),
             @cont(exp[2], il.clamda(v, il.assign(v1, v),
-                           il.if_(il.fun(checkFunction).call(il.state, right), cont.call(v1),
+                           il.if_(il.fun(checkFunction).call(il.parsercursor, right), cont.call(v1),
                               il.failcont.call(v1)))))))
       when FOLLOW
-        state = @newconst('state')
+        parsercursor = @newconst('parsercursor')
         v = @newconst('v')
         v1 = @newconst('v')
-        state = @newconst('state')
-        il.begin(il.assign(state, il.state),
+        parsercursor = @newconst('parsercursor')
+        il.begin(il.assign(parsercursor, il.parsercursor),
                  @cont(exp[1], il.clamda(v, il.assign(v1, v),
-                                       il.setstate(state),
+                                       il.setparsercursor(parsercursor),
                                        cont.call(v))))
       when NOTFOLLOW
-        state = @newconst('state')
+        parsercursor = @newconst('parsercursor')
         fc = @newconst('fc')
         v = @newconst('v')
         v1 = @newconst('v')
         il.begin(
                 il.assign(fc, il.failcont),
-                il.assign(state, il.state),
+                il.assign(parsercursor, il.parsercursor),
                 il.setfailcont(cont),
                 @cont(exp[1], il.clamda(v,il.assign(v1, v),
-                                       il.setstate(state),
+                                       il.setparsercursor(parsercursor),
                                        fc.call(v1))))
       when ADD, SUB, MUL, DIV, MOD, AND, OR, NOT, BITAND, BITOR, BITXOR,\
-          LSHIFT, RSHIFT, EQ, NE, LE, LT, GT, GE, NEG, BITNOT, PUSH, LIST, INDEX
+          LSHIFT, RSHIFT, EQ, NE, LE, LT, GT, GE, NEG, BITNOT, PUSH, LIST, INDEX,\
+          ATTR, LENGTH, SLICE, POP, INSTANCEOF
         vop = il.vopMaps[head]
         args = exp[1...]
         compiler = @
