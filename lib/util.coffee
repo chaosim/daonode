@@ -9,6 +9,7 @@ exports.isObject = isObject = (x) -> x is Object(x)
  exports.NONLOCAL, exports.VARIABLE, exports.UNIQUEVAR, exports.UNIQUECONST,
  exports.ASSIGN, exports.AUGMENTASSIGN, exports.INC, exports.SUFFIXINC, exports.DEC,
  exports.SUFFIXDEC, exports.INCP, exports.SUFFIXINCP, exports.DECP, exports.SUFFIXDECP, exports.IF,
+ exports.RETURN, exports.JSTHROW,
  exports.SWITCH, exports.JSFUN, exports.DIRECT, exports.PURE, exports.EFFECT, exports.IO,
  exports.LAMDA, exports.MACRO, exports.EVALARG, exports.ARRAY, exports.UARRAY,
  exports.MAKEOBJECT, exports.UOBJECT, exports.CONS, exports.FUNCALL, exports.MACROCALL, exports.JSFUNCALL,
@@ -29,7 +30,7 @@ exports.isObject = isObject = (x) -> x is Object(x)
  exports.PARALLEL, exports.FOLLOW, exports.NOTFOLLOW,
  exports.ADD, exports.SUB, exports.MUL, exports.DIV, exports.MOD, exports.AND, exports.OR, exports.NOT,
  exports.BITAND, exports.BITOR, exports.BITXOR, exports.LSHIFT, exports.RSHIFT,
- exports.EQ, exports.NE, exports.LE, exports.LT, exports.GT, exports.GE, exports.NEG, exports.BITNOT]  = [1...1000]
+ exports.EQ, exports.NE, exports.LE, exports.LT, exports.GT, exports.GE, exports.NEG, exports.BITNOT]  = [1...200]
 
 exports.SEXPR_HEAD_FIRST = 1; exports.SEXPR_HEAD_LAST = exports.BITNOT
 
@@ -68,7 +69,9 @@ exports.iff = iff = (clauses, else_) ->
     if length is 1 then if_(test, then_, else_)
     else if_(test, then_, iff(clauses[1...], else_))
 
-exports.switch_ = (test, clauses, else_) -> [exports.SWITCH, test, clauses, else_]
+exports.switch_ = (test, clauses...) -> [exports.SWITCH, test, clauses...]
+exports.return_ = (value) -> [exports.RETURN, value]
+exports.jsthrow = (value) -> [exports.JSTHROW, value]
 
 exports.array = (args...) -> [exports.ARRAY, args...]
 exports.uarray = (args...) -> [exports.UARRAY, args...]
@@ -183,6 +186,8 @@ exports.bitnot = (args...) -> [exports.BITNOT, args...]
 exports.index = index = (args...) -> [exports.INDEX, args...]
 exports.push = push = (args...) -> [exports.PUSH, args...]
 exports.list = list = (args...) -> [exports.LIST, args...]
+exports.headList = headList = (args...) -> [exports.HEADLIST, args...]
+exports.listTail = listTail = (args...) -> [exports.LISTTAIL, args...]
 exports.pushp = pushp = (args...) -> [exports.PUSHP, args...]
 exports.attr =(args...) -> [exports.ATTR, args...]
 exports.length = (args...) -> [exports.LENGTH, args...]
@@ -234,8 +239,8 @@ exports.getvalue = getvalue = (term) -> [exports.GETVALUE, term]
 
 # parser
 exports.parse =  (exp, state) -> [exports.PARSE, exp, state]
-exports.parsedata =  (exp, data) -> [exports.PARSEDATA, exp, data]
-exports.setdata =  (data) -> [exports.SETPARSERDATA, data]
+exports.parsedata = exports.parsetext = (exp, data) -> [exports.PARSEDATA, exp, data]
+exports.setdata = exports.settext = (data) -> [exports.SETPARSERDATA, data]
 exports.setcursor =  (cursor) -> [exports.SETPARSERCURSOR, cursor]
 exports.setstate =  (state) -> [exports.SETPARSERSTATE, state]
 exports.getstate =  [exports.GETPARSERSTATE]

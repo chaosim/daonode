@@ -1,4 +1,4 @@
-#{solve, compile} = dao = require('../lib/dao')
+{solve, compile} = dao = require('../lib/dao')
 
 xexports = {}
 
@@ -12,6 +12,7 @@ xexports.Test =
 #    test.equal  solve('a'), a
     test.done()
 
+xexports.Test =
   "test string": (test) ->
     test.equal  solve('1+1'), 2
     test.done()

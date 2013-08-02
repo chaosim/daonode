@@ -131,7 +131,7 @@ exports.Test =
                                 setdata(string('ab')), greedyany(char(_), result, _), eoi, getvalue(result))), ['a', 'b']
     test.done()
 
-#xexports.Test =
+#exports.Test =
   "test lazysome": (test) ->
     _ = vari('__')
     result = vari('result')
@@ -179,7 +179,7 @@ exports.Test =
     test.equal  solve(parsedata(begin(assign(_, dummy('__')), some(char(string('a'))), eoi), string('b'))), false
     test.done()
 
-#exports.Test =
+#xexports.Test =
   "test times": (test) ->
     _ = vari('__')
     result = vari('result')

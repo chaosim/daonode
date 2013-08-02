@@ -66,7 +66,7 @@ exports.Test =
     test.equal solve(begin(callcc(jsfun((k) -> k(null))), add(1, 2))), 3
     test.done()
 
-#exports.Test =
+#xexports.Test =
   "test callfc": (test) ->
     test.equal solve(orp(callfc(jsfun((k) -> k(null))), print_(1))), null
     test.equal solve(orp(callfc(jsfun((k) -> k(null))), add(1, 2))), 3

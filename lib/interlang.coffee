@@ -146,9 +146,14 @@ class Try extends Element
   constructor: (@test, @vari, @catchBody, @final) -> super
   toString: () -> "try(#{toString(@test)}, #{toString(@vari)}, #{toString(@catchBody)}, #{toString(@final)})"
 
+class Switch extends Element
+  constructor: (@test, @clauses, @default) -> super
+  toString: () -> "switch(#{toString(@test)}, #{toString(@clauses)}, #{toString(@default)})"
+
 replace = (exp, param, value) ->
   exp_replace = exp?.replace
   if exp_replace then exp_replace.call(exp, param, value)
+#  else if isArray(exp) then replace(e, param, value) for e in exp
   else exp
 
 Var::replace = (param, value) -> if @toString() is param then value else @
@@ -169,6 +174,8 @@ Break::replace = (param, value) -> @
 Try::replace = (param, value) ->
   new Try(replace(@test, param, value), @vari,
           replace(@catchBody, param, value), replace(@final, param, value))
+Switch::replace = (param, value) ->
+  new Switch(replace(@test, param, value), replace(@clauses, param, value), replace(@default, param, value))
 New::replace = (param, value) -> new @constructor(replace(@value, param, value))
 Lamda::replace = (param, value) -> @ #param should not occur in Lamda
 Clamda::replace = (param, value) -> @  #param should not occur in Clamda
@@ -182,6 +189,7 @@ JSFun::replace = (param, value) ->  new JSFun(replace(@fun, param, value))
 optimize = (exp, env, compiler) ->
   exp_optimize = exp?.optimize
   if exp_optimize then exp_optimize.call(exp, env, compiler)
+#  else if isArray(exp) then for e in exp then optimize(e, env, compiler)
   else exp
 
 isParam = (vari, lamda) ->
@@ -196,15 +204,13 @@ Var::optimize = (env, compiler) ->
   lamda = env.lamda
   if not isParam(@, lamda) then lamda.vars[@] = @
   if @isRecursive then return @
-  outerEnv = env.outer
-  if outerEnv
-    envExp = outerEnv.lookup(@)
-    if envExp instanceof Assign then envExp._removed = false
+#  outerEnv = env.outer
+#  if outerEnv
+#    envExp = outerEnv.lookup(@)
+#    if envExp instanceof Assign then envExp._removed = false
   content = env.lookup(@)
-  if content instanceof Assign
-    if @isRecursive then @
-    else content.exp
-  else if isArray(content) then @
+  if content instanceof Assign then content.exp
+#  else if isArray(content) then @
   else content
 
 Symbol::optimize = (env, compiler) -> @
@@ -236,13 +242,19 @@ Assign::optimize = (env, compiler) ->
     if exp instanceof Lamda and left.isRecursive
       env.bindings[left] = left
       assign._removed = false
-    else if not isAtomic(exp)
+    else if isObject(exp)
       env.bindings[left] = left
       assign._removed = false
     else if left instanceof VirtualOperation
       assign._removed = false
+    else if left.isConst
+      assign._removed = true
+      env.bindings[left] = exp
     else
       env.bindings[left] = assign
+  else if exp instanceof Var and exp.isConst and left.isConst
+    env.bindings[left] = exp
+    assign._removed = true
   else if exp instanceof Var and exp.isConst
     env.bindings[left] = assign
     assign._removed = false
@@ -307,6 +319,8 @@ Try::optimize = (env, compiler) ->
   catchBody = optimize(@catchBody, env, compiler)
   final = optimize(@final, env, compiler)
   new Try(test, @vari, catchBody, final)
+Switch::optimize = (env, compiler) ->
+  new Switch(optimize(@test, env, compiler), optimize(@clauses, env, compiler), optimize(@default, env, compiler))
 
 New::optimize = (env, compiler) -> new @constructor(compiler.optimize(@value, env))
 Lamda::optimize = (env, compiler) ->
@@ -416,6 +430,7 @@ codeSize = (exp) ->
   exp_codeSize = exp?.codeSize
   if exp_codeSize then exp_codeSize.call(exp)
   else 1
+codeSizeExps = (exps) ->  result = 0; for e in exps then result += codeSize(e); return result
 
 Var::codeSize = () -> 1
 New::codeSize = () -> codeSize(@value)+1
@@ -426,6 +441,7 @@ ForIn::codeSize = () -> codeSize(@vari) + codeSize(@container) + codeSize(@body)
 While::codeSize = () -> codeSize(@test) + codeSize(@body)+2
 Break::codeSize = () -> 1
 Try::codeSize = () -> codeSize(@test) + codeSize(@catchBody)+codeSize(@final)+2
+Switch::codeSize = () -> codeSize(@test) + codeSizeExps(@clauses)+codeSize(@default)+2
 Begin::codeSize = () -> @exps.reduce(((memo, e) -> memo + codeSize(e)), 0)
 VirtualOperation::codeSize = () -> 1
 Lamda::codeSize = () -> codeSize(@body) + 2
@@ -447,6 +463,7 @@ For::boolize = () -> undefined
 ForIn::boolize = () -> undefined
 While::boolize = () -> undefined
 Try::boolize = () -> undefined
+Switch::boolize = () -> undefined
 Break::boolize = () -> undefined
 Begin::boolize = () -> exps = @exps; boolize(exps[exps.length-1])
 VirtualOperation::boolize = () ->
@@ -505,6 +522,7 @@ ForIn::sideEffect = () -> expsEffect [@container, @body]
 While::sideEffect = () -> expsEffect [@test, @body]
 Break::sideEffect = () -> il.EFFECT
 Try::sideEffect = () -> expsEffect [@test, @catchBody, @final]
+Switch::sideEffect = () -> Math.max(expsEffect [@test, @catchBody, @final], sideEffect @clauses)
 Begin::sideEffect = () -> expsEffect(@exps)
 Lamda::sideEffect = () ->  il.PURE
 JSFun::sideEffect = () ->  il.PURE
@@ -551,6 +569,12 @@ Try::postOptimize = (compiler, env) ->
   new Try(postOptimize(@test, compiler, env), @vari,
           postOptimize(@catchBody, compiler, env), postOptimize(@final, compiler, env))
 
+Switch::postOptimize = (compiler, env) ->
+  clauses = for clause in @clauses
+    [postOptimize(id, compiler, env) for id in clause[0], postOptimize(clause[1], compiler, env)]
+  new Switch(postOptimize(@test, compiler, env), clauses,
+             postOptimize(@default, compiler, env))
+
 Begin::postOptimize = (compiler, env) ->
   exps = @exps
   length = exps.length
@@ -559,7 +583,8 @@ Begin::postOptimize = (compiler, env) ->
   result = []
   waitPop = false
   for e in exps
-    if e instanceof Assign and e.removed() then continue
+    if e instanceof Assign and e.removed()
+      result.push(e.exp); waitPop = true; continue
     if waitPop then result.pop()
     e = postOptimize(e, compiler, env)
     if e instanceof Begin
@@ -640,6 +665,9 @@ ForIn::jsify = (compiler, env) ->
 Break::jsify = (compiler, env) -> @
 Try::jsify = (compiler, env) ->
   new Try(jsify(@test, compiler, env), @vari, jsify(@catchBody, compiler, env), jsify(@final, compiler, env))
+Switch::jsify = (compiler, env) ->
+  new Switch(jsify(@test, compiler, env), jsify(@clauses, compiler, env),
+             jsify(@default, compiler, env))
 
 Begin::jsify = (compiler, env) ->
   exps = @exps
@@ -701,6 +729,9 @@ Break::convertBlockLamdaBody = (blockvar) -> @
 Try::convertBlockLamdaBody = (blockvar) ->
   new Try(convertBlockLamdaBody(@test, blockvar), @vari,
           convertBlockLamdaBody(@catchBody, blockvar), convertBlockLamdaBody(@final, blockvar))
+Switch::convertBlockLamdaBody = (blockvar) ->
+  new Switch(convertBlockLamdaBody(@test, blockvar),
+             convertBlockLamdaBodyExps(@clauses, blockvar), convertBlockLamdaBody(@default, blockvar))
 Begin::convertBlockLamdaBody = (blockvar) ->
   exps = []
   for e in @exps
@@ -737,6 +768,8 @@ While::convertOptRecursive = (lamda) -> new While(@test, convertOptRecursive(@bo
 Break::convertOptRecursive = (lamda) -> @
 Try::convertOptRecursive = (lamda) ->
   new Try(convertOptRecursive(@test, lamda), @vari, convertOptRecursive(@catchBody, lamda), convertOptRecursive(@final, lamda))
+Switch::convertOptRecursive = (lamda) ->
+  new Switch(convertOptRecursive(@test, lamda), convertOptRecursiveExps(@clauses, lamda), convertOptRecursive(@default, lamda))
 Begin::convertOptRecursive = (lamda) ->
   exps = []
   for e in @exps
@@ -776,9 +809,13 @@ LabelStatement::convertOptResursiveCall = (lamda, steps)  -> throw new Error(@)
 While::convertOptResursiveCall = (lamda, steps)  -> throw new Error(@)
 Break::convertOptResursiveCall = (lamda, steps)  -> throw new Error(@)
 Try::convertOptResursiveCall = (lamda, steps)  ->
-  new Try(convertOptResursiveCall(@test, lamda, steps), @vari,\
-          convertOptResursiveCall(@catchBody, lamda, steps),\
+  new Try(convertOptResursiveCall(@test, lamda, steps), @vari,
+          convertOptResursiveCall(@catchBody, lamda, steps),
           convertOptResursiveCall(@final, lamda, steps))
+Switch::convertOptResursiveCall = (lamda, steps)  ->
+  new Switch(convertOptResursiveCall(@test, lamda, steps),
+          convertOptResursiveCall(@clause, lamda, steps),
+          convertOptResursiveCall(@default, lamda, steps))
 Begin::convertOptResursiveCall = (lamda, steps)  -> throw new Error(@)
 ExpressionList::convertOptResursiveCall = (lamda, steps)  ->
   exps = []
@@ -816,6 +853,9 @@ Break::convertTailRecursive = (lamda) -> @
 Try::convertTailRecursive = (lamda) ->
   new Try(convertTailRecursive(@test, lamda), @vari,
           convertTailRecursive(@catchBody, lamda), convertTailRecursive(@final, lamda))
+Switch::convertTailRecursive = (lamda) ->
+  new Switch(convertTailRecursive(@test, lamda),
+          convertTailRecursive(@clauses, lamda), convertTailRecursive(@default, lamda))
 Begin::convertTailRecursive = (lamda) ->
   exps = []
   for e in @exps
@@ -857,6 +897,9 @@ Try::convertTailResursiveCall = (lamda, steps)  ->
   new Try(convertTailResursiveCall(@test, lamda, steps), @vari,\
           convertTailResursiveCall(@catchBody, lamda, steps),\
           convertTailResursiveCall(@final, lamda, steps))
+Switch::convertTailRecursive = (lamda, steps) ->
+  new Switch(convertTailRecursive(@test, lamda, steps),
+             convertTailRecursiveExps(@clauses, lamda, steps), convertTailRecursive(@default, lamda, steps))
 Begin::convertTailResursiveCall = (lamda, steps)  -> throw new Error(@)
 ExpressionList::convertTailResursiveCall = (lamda, steps)  ->
   exps = []
@@ -898,6 +941,10 @@ Try::getConvertParameters = (compiler, lamda) ->
   getConvertParameters(@test, compiler, lamda)
   getConvertParameters(@catchBody, compiler, lamda)
   getConvertParameters(@final, compiler, lamda)
+Switch::getConvertParameters = (compiler, lamda) ->
+  getConvertParameters(@test, compiler, lamda)
+  getConvertParameters(@clauses, compiler, lamda)
+  getConvertParameters(@default, compiler, lamda)
 Begin::getConvertParameters = (compiler, lamda) -> getConvertParameters e, compiler, lamda
 New::getConvertParameters = (compiler, lamda) -> getConvertParameters @value, compiler, lamda
 Lamda::getConvertParameters = (varivar) ->
@@ -938,6 +985,7 @@ LabelStatement::useConvertParams = (vars) -> throw new Error(@)
 While::useConvertParams = (vars) -> throw new Error(@)
 Break::useConvertParams = (vars) -> throw new Error(@)
 Try::useConvertParams = (vars) -> throw new Error(@)
+Switch::useConvertParams = (vars) -> throw new Error(@)
 Begin::useConvertParams = (vars) -> throw new Error(@)
 ExpressionList::useConvertParams = (vars) -> useConvertParams e, vars
 Throw::useConvertParams = (vars) ->  throw new Error(@)
@@ -987,7 +1035,7 @@ il.insertReturn = insertReturn = (exp) ->
   if exp_insertReturn then exp_insertReturn.call(exp)
   else new Return(exp)
 
-Assign::insertReturn = () -> il.begin(@, il.return(@left))
+Assign::insertReturn = () -> il.return(@)
 New::insertReturn = () -> new Return(@)
 Throw::insertReturn = () -> @
 Return::insertReturn = () -> @
@@ -1007,6 +1055,9 @@ Try::insertReturn = () ->
     if catchBody isnt null and catchBody isnt undefined then catchBody = insertReturn(catchBody)
     if final isnt null and final isnt undefined then final = insertReturn(final)
   new Try(insertReturn(@test), @vari, catchBody, final)
+Switch::insertReturn = () ->
+  clauses = for clause in @clauses then [clause[0], insertReturn(clause[1])]
+  new Switch(@test, clauses, @default)
 Begin::insertReturn = () ->
   exps = @exps
   length = exps.length
@@ -1063,7 +1114,7 @@ If::toCode = (compiler) ->
       else elseBody = "#{compiler.toCode(else_)}"
       "if (#{compiler.toCode(@test)}) #{thenBody}else #{elseBody}"
   else
-    "(#{compiler.toCode(@test)}) ? #{expressionToCode(compiler, @then_)} : #{expressionToCode(compiler, @else_)}"
+    "((#{compiler.toCode(@test)}) ? #{expressionToCode(compiler, @then_)} : #{expressionToCode(compiler, @else_)})"
 LabelStatement::toCode = (compiler) ->  "#{compiler.toCode(@label)}:#{compiler.toCode(@statement)}"
 For::toCode = (compiler) ->
   "for (#{compiler.toCode(@init)};#{compiler.toCode(@test)};#{compiler.toCode(@step)}){#{compiler.toCode(@body)}}"
@@ -1083,6 +1134,15 @@ Try::toCode = (compiler) ->
     "try{ #{compiler.toCode(@test)}} catch (#{@vari}) {#{compiler.toCode(catchBody)}}"
   else
     "try{ #{compiler.toCode(@test)}} catch (#{@vari}) {#{compiler.toCode(catchBody)}} finally {#{compiler.toCode(final)}}"
+Switch::toCode = (compiler) ->
+  result =
+  clauses = @clauses; default1 = @default
+  body = ''
+  for clause in clauses
+    for e in clause[0] then body += "case #{compiler.toCode(e)}:"
+    body += compiler.toCode(clause[1]) + ';'
+  if default1 is undefined then "switch (#{compiler.toCode(@test)}){ #{body} }"
+  else "switch (#{compiler.toCode(@test)}){ #{body} default: #{compiler.toCode(default1)}}"
 Break::toCode = (compiler) ->
   if @label then "break #{compiler.toCode(@label)}"
   else "break"
@@ -1131,6 +1191,7 @@ For::isStatement = () -> true
 ForIn::isStatement = () -> true
 ForOf::isStatement = () -> true
 Try::isStatement = () -> true
+Switch::isStatement = () -> true
 Begin::isStatement = () -> true
 Return::isStatement = () -> true
 
@@ -1351,6 +1412,7 @@ il.for_ = (init,test, step, body) -> new For(test, il.begin(body...))
 il.forin = (vari, container, body...) -> new ForIn(vari, container, il.begin(body...))
 il.forof = (vari, container, body...) -> new ForOf(vari, container, il.begin(body...))
 il.try = (test, vari, catchBody, final) -> new Try(test, vari, catchBody, final)
+il.switch = (test, clauses, default1) -> new Switch(test, clauses, default1)
 
 il.break_ = (label) -> new Break(label)
 il.continue_ = (label) -> new Continue(label)

@@ -6,7 +6,7 @@ il = require("./interlang")
 
 { QUOTE, EVAL, STRING, BEGIN, NONLOCAL, VARIABLE, UNIQUEVAR, UNIQUECONST,\
   ASSIGN, AUGMENTASSIGN, INC, SUFFIXINC, DEC, SUFFIXDEC, INCP, SUFFIXINCP, DECP, SUFFIXDECP, IF,\
-  SWITCH, JSFUN, DIRECT, PURE, EFFECT, IO,\
+  SWITCH, RETURN, JSTHROW, JSFUN, DIRECT, PURE, EFFECT, IO,\
   LAMDA, MACRO, EVALARG, ARRAY, UARRAY, MAKEOBJECT, UOBJECT, CONS, FUNCALL, MACROCALL, JSFUNCALL, \
   FOR, FORIN, FOROF, TRY, BLOCK, BREAK, CONTINUE, CATCH, THROW,  UNWINDPROTECT, CALLCC, CALLFC,\
   QUASIQUOTE, UNQUOTE, UNQUOTESLICE,\
@@ -197,12 +197,16 @@ exports.Compiler = class Compiler
 
       when SWITCH
         v = @newconst('v')
-        clauses = for clause in exp[1]
-          values = clause[0]; act = clause[1]
-          values = for value in values then il.lamda([], @cont(value, il.idcont())).call()
-          act = @cont(act, cont)
-          [values, act]
-        @cont(exp[0], il.clamda(v, il.switch_(v, clauses, @cont(exp[2], cont))))
+        k = @newconst('cont')
+        clauses = exp[2...]
+        length = clauses.length
+        if length%2 is 1 then default1 = clauses[length-1]; clauses = clauses[0...length-1]
+        else default1 = undefined
+
+        clauses = for i in [0...length-1] by 2
+          [(for value in clauses[i] then @cont(value, il.idcont())), @cont(clauses[i+1], k)]
+        default1 = @cont(default1, k)
+        il.begin(il.assign(k, cont), @cont(exp[1], il.clamda(v, il.switch(v, clauses,default1))))
 
       when JSFUN then f = il.jsfun(exp[1]);  f._effect = @_effect;  cont.call(f)
       when DIRECT then il.begin(exp[1], cont.call())
@@ -249,7 +253,7 @@ exports.Compiler = class Compiler
         compiler = @
         length = args.length
         xs = (@newconst('x'+i) for i in [0...length])
-        cont = cont.call(il.array(xs))
+        cont = cont.call(il.array(xs...))
         for i in [length-1..0] by -1
           cont = do (i=i, cont=cont) ->
             compiler.cont(args[i], il.clamda(xs[i], cont))
@@ -416,9 +420,16 @@ exports.Compiler = class Compiler
                                       cont.call(temp)))))
         @protect = oldprotect
         result
-
-      when CALLCC then v = @newconst('v'); @cont(exp[1], il.clamda(v, cont.call(v.call(cont, cont))))
-      when CALLFC then v = @newconst('v'); @cont(exp[1], il.clamda(v, cont.call(v.call(il.failcont, cont))))
+      when RETURN
+        il.begin(il.return(il.lamda([], @cont(exp[1], il.idcont())).call()), cont.call(null))
+      when JSTHROW
+        il.begin(il.throw(il.lamda([], @cont(exp[1], il.idcont())).call()), cont.call(null))
+      when CALLCC
+        v = @newconst('v'); k = @newconst('k')
+        il.begin(il.assign(k, cont), @cont(exp[1], il.clamda(v, k.call(v.call(k, k)))))
+      when CALLFC
+        v = @newconst('v'); k = @newconst('k')
+        il.begin(il.assign(k, cont), @cont(exp[1], il.clamda(v, k.call(v.call(il.failcont, k)))))
 
       when LOGICVAR then cont.call(il.newLogicVar(exp[1]))
       when DUMMYVAR then cont.call(il.newDummyVar(exp[1]))
@@ -599,12 +610,10 @@ exports.Compiler = class Compiler
                                 @cont(exp[1], il.clamda(v, cont.call(v)))))
       when PARSEDATA
         v = @newconst('v')
-        data = @newconst('data')
         @cont(exp[2], il.clamda(v,
-                            il.begin(il.assign(data, il.parserdata),
-                               il.setparserdata(v),
+                            il.begin(il.setparserdata(v),
                                il.setparsercursor(0),
-                               @cont(exp[1], il.clamda(v, il.setparserdata(v), cont.call(il.parserdata))))))
+                               @cont(exp[1], il.clamda(v, cont.call(v))))))
       when SETPARSERSTATE
         v = @newconst('v'); v1 = @newconst('v')
         @cont(exp[1], il.clamda(v,
@@ -809,38 +818,31 @@ exports.Compiler = class Compiler
       v = @newconst('v')
       temp = @newconst('temp')
       switch task
-        when ASSIGN then return @cont(exp, il.clamda(v, il.assign(item, v), cont.call(item)))
-        when AUGMENTASSIGN
-          return @cont(exp, il.clamda(v, il.assign(item, il[op](item, v)), cont.call(item)))
-        when INC
-          return il.begin(il.assign(item, il.add(item, 1)), cont.call(item))
-        when DEC
-          return il.begin(il.assign(item, il.sub(item, 1)), cont.call(item))
-        when SUFFIXINC
-          return il.begin(il.assign(temp, item), il.assign(item, il.add(item, 1)), cont.call(temp))
-        when SUFFIXDEC
-          return il.begin(il.assign(temp, item), il.assign(item, il.sub(item, 1)), cont.call(temp))
+        when ASSIGN then @cont(exp, il.clamda(v, cont.call(il.assign(item, v))))
+        when AUGMENTASSIGN then @cont(exp, il.clamda(v, cont.call(il.assign(item, il[op](item, v)))))
+        when INC then cont.call(il.assign(item, il.add(item, 1)))
+        when DEC then cont.call(il.assign(item, il.sub(item, 1)))
+        when SUFFIXINC then il.begin(il.assign(temp, item), il.assign(item, il.add(item, 1)), cont.call(temp))
+        when SUFFIXDEC then il.begin(il.assign(temp, item), il.assign(item, il.sub(item, 1)), cont.call(temp))
         when INCP
           fc = @newconst('fc')
-          return il.begin(il.assign(fc, il.failcont),
+          il.begin(il.assign(fc, il.failcont),
                           il.setfailcont(il.clamda(v, il.assign(item, il.sub(item, 1)),fc.call(item))),
-                          il.assign(item, il.add(item, 1)),
-                          cont.call(item))
+                          cont.call(il.assign(item, il.add(item, 1))))
         when DECP
           fc = @newconst('fc')
-          return il.begin(il.assign(fc, il.failcont),
+          il.begin(il.assign(fc, il.failcont),
                           il.setfailcont(il.clamda(v, il.assign(item, il.add(item, 1)),fc.call(item))),
-                          il.assign(item, il.sub(item, 1)),
-                          cont.call(item))
+                          cont.call(il.assign(item, il.sub(item, 1))))
         when SUFFIXINCP
           fc = @newconst('fc')
-          return il.begin(il.assign(temp, item), il.assign(fc, il.failcont),
+          il.begin(il.assign(temp, item), il.assign(fc, il.failcont),
                           il.setfailcont(il.clamda(v, il.assign(item, il.sub(item, 1)),fc.call(temp))),
                           il.assign(item, il.add(item, 1)),
                           cont.call(temp))
         when SUFFIXINCP
           fc = @newconst('fc')
-          return il.begin(il.assign(temp, item), il.assign(fc, il.failcont),
+          il.begin(il.assign(temp, item), il.assign(fc, il.failcont),
                           il.setfailcont(il.clamda(v, il.assign(item, il.add(item, 1)),fc.call(temp))),
                           il.assign(item, il.sub(item, 1)),
                           cont.call(temp))
@@ -917,7 +919,8 @@ exports.Compiler = class Compiler
     exptoCode = exp?.toCode
     if exptoCode then exptoCode.call(exp, @)
     else if typeof exp is 'function' then exp.toString()
-    else  JSON.stringify(exp)
+    else if exp is undefined then 'undefined'
+    else JSON.stringify(exp)
 
 class Env
 
@@ -1017,9 +1020,9 @@ exports.OptimizationEnv = class OptimizationEnv extends CpsEnv
     bindings = @bindings
     if bindings.hasOwnProperty(vari) then return bindings[vari]
     else
-      if @isConst
+      if vari.isConst
         outer = @outer
-        if outer then outer.lookup(vari) else vari
+        if outer instanceof OptimizationEnv then outer.lookup(vari) else vari
       else vari
 
 exports.Error = class Error
