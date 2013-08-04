@@ -81,7 +81,7 @@ class TailRecuisiveLamda extends Lamda
 class Clamda extends Lamda
   constructor: (@v, @body) -> @name = @toString(); @params = [v]
   toString: () -> "(#{toString(@v)} -> #{toString(@body)})"
-  call: (value) -> replace(@body, @v.toString(), value)
+  call: (value) -> replace(@body, @v, value)
 class RecursiveClamda extends Clamda
   call: (value) -> new CApply(@, value)
 
@@ -151,12 +151,13 @@ class Switch extends Element
   toString: () -> "switch(#{toString(@test)}, #{toString(@clauses)}, #{toString(@default)})"
 
 replace = (exp, param, value) ->
+  if isString(exp) then return exp
   exp_replace = exp?.replace
   if exp_replace then exp_replace.call(exp, param, value)
 #  else if isArray(exp) then replace(e, param, value) for e in exp
   else exp
 
-Var::replace = (param, value) -> if @toString() is param then value else @
+Var::replace = (param, value) -> if @ is param then value else @
 Assign::replace = (param, value) ->
   left = @left
   if left instanceof VirtualOperation then left = replace(left, param, value)
@@ -177,8 +178,19 @@ Try::replace = (param, value) ->
 Switch::replace = (param, value) ->
   new Switch(replace(@test, param, value), replace(@clauses, param, value), replace(@default, param, value))
 New::replace = (param, value) -> new @constructor(replace(@value, param, value))
-Lamda::replace = (param, value) -> @ #param should not occur in Lamda
-Clamda::replace = (param, value) -> @  #param should not occur in Clamda
+Lamda::replace = (param, value) ->
+  body = @body
+  newBody =  replace(body, param, value)
+  if newBody is body then @
+  else new @constructor(@params, newBody)
+Clamda::replace = (param, value) ->
+  v = @v
+  if param is v then @
+  else
+    body = @body
+    newBody =  replace(body, param, value)
+    if newBody is body then @
+    else new Clamda(v,newBody)
 IdCont::replace = (param, value) -> @
 Apply::replace = (param, value) -> new Apply(replace(@caller, param, value), (replace(a, param, value) for a in @args))
 VirtualOperation::replace = (param, value) -> new @constructor((replace(a, param, value) for a in @args))
@@ -235,7 +247,7 @@ Assign::optimize = (env, compiler) ->
         if left instanceof BlockVar then left.lamda = lamda
   exp = compiler.optimize(@exp, env)
   assign = new @constructor(left, exp)
-  assign.root = root
+  if left.isConst then assign.root = root
   if @isParamAssign then assign.isParamAssign = true
   left.assigned = assign.root
   if isValue(exp)

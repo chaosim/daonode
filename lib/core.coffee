@@ -35,7 +35,7 @@ exports.solve = (exp, path) ->
 compile = (exp, path) ->
   compiler = new Compiler()
   code = compiler.compile(exp) + "\n//exports.main();"
-  code = beautify(code, { indent_size: 2})
+  code = beautify(code, { indent_size: 2, "brace_style": "collapse"})
   fd = fs.openSync(path, 'w')
   fs.writeSync fd, code
   fs.closeSync fd
@@ -118,7 +118,7 @@ exports.Compiler = class Compiler
           result.push(@env.alphaName(name))
         result
       when VARIABLE
-        result = [head]; result.push(@env.alphaName(name) for name in exp[1...]); result
+        result = [head]; (result.push(@env.alphaName(name)) for name in exp[1...]); result
       when ASSIGN
         left = exp[1]
         if isString(left) then left = @env.alphaName(left)
@@ -157,7 +157,7 @@ exports.Compiler = class Compiler
 
   # compile to continuation
   cont: (exp, cont) ->
-    if isString(exp) then return cont.call(@uservar(exp))
+    if isString(exp) then v = @uservar(exp); v.isConst = true; return cont.call(v)
     if not isArray(exp) then return cont.call(exp)
     length = exp.length
     if length is 0 then return cont.call(exp)

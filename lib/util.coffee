@@ -79,7 +79,7 @@ exports.cons = (head, tail) -> [exports.CONS, head, tail]
 exports.makeobject = (args...) -> [exports.MAKEOBJECT, args...]
 exports.uobject = (args...) -> [exports.UOBJECT, args...]
 exports.funcall = funcall = (caller, args...) -> [exports.FUNCALL, caller, args...]
-exports.jsfuncall = (caller, args...) -> [exports.JSFUNCALL, caller, args...]
+exports.jsfuncall = jsfuncall = (caller, args...) -> [exports.JSFUNCALL, caller, args...]
 exports.macall = (caller, args...) -> [exports.MACROCALL, caller, args...]
 
 exports.jsobject = (exp) -> [exports.JSOBJECT, exp]
@@ -194,6 +194,7 @@ exports.length = (args...) -> [exports.LENGTH, args...]
 exports.slice = (args...) -> [exports.SLICE, args...]
 exports.pop = (args...) -> [exports.POP, args...]
 exports.instanceof = (args...) -> [exports.INSTANCEOF, args...]
+exports.concat = (args...) -> jsfuncall('concat', args...)
 
 # logic
 

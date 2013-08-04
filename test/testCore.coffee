@@ -19,12 +19,14 @@ exports.Test =
     test.equal  solve(begin(variable(x), assign(x, 1), suffixinc(x))), 1
     test.done()
 
-#xexports.Test =
+#exports.Test =
   "test 1": (test) ->
     test.equal  solve(1), 1
+    test.equal  solve(string("1")), "1"
+    test.equal  solve(string('"1"')), '"1"'
     test.done()
 
-#exports.Test =
+#xexports.Test =
   "test begin": (test) ->
     test.equal  solve(begin(1, 2)), 2
     test.done()

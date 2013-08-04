@@ -1,6 +1,7 @@
 {solve} = core = require('./core')
 {string, char, number, parsetext, quoteString, identifier
 begin, nonlocal, direct, switch_
+if_, eq, concat,
 jsfun, lamda, funcall
 andp, orp, assign,
 array, headList
@@ -45,12 +46,19 @@ $statement = '$statement'; $expression = '$expression'; $exprList = '$exprList'
 $ifExpr = '$ifExpr'; $forExpr = '$forExpr';  $switchExpr = '$switchExpr';
 $tryExpr = '$tryExpr'; $throwExpr = '$throwExpr'
 $assignExpr = '$assignExpr'; $leftValueExpr = '$leftValueExpr'
-$operationExpr = '$operationExpr'; $binaryExpr = '$binaryExpr'; $unaryExpr = '$unaryExpr'; $atomExpr = '$atomExpr'
+$attrExpr = '$attrExpr'; $indexExpr = '$indexExpr'
+$operationExpr = '$operationExpr'; $binaryExpr = '$binaryExpr'; $unaryExpr = '$unaryExpr'; $atomExpr = '$atomExpr';
+$parenExpr ='$parenExpr';
 $valueExpr = '$valueExpr'; $invocationExpr = '$invocationExpr'; $code = '$code'
+$parenExper = '$parenExper'; $arrayLiteral = '$arrayLiteral'
 $linecomment = '$linecomment'
 $blockcomment = '$blockcomment
 '
 $matchToEOL = '$matchToEOL'
+
+charLeftParen = char(string('(')); charRightParen = char(string(')'))
+charLeftBracket = char(string('[')); charRightBracket = char(string(']'))
+charDot = char(string('.')); charComma = char(string(',')); charSemiConlon = char(string(';')); charConlon = char(string(':'))
 
 grammar = begin(
    direct(il.begin(
@@ -87,10 +95,19 @@ grammar = begin(
     funcall($switchExpr),
     funcall($throwExpr)))),
   assign($assignExpr, lamda([],
-      assign(left, funcall($leftValueExpr)),
-      assign(op, funcall('assignOperator', solver)),
-      assign(exp, funcall($expression)),
-      array(op, left, exp))),
+                            assign(left, funcall($leftValueExpr)),
+                            assign(op, funcall('assignOperator', solver)),
+                            assign(exp, funcall($expression)),
+                            if_(eq(op, util.ASSIGN), array(op, left, exp),
+                                   concat(op, array(left, exp))))),
+  assign($leftValueExpr, lamda([],
+                            orp(identifier(),
+                               funcall($attrExpr),
+                               funcall($indexExpr)))),
+  assign($attrExpr, lamda([],  andp(orp(identifier(), funcall($parenExper), funcall($arrayLiteral), quoteString()),
+                                    charDot, identifier()))),
+  assign($indexExpr, lamda([],  andp(orp(identifier(), funcall($parenExpr)),
+                                    charLeftBracket, funcall($expression), charRightBracket))),
   assign($binaryExpr, lamda([],
                             andp(assign(x, funcall($unaryExpr)),
                                  orp(andp(assign(op, funcall('binaryOperator', solver)),
@@ -104,7 +121,9 @@ grammar = begin(
           andp(assign(x, funcall($atomExpr)),
               orp(andp(assign(op, funcall('suffixOperator', solver)), array(op, x)),
                   x)))))
-  assign($atomExpr, lamda([], orp(identifier(), quoteString(), number()))),
-  funcall($assignExpr))
+  assign($parenExpr, lamda([],
+      andp(charLeftParen, assign(exp, funcall($binaryExpr)), charRightParen, exp))),
+  assign($atomExpr, lamda([], orp(identifier(), array(util.STRING, quoteString()), number(), funcall($parenExpr)))),
+  funcall($binaryExpr))
 
 

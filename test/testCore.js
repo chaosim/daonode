@@ -26,6 +26,8 @@
     },
     "test 1": function(test) {
       test.equal(solve(1), 1);
+      test.equal(solve(string("1")), "1");
+      test.equal(solve(string('"1"')), '"1"');
       return test.done();
     },
     "test begin": function(test) {
