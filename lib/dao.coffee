@@ -70,21 +70,27 @@ grammar = begin(
                   il.new(il.uservar('StateMachine').call(il.uservar('tokenInfoList'))))
       )),
 
+  assign($nextToken, lamda([] )),
   assign($program, lamda([],
     orp(andp(eoi, null),
-        andp(assign(body, funcall($programBody), headList('begin', body)))))),
+        andp(assign(body, funcall($programBody), headList('begin', body))), eoi))),
+
   assign($statement, lamda([],
+    nextToken,
     assign(token, funcall(readToken)),
     switch_(token,
       [TKNRETURN],
-        begin(assign(exp, funcall($expression)), array(util.RETURN, exp)),
+      begin(assign(exp, funcall($expression)), array(util.RETURN, exp)),
+      [TKNTHROWN],
+      begin(assign(exp, funcall($expression)), array(util.THROW, exp)),
       [TKNPASS],
         funcall($matchToEOL),
-      [TKNLINECOMMENTBEGIN],
+      [TKNCOMMENTBEGIN],
         funcall($blockcomment),
       #else
        funcall($expression))
     )),
+
   assign($expression, lamda([],
     orp(funcall($valueExpr),
     funcall($invocationExpr),
@@ -96,44 +102,89 @@ grammar = begin(
     funcall($forExpr),
     funcall($switchExpr),
     funcall($throwExpr)))),
+
   assign($assignExpr, lamda([],
     assign(left, funcall($leftValueExpr)),
     assign(op, funcall('assignOperator', solver)),
     assign(exp, funcall($expression)),
     if_(eq(op, util.ASSIGN), array(op, left, exp),
            concat(op, array(left, exp))))),
+
   assign($leftValueExpr, lamda([],
-    orp(identifier(),
-       funcall($attrExpr),
-       funcall($indexExpr)))),
+    if_(eq(tokenId, TKNIDENTIFIER), tokenValue,
+       orp(funcall($attrExpr),
+         funcall($indexExpr))))),
+
   assign($attrExpr, lamda([],
-    andp(orp(identifier(), funcall($parenExper), funcall($arrayLiteral), quoteString()),
-         charDot,
-         identifier()))),
+    nextToken,
+    switct_(tokenID,
+      array(TKNIDENTIFIER), assign(exp, tokenValue),
+      array(TKNLEFTPAREN), assign(exp, $parenExpr),
+      array(TKNLEFTBRACKET), assign(exp, $arrayLiteral),
+      array(TKNSTRING), assign(exp, tokenValue))
+    nextToken,
+
+      switch_(tokenID,
+        TKNIDENTIFIER, identifier,
+      andp(assign(exp, orp(identifier(), funcall($parenExper), funcall($arrayLiteral), quoteString())),
+                               greedyany(orp(andp(charDot, assign(exp, array(ATTR, exp,identifier()))),
+                                             andp(charLeftParen, assign(exp, array(FUNCALL, exp, expressionList())), charRightParen) ) )))),
+
   assign($indexExpr, lamda([],
     andp(orp(identifier(), funcall($parenExpr)),
          charLeftBracket,
          funcall($expression),
          charRightBracket))),
+  assign($chainExpr, lamda([])),
+
+  assign($callExpr, lamda([],
+                          andp(assign(exp, orp(identifier(), funcall($parenExper), funcall($arrayLiteral), quoteString())),
+                               greedyany(orp(andp(charDot, assign(exp, array(ATTR, exp,identifier()))),
+                                             andp(charLeftParen, assign(exp, array(FUNCALL, exp, expressionList())), charRightParen) ) )))),
+
   assign($binaryExpr,lamda([],
       variable(x),
       assign(x, funcall($unaryExpr)),
-      orp(andp(greedyany(
-                  andp(assign(op, funcall('binaryOperator', solver)),
-                    assign(y, funcall($unaryExpr)),
-                    assign(x, array(op, x, y)))),
-                  x),
-         x))),
+      while_(1,
+        nextToken,
+        switch_(tokenID,
+          [TKNADD, TKNSUB],
+            andp(assign(op, tokenValue),
+                 assign(y, funcall($unaryExpr)),
+                 assign(x, array(op, x, y))),
+          reuseToken, jsbreak_()))
+      x)),
+
   assign($unaryExpr, lamda([],
-      orp(andp(assign(op, funcall('unaryOperator', solver)),
-               assign(x, funcall($atomExpr)),
-               array(op, x)),
-          andp(assign(x, funcall($atomExpr)),
-              orp(andp(assign(op, funcall('suffixOperator', solver)), array(op, x)),
-                  x)))))
+      nextToken,
+      switch_(tokenID,
+        [TKNNEG, TKNPOSITIVE, TKNINC, TKNDEC],
+          andp(assign(op, tokenValue), assign(x, funcall($atomExpr)), array(op,x))
+        #else
+          andp( reuseToken,
+                assign(x, funcall($atomExpr)),
+                nextToken,
+                switch_( tokenID,
+                  [TKNINC, TKNDEC] ,
+                    array(tokenValue, x)
+                  #else
+                    andp(reuseToken, x) )))))
+
   assign($parenExpr, lamda([],
-      charLeftParen, assign(exp, funcall($binaryExpr)), charRightParen, exp)),
-  assign($atomExpr, lamda([], orp(identifier(), array(util.STRING, quoteString()), number(), funcall($parenExpr)))),
-  funcall($binaryExpr))
+      assign(exp, funcall($binaryExpr)), charRightParen, exp)),
+
+  assign($atomExpr, lamda([],
+    nextToken,
+    switch_(tokenID,
+      TKNTRUE, true,
+      TKNFALSE, false,
+      TKNIDENTIFIER, tokenValue,
+      TKNSTRING, tokenValue,
+      TKNNUMBER, jseval(tokenValue),
+      TKNLEFTBRACKET, funcall($arrayLiteral),
+      TKNLEFTPAREN, funcall($parenExpr)
+      reuseToken))),
+
+  funcall(parse, BinaryExpr)))
 
 

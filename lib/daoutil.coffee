@@ -210,3 +210,45 @@ exports.suffixOperator = (solver, cont) ->
   op = suffixOperatorMap[token]
   if op isnt undefined then cont(op)
   else  solver.parsercursor = start; solver.failcont(null)
+
+nextToken = (solver, cont) ->
+  text = solver.parserdata
+  cursor = solver.parsercursor
+  c = text[cursor]
+  switch c
+    when undefined then [EOI, cursor]
+    when '0'
+      c2 = cursor[1]
+      switch c2
+        when 'x', 'X', 'h', 'H' then hexadigit(text, cursor)
+        when '1', '2', '3', '4','5','6','7' then octal(text, cursor)
+    when '1', '2', '3', '4','5','6','7','8','9' then number(text, cursor)
+    when '+','-'
+      c2 = cursor[1]
+      switch c
+        when '0'
+          c2 = cursor[1]
+          switch c2
+            when 'x', 'X', 'h', 'H' then hexadigit(text, cursor)
+            when '1', '2', '3', '4','5','6','7' then octal(text, cursor)
+        when '1', '2', '3', '4','5','6','7','8','9' then number(text, cursor)
+    when 'a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y'
+      result = keyword(text, cursor)
+      if result[0] is undefined
+        result2 = identifier(text, result[1])
+      else
+        c2 = text[result[1]]
+        if isIdentifierCharacter(c2)
+          result2 = identifier(text, result[1])
+    when '_', '$','z', 'A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z'
+      identifier(text, cursor)
+    when ' ','\t'
+      whitespace(text, cursor)
+    when '"', "'"
+      result = quoteString(text, cursor, c)
+      if result[0] is undefined then [QUOTE, c]
+    when '#'
+      result = comment(text, cursor)
+    when '\r','\n' #indent and unindent
+      newlineIndent(text, cursor, solver)
+    else symbolToken(text, cursor)
