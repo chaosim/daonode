@@ -1,16 +1,55 @@
 {Trail, Var,  ExpressionError, TypeError} = require "./solve"
-util = require "./util"
-[ TOKEN_BLOCKCOMMENTBEGIN, TOKEN_LINECOMMENTBEGIN,
-  TOKEN_QUOTE, TOKEN_QUOTE2, TOKEN_QUOTE3,
-  TOKEN_DOUBLEQUOTE, TOKEN_DOUBLEQUOTE2, TOKEN_DOUBLEQUOTE3,
-  TOKEN_BACKQUOTE, TOKEN_BACKQUOTE2, TOKEN_BACKQUOTE3,
-  TOKEN_LPAREN, TOKEN_RPAREN, TOKEN_LBRACKET, TOKEN_RPAREN, TOKEN_LBRACE, TOKEN_RBRACE,
-  TOKEN_COLON, TOKEN_SEMICOLON, TOKEN_DOT, TOKEN_DOT2, TOKEN_DOT3, TOKEN_ARROW, # ->
-  TOKEN_EQ, TOKEN_EQ2, TOKEN_EQ3, TOKEN_NE, TOKEN_GT, TOKEN_GE, TOKEN_LE, TOKEN_LT, TOKEN_COLONEQ,
-  TOKEN_ADD, TOKEN_ADD2, TOKEN_SUB, TOKEN_SUB2, TOKEN_MUL, TOKEN_DIV, TOKEN_LSHIFT, TOKEN_RSHIFT, TOKEN_BITNOT, TOKEN_BITXOR, TOKEN_LOGICNOT, TOKEN_LOGICAND, TOKEN_LOGICOR,
-  TOKEN_IF, TOKEN_ELSE, TOKEN_SWITCH, TOKEN_THIS, TOKEN_CLASS, TOKEN_RETURN, TOKEN_PASS, TOKEN_TRY, TOKEN_CATCH, TOKEN_FINALLY, TOKEN_WHILE, TOKEN_UNTIL, TOKEN_DO,
-  TOKEN_WHEN, TOKEN_LET, TOKEN_CASE, TOKEN_DEBUGGER, TOKEN_DEFAULT, TOKEN_DELETE, TOKEN_IN,
-  TOKEN_INSTANCEOF, TOKEN_NEW, TOKEN_THROW, TOKEN_FUNCTION, TOKEN_CONTINUE, TOKEN_VOID, TOKEN_VAR, TOKEN_WITH, TOKEN_TYPEOF, TOKEN_LOOP, TOKEN_AND, TOKEN_NOT, TOKEN_OR]  = [1..255]
+{ADD, SUB, MUL, DIV, MOD, LSFHIFT, RSHIFT,
+AND, OR, NOT, BITAND, BITOR, BITNOT} = util = require "./util"
+
+index = 0
+exports.tokenInfoList = tokenInfoList = []
+newToken = (text) ->
+  i = text.indexOf(': ')
+  names = text.slice(0, i).split(' ')
+  symbol = text.slice(i+2)
+  for name in names then tokenNames[name] = global[name] = index
+  tokenInfoList.push([symbol, index]);
+  index++
+
+exports.tokenNames = tokenNames = {}
+
+newToken(x) for x in [
+  'TKNLINECOMMENTBEGIN TKNSHARP: #', 'TKNSHARP2: ##', 'TKNSHARP3: ###',
+  "TKNQUOTE: '", "TKNQUOTE2: ''", "TKNQUOTE3: '''",
+  'TKNDOUBLEQUOTE1: "', 'TKNDOUBLEQUOTE2: ""', 'TKNDOUBLEQUOTE3: """',
+  'TKNBACKQUOTE: `', 'TKNBACKQUOTE2: ``', 'TKNBACKQUOTE3: ```',
+  'TKNLPAREN: (', 'TKNRPAREN: )', 'TKNLBRACKET: [', 'TKNRBRACKET: ]', 'TKNLBRACE: {', 'TKNRBRACE: }',
+  'TKNCOLON: :', 'TKNCOLON2: ::', 'TKNCOLON3: :::', 'TKNSEMICOLON: ;',
+  'TKNDOT: .', 'TKNDOT2: ..', 'TKNDOT3: ...',
+  'TKNEQ: =', 'TKNEQ2: ==', 'TKNEQ3: ===',
+  'TKNGT: >', 'TKNGT2 TKNRSHIFT: >>', 'TKNGT3: >>>',
+  'TKNLT: <', 'TKNLT2 TKNLSHIFT: <<', 'TKNLT3: <<<',
+  'TKNNE: !=',  'TKNLTGT: <>',  'TKNGE: >=', 'TKNLE: <=',
+  'TKNSUBARROW: ->', 'TKNEQARROW: =>', 'TKNCOLONEQ: :=', 'TKNCOLONSUB: :-',
+  'TKNPOSITIVE TKNADD: +', 'TKNINC TKNADD2: ++', 'TKNADD3: +++',
+  'TKNNEG TKNSUB: -', 'TKNDEC TKNSUB2: --', 'TKNSUB3: ---',
+  'TKNMUL: *', 'TKNMUL2: **', 'TKNMUL3: ***',
+  'TKNDIV: /', 'TKNDIV2: //', 'TKNDIV3: ///',
+  'TKNMOD: %', 'TKNMOD2: %%', 'TKNMOD3: %%%',
+  'TKNVLINE TKNBITOR: |', 'TKNVLINE2 TKNOR: ||', 'TKNVLINE3: |||'
+  'TKNBITNOT: ~', 'TKNBITXOR: ^', 'TKNNOT: !',
+  'TKNBITAND AMPERSAND1: &','TKNAND AMPERSAND2: &&','AMPERSAND3: &&&',
+  'TKNRETURN: return', 'TKNPASS: pass',
+  'TKNCONTINUE: continue', 'TKNBREAK: break',
+  'TKNIF: if', 'TKNELSE: else', 'TKNELSEIF: elseif', 'TKNELIF: elif',
+  'TKNSWITCH: switch', 'TKNDEFAULT: default',
+  'TKNTRY: try', 'TKNCATCH: catch',   'TKNEXCEPT: except', 'TKNFINALLY: finally',
+  'TKNTHROW: throw', 'TKNRAISE: raise', 'TKNERROR: error',
+  'TKNWHILE: while', 'TKNUNTIL: until', 'TKNLOOP: loop',
+  'TKNWHEN: when', 'TKNON: on', 'TKNLET: let', 'TKNWHERE: where', 'TKNCASE: case',
+  'TKNVAR: var', 'TKNWITH: with', 'TKNDELETE: delete','TKNDEL: del',
+  'TKNFUNCTION: function', 'TKNFUN: fun', 'TKNDEF: def',
+  'TKNCLASS: class', 'TKNMACRO: macro',
+  'TKNIN: in', 'TKNIS: is', 'TKNIS: unify', 'TKNINSTANCEOF: instanceof', 'TKNTYPEOF: typeof', 'TKNDOF: of',
+  'TKNAND: and', 'TKNNOT: not', 'TKNOR: or'
+  'TKNVOID: void', 'TKNNEW: new', 'TKNDEBUGGER: debugger', 'TKNTHIS: this',
+]
 
 exports.binaryOperator = (solver, cont) ->
   text = solver.parserdata; pos = solver.parsercursor
@@ -41,6 +80,7 @@ exports.binaryOperator = (solver, cont) ->
       if c1=='=' then solver.parsercursor = pos+2; cont(util.le)
       else if c1=='<' then solver.parsercursor = pos+2; cont(util.LSHIFT)
       else solver.parsercursor = pos+1; cont(util.lt)
+    else solver.failcont(pos)
 
 exports.unaryOperator = (solver, cont) ->
   text = solver.parserdata; pos = solver.parsercursor
@@ -76,74 +116,97 @@ exports.suffixOperator = (solver, cont) ->
       else solver.failcont(pos)
     else solver.failcont(pos)
 
-exports.program = (solver, cont) ->
-  text = solver.parserdata; pos = solver.parsercursor
-  length = text.length
-  if pos>=length then return cont(null)
-  else programBody(solver, cont)
+hasOwnProperty = Object.hasOwnProperty
 
-exports.programBody = (solver, cont) ->
-  exps = []
-  while 1
-    stmt = statement(solver, cont)
-    if stmt[0]==sexpression.COMMENT then continue
-    [text, pos] = solver.state
-    if pos==text.length then break
-  if exps.length is 0 then null
-  else exps.unshift sexpression.BEGIN; exps
-
-exports.statement = (solver, cont) ->
-  solver.token = token = readStartToken(solver, cont)
-  switch token
-    when SYM_RETURN then  exp = expression(solver, cont); [util.RETURN, exp]
-    when SYM_PASS then passStatement(solver, cont); undefined
-    when SYM_BLOCKCOMMENT then blockComment(solver, cont)
-    when SYM_LINECOMMENT then lineComment(solver, cont)
-    when SYM_IF
-      orp(andp(testExpression(solver, cont)))
-    else expression(solver, cont)
-
-exports.expression = (solver, cont) ->
-  assignExpr(solver, cont)
-
-class StateMachine
-  constructor = (items=[]) ->
-    @index = 0
+exports.StateMachine = class StateMachine
+  constructor: (items=[]) ->
+    @index = 1
     @stateMap = {}
     @stateMap[0] = {}
     @tagMap = {}
     for item in items then @add(item[0], item[1])
 
-  add = (word, tag) ->
+  add: (word, tag) ->
     length = word.length
-    for c in word[0...length-1]
-      if c in @stateMap[state]
-        state = Math.abs(@stateMap[state][c])
+    state = 0
+    i = 0
+    while i<length-1
+      c = word[i++]
+      if hasOwnProperty.call(@stateMap[state], c)
+        state = @stateMap[state][c]
+        if state < 0 then state = -state
       else
         newState = @index++
         @stateMap[state][c] = newState
         @stateMap[newState] = {}
         state = newState
-    c = word[-1]
-    if c in @stateMap[state]
-      if @stateMap[state][c]>0 then @stateMap[state][c] = -@stateMap[state][c]
+    c = word[i]
+    if hasOwnProperty.call(@stateMap[state], c)
+      s = @stateMap[state][c]
+      if s>0
+        @stateMap[state][c] = -s
+        @tagMap[s] = tag
     else
-      newState = @new_state++
+      newState = @index++
       @stateMap[state][c] = -newState
       @stateMap[newState] = {}
       @tagMap[newState] = tag
 
-  match = (text, i) ->
+  match: (text, i) ->
     state = 0
-    succeedState
-    length = string.length
+    length = text.length
     while i<length
-      c = text[i]
-      state = @stateMap[state][c]
-      if state is null
-        if succeedState then return @tagMap[succeedState]
-        else return null
-      else if state<0
-        i++
-        state = -state
-        succeedState = state
+      state = @stateMap[state][text[i++]]
+      if state is undefined then i--; break
+      else if state<0 then state = -state; succeedState = state; cursor = i
+    if succeedState then return [@tagMap[succeedState], cursor]
+    else return [null, i]
+
+exports.readToken = readToken = (solver) ->
+  tokenStateMachine = solver.tokenStateMachine
+  text = solver.parserdata
+  start = solver.parsercursor
+  result = tokenStateMachine.match(text, start)
+  value = result[0]; cursor = result[1]
+  if value then solver.parsercursor = cursor; value
+  else solver.parsercursor = start; null
+
+binaryOperatorMap = {}
+(binaryOperatorMap[pair[0]] = pair[1]) for pair in [
+  [TKNADD, ADD], [TKNSUB, SUB], [TKNMUL, MUL], [TKNDIV, DIV], [TKNMOD, MOD],
+  [TKNAND, AND], [TKNOR, OR],
+  [TKNBITAND, BITAND], [TKNBITOR, BITOR], [TKNLSHIFT, LSHIFT], [TKNRSHIFT, RSHIFT],
+  [TKNEQ, EQ], [TKNNE, NE], [TKNLT, LT], [TKNLE, LE], [TKNGE, GE], [TKNGT, GT]
+]
+
+exports.binaryOperator = (solver, cont) ->
+  start = solver.parsercursor
+  token =  readToken(solver)
+  op = binaryOperatorMap[token]
+  if op isnt undefined then cont(op)
+  else solver.parsercursor = start; solver.failcont(null)
+
+unaryOperatorMap = {}
+(unaryOperatorMap[pair[0]] = pair[1]) for pair in [
+  [TKNNOT, NOT], [TKNBITNOT, BITNOT], [TKNNEG, NEG], [TKNPOSITIVE, POSITIVE]
+  [TKNINC, INC], [TKNDEC, DEC]
+]
+
+exports.unaryOperator = (solver, cont) ->
+  start = solver.parsercursor
+  token =  readToken(solver)
+  op = unaryOperatorMap[token]
+  if op isnt undefined then cont(op)
+  else  solver.parsercursor = start; solver.failcont(null)
+
+suffixOperatorMap = {}
+(suffixOperatorMap[pair[0]] = pair[1]) for pair in [
+  [TKNINC, INC], [TKNDEC, SUFFIXDEC]
+]
+
+exports.suffixOperator = (solver, cont) ->
+  start = solver.parsercursor
+  token =  readToken(solver)
+  op = suffixOperatorMap[token]
+  if op isnt undefined then cont(op)
+  else  solver.parsercursor = start; solver.failcont(null)
