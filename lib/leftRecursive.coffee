@@ -1,6 +1,4 @@
-ENTER = undefined; EXTEND = 1; REDUCE = 2; DONE = 3
-
-class BaseParser
+exports.BaseParser =  class
   parse: (code, options) ->
     oldText = global.text
     oldTextLength = global.textLength
@@ -80,61 +78,39 @@ class BaseParser
     rule = @[symbol]
     rec = (start) =>
       hash = symbol+start
-      switch memoState[hash]
-        when ENTER
-#          memoState[hash] = REDUCE
-#          memo[hash] = [undefined, start]
+      memoState[hash] = state = memoState[hash] or 0
+      switch state
+        when 0 #enter
+          memoState[hash]++
+          memo[hash] = [undefined, start]
           if result = rule(start)
-            memoState[hash] = EXTEND
             memo[hash] = [result, @cursor]
             rec(start)
           else
-            memoState[hash] = DONE
+            memoState[hash] = -1
             memo[hash] = [undefined, 0]
             undefined
-        when REDUCE
-          m = memo[hash]
-          @cursor = m[1]
-          m[0]
-        when EXTEND
-          memoState[hash] = REDUCE
+        when 1 then memoState[hash]++; undefined #alpha
+        when 2 #extend
+          memoState[hash] = 3
           if result = rule(start)
             memo[hash] = [result, @cursor]
-            memoState[hash] = EXTEND
+            memoState[hash] = 2
             rec(start)
           else
-            memoState[hash] = DONE
+            memoState[hash] = -1
             m = memo[hash]
             @cursor = m[1]
             m[0]
-        when DONE
+        when 3 #reduce
+          m = memo[hash]
+          @cursor = m[1]
+          m[0]
+        when -1  #done
           m = memo[hash]
           @cursor = m[1]
           return m[0]
 
   getmemo: (symbol) -> (position) => memo[symbol+position][0]
   reduce: (symbol) -> (start) -> state = memoState[symbol+start]; state==REDUCE
-  enter: (symbol) -> (start) -> state = memoState[symbol+start]; state==ENTER
-
-class Parser extends BaseParser
-  constructor: () ->
-    @Root = @A = @recursive 'A', @A
-
-  A: (start) =>
-    @A(start) and @char('x')(@cursor) and @getmemo('A')(start)+'x'\
-    or @enter('A')(start) and @char('a')(start)
-
-class Parser extends BaseParser
-  constructor: () ->
-    @A = @recursive 'A'
-    @Root = @A
-
-  A: (start) =>
-    (b = @B(start)) and @char('x')(@cursor) and b+'x'\
-    or @enter('A')(start) and @char('a')(start)
-
-  B: (start) =>
-    @reduce('A')(start) and @A(start)\
-    or @enter('A')(start) and @char('b')(start)
-
-exports.parse = (text) -> new Parser().parse(text)
+  alpha: (symbol) -> (start) -> state = memoState[symbol+start]; state==2   #alpha
