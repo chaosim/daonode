@@ -51,71 +51,6 @@ newToken(x) for x in [
   'TKNVOID: void', 'TKNNEW: new', 'TKNDEBUGGER: debugger', 'TKNTHIS: this',
 ]
 
-exports.binaryOperator = (solver, cont) ->
-  text = solver.parserdata; pos = solver.parsercursor
-  length = text.length
-  if pos>=length then return solver.failcont(pos)
-  c = text[pos]
-  switch c
-    when '+' then solver.parsercursor = pos+1; cont(util.ADD)
-    when '-' then solver.parsercursor = pos+1; cont(util.SUB)
-    when '*' then solver.parsercursor = pos+1; cont(util.MUL)
-    when '/' then solver.parsercursor = pos+1; cont(util.DIV)
-    when '%' then solver.parsercursor = pos+1; cont(util.MOD)
-    when '='
-      c1 = text[pos+1]
-      if c1=='=' then solver.parsercursor = pos+2; cont(util.EQ)
-      else return solver.failcont(pos)
-    when '!'
-      c1 = text[pos+1]
-      if c1=='=' then solver.parsercursor = pos+2; cont(util.NE)
-      else return solver.failcont(pos)
-    when '>'
-      c1 = text[pos+1]
-      if c1=='=' then solver.parsercursor = pos+2; cont(util.GE)
-      else if c1=='>' then solver.parsercursor = pos+2; cont(util.RSHIFT)
-      else solver.parsercursor = pos+1; cont(util.gt)
-    when '<'
-      c1 = text[pos+1]
-      if c1=='=' then solver.parsercursor = pos+2; cont(util.le)
-      else if c1=='<' then solver.parsercursor = pos+2; cont(util.LSHIFT)
-      else solver.parsercursor = pos+1; cont(util.lt)
-    else solver.failcont(pos)
-
-exports.unaryOperator = (solver, cont) ->
-  text = solver.parserdata; pos = solver.parsercursor
-  length = text.length
-  if pos>=length then return solver.failcont(pos)
-  c = text[pos]
-  switch c
-    when '+'
-      c1 = text[pos+1]
-      if c1=='+' then solver.parsercursor = pos+2; cont(util.INC)
-      else solver.parsercursor = pos+1; cont(util.pos)
-    when '-'
-      c1 = text[pos+1]
-      if c1=='+' then solver.parsercursor = pos+2; cont(util.DEC)
-      else solver.parsercursor = pos+1; cont(util.NEG)
-    when '!' then solver.parsercursor = pos+1; cont(util.NOT)
-    when '~' then solver.parsercursor = pos+1; cont(util.BITNOT)
-    else solver.failcont(pos)
-
-exports.suffixOperator = (solver, cont) ->
-  text = solver.parserdata; pos = solver.parsercursor
-  length = text.length
-  if pos>=length then return solver.failcont(pos)
-  c = text[pos]
-  switch c
-    when '+'
-      c1 = text[pos+1]
-      if c1=='+' then solver.parsercursor = pos+2; cont(util.INC)
-      else solver.failcont(pos)
-    when '-'
-      c1 = text[pos+1]
-      if c1=='+' then solver.parsercursor = pos+2; cont(util.DEC)
-      else solver.failcont(pos)
-    else solver.failcont(pos)
-
 hasOwnProperty = Object.hasOwnProperty
 
 exports.StateMachine = class StateMachine
@@ -162,40 +97,40 @@ exports.StateMachine = class StateMachine
     if succeedState then return [@tagMap[succeedState], cursor]
     else return [null, i]
 
-exports.readToken = readToken = (solver) ->
+exports.readToken = readToken = (text, start) ->
   tokenStateMachine = solver.tokenStateMachine
   text = solver.parserdata
   start = solver.parsercursor
   result = tokenStateMachine.match(text, start)
   value = result[0]; cursor = result[1]
-  if value then solver.parsercursor = cursor; value
+  if value then solver.parsercursor = cursor; [value, cursor]
   else solver.parsercursor = start; null
 
-binaryOperatorMap = {}
-(binaryOperatorMap[pair[0]] = pair[1]) for pair in [
+BinaryOperatorMap = {}
+(BinaryOperatorMap[pair[0]] = pair[1]) for pair in [
   [TKNADD, ADD], [TKNSUB, SUB], [TKNMUL, MUL], [TKNDIV, DIV], [TKNMOD, MOD],
   [TKNAND, AND], [TKNOR, OR],
   [TKNBITAND, BITAND], [TKNBITOR, BITOR], [TKNLSHIFT, LSHIFT], [TKNRSHIFT, RSHIFT],
   [TKNEQ, EQ], [TKNNE, NE], [TKNLT, LT], [TKNLE, LE], [TKNGE, GE], [TKNGT, GT]
 ]
 
-exports.binaryOperator = (solver, cont) ->
+exports.BinaryOperator = (solver, cont) ->
   start = solver.parsercursor
   token =  readToken(solver)
-  op = binaryOperatorMap[token]
+  op = BinaryOperatorMap[token]
   if op isnt undefined then cont(op)
   else solver.parsercursor = start; solver.failcont(null)
 
-unaryOperatorMap = {}
-(unaryOperatorMap[pair[0]] = pair[1]) for pair in [
+UnaryOperatorMap = {}
+(UnaryOperatorMap[pair[0]] = pair[1]) for pair in [
   [TKNNOT, NOT], [TKNBITNOT, BITNOT], [TKNNEG, NEG], [TKNPOSITIVE, POSITIVE]
   [TKNINC, INC], [TKNDEC, DEC]
 ]
 
-exports.unaryOperator = (solver, cont) ->
+exports.UnaryOperator = (solver, cont) ->
   start = solver.parsercursor
   token =  readToken(solver)
-  op = unaryOperatorMap[token]
+  op = UnaryOperatorMap[token]
   if op isnt undefined then cont(op)
   else  solver.parsercursor = start; solver.failcont(null)
 
@@ -252,3 +187,459 @@ nextToken = (solver, cont) ->
     when '\r','\n' #indent and unindent
       newlineIndent(text, cursor, solver)
     else symbolToken(text, cursor)
+
+# on succeed any matcher should not return result is not null or undefined, except the root symbol.
+
+orp = (exps) -> (start) ->
+  length = exps.length
+  i = 0
+  while i<length
+    x = exps(start)
+    if x? then return x
+
+andp = (exps) -> (start) ->
+  length = exps.length
+  i = 0
+  cursor = start
+  while i<length
+    x = exps(cursor)
+    if not x? then return
+  return x
+
+notp = (exp) -> (start) ->
+  x = exp(start)
+  if not x? then return true
+  return
+
+char = (c) -> (start) ->
+  if text[start]==c then cursor = start+1; return true
+
+literal = (string) -> (start) ->
+  len = string.length
+  if text.slice(start,  stop = start+len)==string then cursor = stop; return true
+
+keyword = (string) -> (start) ->
+  len = string.length
+  if text.slice(start, stop = start+len)==string and not text[stop2= stop+1].match /^[A-Za-z]/
+    cursor = stop2; return true
+
+spaces = (start) ->
+  len = 0
+  cursor = start
+  while 1
+    switch text[cursor]
+     when ' ' then len++
+     when '\t' then len += tabWidth
+     else break
+  return len
+
+spaces1 = (start) ->
+  len = 0
+  cursor = start
+  while 1
+    switch text[cursor]
+      when ' ' then len++
+      when '\t' then len += tabWidth
+      else break
+  if len then return len
+
+exports.parse = (element, text, tabWidth=4) ->
+  global.text = text
+  global.cursor = 0
+  global.tokens = []
+  global.memo = {}
+  global.indentList = []
+  global.tabWidth = tabWidth
+  rules[element](0)
+
+rules = {
+Root: (start) ->
+  if start is textLength then null
+  else rules.Body(start)
+
+Body: (start) ->
+  cursor = start
+  exps = []
+  while 1
+    x = rules.Statement(start)
+    if x instanceof Comment then continue
+    else if cursor is textLength then return begin(exps...)
+    else exps.push Statement()
+
+Statement: #(start) ->
+  orp(rules.Comment, rules.Return, rules.Expression)#(start)
+
+Expression: #(start) ->
+  orp(rules.If, rules.Try, rules.For, rules.While, rules.Throw, rules.Class, rules.Switch,
+     rules.Value, rules.Invocation, rules.FunctionDef, rules.Operation)#(start)
+
+#  Value  Invocation FunctionDef Operation Assign If Try While For Switch Class Throw
+
+Block: #(start) ->
+  andp(indent, rules.Body, dedent) #(start)
+
+Literal: #(start) ->
+  orp(rules.KeywordLiteral, rules.RawJS, rules.String, rules.Alpha, rules.Number, rules.JSRegex)#(start)
+
+KeywordLiteral:(start) ->
+  if text.slice(start, start+2) == 'true' then return new Literal(true)
+  s = text.slice(start, start+4)
+  if s == 'null' then return new Literal(null)
+  if s == 'true' then return new Literal(true)
+  s = text.slice(start, start+5)
+  if s == 'false' then return new Literal(false)
+  if text.slice(start, start+7) == 'debugger' then return new Literal('debugger')
+  s = text.slice(start, start+9)
+  if s == 'undefined' then return new Literal(undefined)
+
+Assign: (start) ->
+  left = rules.Assignable(start)
+  if left is null then return
+  if rules.wrapSpaces('=')(cursor) is null then return
+  if newline(cursor) is null then exp = rules.Expression(cursor)
+  else
+    if indent() is null then return
+    exp = rules.Expression(cursor)
+    if dedent() is null then return
+  return assign(left, exp)
+
+AssignObj: #(start) ->
+  orp(rules.Comment, AssignObjClause) #(start)
+
+AssignObjClause: (start) ->
+  left = rules.ObjAssignable(start)
+  if left is null then return
+  andp(spaces, char(':'), spaces)(cursor)
+  if indent(cursor) is null then exp = rules.Expression(cursor)
+  else
+    if (exp = rules.Expression(cursor)) isnt null
+      dedent(cursor)
+  [left, exp]
+
+ObjAssignable:
+  orp(rules.Identifier, rules.Alpha, rules.Numberic, rules.ThisProperty)
+
+Return: (start) ->
+  if keyword('return')(start) and spaces(cursor)
+    if exp=rules.Expression(cursor) then util.return_(exp)
+    else util.return_()
+
+Comment: (start) ->
+  spaces(start); char('#')(cursor); string = matchToNewLine(cursor); return new Comment(string)
+
+FunctionDef: (start) ->
+  params = rules.Parameters(start)
+  wrapped(rules.FuncGlyph)(cursor)
+  body = Block(cursor)
+  util.lamda(params, body)
+
+FuncGlyph: (start) ->
+  if literal('->')(start) then 'func'
+  else if literal('=>')(start) then 'boundfunc'
+
+Parameters: (start) ->
+  x = wrap(ParamList, leftParen, rightParen)
+  if x? then x else []
+
+ParameterList: (start) ->
+  result = []
+  spaces(curosr)
+  while 1
+    exp = rules.Param(cursor)
+    orp(wrapped(char(',')),
+        andp(may(wrapped(char(','))), newline))(curosr) #todo indent ParamList
+    if exp? then result.push(exp)
+    else breaks
+  return []
+
+Param: (start) ->
+  v = rules.ParamVar(start)
+  if v
+    if wrap('...')(cursor) then return new Param $1, null, on
+    else
+      if v2 = andp(wrap('='), rules.Expression)  then new Param $1, $3
+  o 'ParamVar',                               -> new Param $1
+  o 'ParamVar ...',                           -> new Param $1, null, on
+  o 'ParamVar = Expression',                  -> new Param $1, $3
+
+ParamVar: [
+  o 'Identifier'
+  o 'ThisProperty'
+  o 'Array'
+  o 'Object'
+]
+Splat: [
+  o 'Expression ...',                         -> new Splat $1
+]
+SimpleAssignable: [
+  o 'Identifier',                             -> new Value $1
+  o 'Value Accessor',                         -> $1.add $2
+  o 'Invocation Accessor',                    -> new Value $1, [].concat $2
+  o 'ThisProperty'
+]
+Assignable: [
+  o 'SimpleAssignable'
+  o 'Array',                                  -> new Value $1
+  o 'Object',                                 -> new Value $1
+]
+Value: [
+  o 'Assignable'
+  o 'Literal',                                -> new Value $1
+  o 'Parenthetical',                          -> new Value $1
+  o 'Range',                                  -> new Value $1
+  o 'This'
+]
+Accessor: [
+  o '.  Identifier',                          -> new Access $2
+  o '?. Identifier',                          -> new Access $2, 'soak'
+  o ':: Identifier',                          -> [LOC(1)(new Access new Literal('prototype')), LOC(2)(new Access $2)]
+  o '?:: Identifier',                         -> [LOC(1)(new Access new Literal('prototype'), 'soak'), LOC(2)(new Access $2)]
+  o '::',                                     -> new Access new Literal 'prototype'
+  o 'Index'
+]
+Index: [
+  o 'INDEX_START IndexValue INDEX_END',       -> $2
+  o 'INDEX_SOAK  Index',                      -> extend $2, soak : yes
+]
+IndexValue: [
+  o 'Expression',                             -> new Index $1
+  o 'Slice',                                  -> new Slice $1
+]
+Object: [
+  o '{ AssignList OptComma }',                -> new Obj $2, $1.generated
+]
+AssignList: [
+  o '',                                                       -> []
+  o 'AssignObj',                                              -> [$1]
+  o 'AssignList , AssignObj',                                 -> $1.concat $3
+  o 'AssignList OptComma TERMINATOR AssignObj',               -> $1.concat $4
+  o 'AssignList OptComma INDENT AssignList OptComma OUTDENT', -> $1.concat $4
+]
+Class: [
+  o 'CLASS',                                           -> new Class
+  o 'CLASS Block',                                     -> new Class null, null, $2
+  o 'CLASS EXTENDS Expression',                        -> new Class null, $3
+  o 'CLASS EXTENDS Expression Block',                  -> new Class null, $3, $4
+  o 'CLASS SimpleAssignable',                          -> new Class $2
+  o 'CLASS SimpleAssignable Block',                    -> new Class $2, null, $3
+  o 'CLASS SimpleAssignable EXTENDS Expression',       -> new Class $2, $4
+  o 'CLASS SimpleAssignable EXTENDS Expression Block', -> new Class $2, $4, $5
+]
+Invocation: [
+  o 'Value OptFuncExist Arguments',           -> new Call $1, $3, $2
+  o 'Invocation OptFuncExist Arguments',      -> new Call $1, $3, $2
+  o 'SUPER',                                  -> new Call 'super', [new Splat new Literal 'arguments']
+  o 'SUPER Arguments',                        -> new Call 'super', $2
+]
+OptFuncExist: [
+  o '',                                       -> no
+  o 'FUNC_EXIST',                             -> yes
+]
+Arguments: [
+  o 'CALL_START CALL_END',                    -> []
+  o 'CALL_START ArgList OptComma CALL_END',   -> $2
+]
+This: [
+  o 'THIS',                                   -> new Value new Literal 'this'
+  o '@',                                      -> new Value new Literal 'this'
+]
+ThisProperty: [
+  o '@ Identifier',                           -> new Value LOC(1)(new Literal('this')), [LOC(2)(new Access($2))], 'this'
+]
+Array: [
+  o '[ ]',                                    -> new Arr []
+  o '[ ArgList OptComma ]',                   -> new Arr $2
+]
+RangeDots: [
+  o '..',                                     -> 'inclusive'
+  o '...',                                    -> 'exclusive'
+]
+Range: [
+  o '[ Expression RangeDots Expression ]',    -> new Range $2, $4, $3
+]
+Slice: [
+  o 'Expression RangeDots Expression',        -> new Range $1, $3, $2
+  o 'Expression RangeDots',                   -> new Range $1, null, $2
+  o 'RangeDots Expression',                   -> new Range null, $2, $1
+  o 'RangeDots',                              -> new Range null, null, $1
+]
+ArgList: [
+  o 'Arg',                                              -> [$1]
+  o 'ArgList , Arg',                                    -> $1.concat $3
+  o 'ArgList OptComma TERMINATOR Arg',                  -> $1.concat $4
+  o 'INDENT ArgList OptComma OUTDENT',                  -> $2
+  o 'ArgList OptComma INDENT ArgList OptComma OUTDENT', -> $1.concat $4
+]
+Arg: [
+  o 'Expression'
+  o 'Splat'
+]
+SimpleArgs: [
+  o 'Expression'
+  o 'SimpleArgs , Expression',                -> [].concat $1, $3
+]
+Try: [
+  o 'TRY Block',                              -> new Try $2
+  o 'TRY Block Catch',                        -> new Try $2, $3[0], $3[1]
+  o 'TRY Block FINALLY Block',                -> new Try $2, null, null, $4
+  o 'TRY Block Catch FINALLY Block',          -> new Try $2, $3[0], $3[1], $5
+]
+Catch: [
+  o 'CATCH Identifier Block',                 -> [$2, $3]
+  o 'CATCH Object Block',                     -> [LOC(2)(new Value($2)), $3]
+  o 'CATCH Block',                            -> [null, $2]
+]
+Throw: [
+  o 'THROW Expression',                       -> new Throw $2
+]
+Parenthetical: [
+  o '( Body )',                               -> new Parens $2
+  o '( INDENT Body OUTDENT )',                -> new Parens $3
+]
+WhileSource: [
+  o 'WHILE Expression',                       -> new While $2
+  o 'WHILE Expression WHEN Expression',       -> new While $2, guard: $4
+  o 'UNTIL Expression',                       -> new While $2, invert: true
+  o 'UNTIL Expression WHEN Expression',       -> new While $2, invert: true, guard: $4
+]
+While: [
+  o 'WhileSource Block',                      -> $1.addBody $2
+  o 'Statement  WhileSource',                 -> $2.addBody LOC(1) Block.wrap([$1])
+  o 'Expression WhileSource',                 -> $2.addBody LOC(1) Block.wrap([$1])
+  o 'Loop',                                   -> $1
+]
+Loop: [
+  o 'LOOP Block',                             -> new While(LOC(1) new Literal 'true').addBody $2
+  o 'LOOP Expression',                        -> new While(LOC(1) new Literal 'true').addBody LOC(2) Block.wrap [$2]
+]
+For: [
+  o 'Statement  ForBody',                     -> new For $1, $2
+  o 'Expression ForBody',                     -> new For $1, $2
+  o 'ForBody    Block',                       -> new For $2, $1
+]
+ForBody: [
+  o 'FOR Range',                              -> source: LOC(2) new Value($2)
+  o 'ForStart ForSource',                     -> $2.own = $1.own; $2.name = $1[0]; $2.index = $1[1]; $2
+]
+ForStart: [
+  o 'FOR ForVariables',                       -> $2
+  o 'FOR OWN ForVariables',                   -> $3.own = yes; $3
+]
+ForValue: [
+  o 'Identifier'
+  o 'ThisProperty'
+  o 'Array',                                  -> new Value $1
+  o 'Object',                                 -> new Value $1
+]
+ForVariables: [
+  o 'ForValue',                               -> [$1]
+  o 'ForValue , ForValue',                    -> [$1, $3]
+]
+ForSource: [
+  o 'FORIN Expression',                               -> source: $2
+  o 'FOROF Expression',                               -> source: $2, object: yes
+  o 'FORIN Expression WHEN Expression',               -> source: $2, guard: $4
+  o 'FOROF Expression WHEN Expression',               -> source: $2, guard: $4, object: yes
+  o 'FORIN Expression BY Expression',                 -> source: $2, step:  $4
+  o 'FORIN Expression WHEN Expression BY Expression', -> source: $2, guard: $4, step: $6
+  o 'FORIN Expression BY Expression WHEN Expression', -> source: $2, step:  $4, guard: $6
+]
+Switch: [
+  o 'SWITCH Expression INDENT Whens OUTDENT',            -> new Switch $2, $4
+  o 'SWITCH Expression INDENT Whens ELSE Block OUTDENT', -> new Switch $2, $4, $6
+  o 'SWITCH INDENT Whens OUTDENT',                       -> new Switch null, $3
+  o 'SWITCH INDENT Whens ELSE Block OUTDENT',            -> new Switch null, $3, $5
+]
+Whens: [
+  o 'When'
+  o 'Whens When',                             -> $1.concat $2
+]
+When: [
+  o 'LEADING_WHEN SimpleArgs Block',            -> [[$2, $3]]
+  o 'LEADING_WHEN SimpleArgs Block TERMINATOR', -> [[$2, $3]]
+]
+IfBlock: [
+  o 'IF Expression Block',                    -> new If $2, $3, type: $1
+  o 'IfBlock ELSE IF Expression Block',       -> $1.addElse LOC(3,5) new If $4, $5, type: $3
+]
+If: [
+  o 'IfBlock'
+  o 'IfBlock ELSE Block',                     -> $1.addElse $3
+  o 'Statement  POST_IF Expression',          -> new If $3, LOC(1)(Block.wrap [$1]), type: $2, statement: true
+  o 'Expression POST_IF Expression',          -> new If $3, LOC(1)(Block.wrap [$1]), type: $2, statement: true
+]
+Operation: [
+  o 'UNARY Expression',                       -> new Op $1 , $2
+  o '-     Expression',                      (-> new Op '-', $2), prec: 'UNARY'
+  o '+     Expression',                      (-> new Op '+', $2), prec: 'UNARY'
+
+  o '-- SimpleAssignable',                    -> new Op '--', $2
+  o '++ SimpleAssignable',                    -> new Op '++', $2
+  o 'SimpleAssignable --',                    -> new Op '--', $1, null, true
+  o 'SimpleAssignable ++',                    -> new Op '++', $1, null, true
+
+  # [The existential operator](http://jashkenas.github.com/coffee-script/#existence).
+  o 'Expression ?',                           -> new Existence $1
+
+  o 'Expression +  Expression',               -> new Op '+' , $1, $3
+  o 'Expression -  Expression',               -> new Op '-' , $1, $3
+
+  o 'Expression MATH     Expression',         -> new Op $2, $1, $3
+  o 'Expression SHIFT    Expression',         -> new Op $2, $1, $3
+  o 'Expression COMPARE  Expression',         -> new Op $2, $1, $3
+  o 'Expression LOGIC    Expression',         -> new Op $2, $1, $3
+  o 'Expression RELATION Expression',         ->
+    if $2.charAt(0) is '!'
+      new Op($2[1..], $1, $3).invert()
+    else
+      new Op $2, $1, $3
+
+  o 'SimpleAssignable COMPOUND_ASSIGN
+                 Expression',                             -> new Assign $1, $3, $2
+  o 'SimpleAssignable COMPOUND_ASSIGN
+                 INDENT Expression OUTDENT',              -> new Assign $1, $4, $2
+  o 'SimpleAssignable COMPOUND_ASSIGN TERMINATOR
+                 Expression',                             -> new Assign $1, $4, $2
+  o 'SimpleAssignable EXTENDS Expression',    -> new Extends $1, $3
+]
+
+Binary: (start) ->
+  "Binary: Unary | Binary+Unary"
+  hash = 'Binary'+start
+  m = memo[hash]
+  if m is null
+    memo[hash] = rules.Unary(start)
+    return rules.Binary(start)
+  if text[cursor]!='+' then delete memo[hash]; return m
+  cursor++
+  a = rules.Unary(cursor)
+  if a is null then delete memo[hash]; return m
+  memo[hash] = m+a;
+  return rules.Binary(start)
+
+Unary: (start) ->
+  "Unary: +Unary | -Unary | Atom | Atom++ | Atom--"
+  c = text[cursor]
+  switch c
+    when '+'
+      cursor++;
+      if text[cursor]=='+' then cursor++; rules.Unary(cursor)+1;
+      else rules.Unary(cursor)
+    when '-'
+      cursor++;
+      if text[cursor]=='-' then cursor++; rules.Unary(cursor)-1
+      else -rules.Unary(cursor)
+    else
+      x = rules.Atom(start)
+      if text[cursor]=='+' and text[cursor+1]=='+' then cursor+=2; x+1
+      else if text[cursor]=='-' and text[cursor+1]=='-' then cursor+=2; x-1
+      else x
+
+Atom: (start) ->
+  "Atom: 1 | ( Binary )"
+  switch text[cursor]
+    when '1' then cursor++; 1
+    when '(' then cursor++; exp = rules.Binary(cursor); match(')'); exp
+    when '[' then cursor++; exp = rules.Expression(cursor); match(')'); exp
+
+}
