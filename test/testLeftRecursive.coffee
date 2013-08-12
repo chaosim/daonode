@@ -1,47 +1,47 @@
-{BaseParser, set, get} = require "../lib/leftrecursive.js"
+{addRecCircles, setMemoRules, memo, char, cur} = parser = p  = require "../lib/leftrecursive.js"
+
+a = char('a'); b = char('b'); x = char('x')
+memoA = memo('A'); memoB = memo('B')
+
+parse1 = (text) ->
+  rules =
+    A: (start) ->
+      (m = memoA(start)) and x(p.cur()) and m+'x'\
+      or m\
+      or a(start)
+  parser.clear()
+  addRecCircles(['A'])
+  setMemoRules(rules)
+  parser.parse(text, rules['A'])
+
+parse2 = (text) ->
+  rules =
+    A: (start) =>
+      (m = memoB(start)) and x(p.cur()) and m+'x'\
+      or m\
+      or a(start)
+
+    B: (start) ->
+      memoA(start)\
+      or b(start)
+  addRecCircles(['A', 'B'])
+  setMemoRules(rules)
+  parser.parse(text, rules['A'])
 
 xexports = {}
 
-class Parser1 extends BaseParser
-  constructor: () ->
-    super
-    @addRecCircles(['A'])
-    @setMemoRules()
-    @Root = @A
-
-  A: (start) =>
-    (memo = @memo('A')(start)) and @char('x')(@cursor) and memo+'x'\
-    or memo\
-    or @char('a')(start)
-
-class Parser2 extends BaseParser
-  constructor: () ->
-    super
-    @addRecCircles(['A', 'B'])
-    @setMemoRules()
-    @Root = @A
-
-  A: (start) =>
-    (memo = @memo('B')(start)) and @char('x')(@cursor) and memo+'x'\
-    or memo\
-    or @char('a')(start)
-
-  B: (start) =>
-    @memo('A')(start)\
-    or @char('b')(start)
-
 exports.Test =
   "test A: Ax|a": (test) ->
-    parse = (text) -> new Parser1().parse(text)
+    parse = parse1
     test.equal parse('a'), 'a'
     test.equal parse('ax'), 'ax'
     test.equal parse('axx'), 'axx'
     test.equal parse('axxx'), 'axxx'
     test.done()
 
-exports.Test =
+#xexports.Test =
   "test A: Bx|a; B:A|b": (test) ->
-    parse = (text) -> new Parser2().parse(text)
+    parse = parse2
     test.equal parse('a'), 'a'
     test.equal parse('ax'), 'ax'
     test.equal parse('axx'), 'axx'
