@@ -1,12 +1,14 @@
 exports.BaseParser =  class
+  constructor: () ->
+    @symbolToParentsMap = {}
+    @baseRules = {}
+
   parse: (code, options) ->
     @text = code
     @textLength = code.length
     @cursor = 0
     @tokens = []
     @_memo = {}
-    @memoState = {}
-    @lookDepth = {}
     @indentList = []
     @tabWidth = 4
     @yy = @yy
@@ -60,32 +62,70 @@ exports.BaseParser =  class
     if left(start) and result = item(@cursor) and right(@cursor)
       return result
 
-  recursive: (symbol) ->
-    rule = @[symbol]
+  addParentChildrens: (parentChildrens...) ->
+    map = @symbolToParentsMap
+    for parentChildren in parentChildrens
+      for parent, children of parentChildren
+        for name in children
+          list = map[name] ?= []
+          if parent isnt name and parent not in list then list.push parent
+
+  addRecCircles: (recursiveCircles...) ->
+    map = @symbolToParentsMap
+    for circle in recursiveCircles
+      i = 0
+      length = circle.length
+      while i<length
+        if i==length-1 then j = 0 else j = i+1
+        name = circle[i]
+        list = map[name] ?= []
+        parent = circle[j]
+        if parent isnt name and parent not in list then list.push parent
+        i++
+
+  setMemoRules: () ->
+    map = @symbolToParentsMap
+    for name of map
+      @baseRules[name] = @[name]
+      @[name] = @memoRule(name)
+
+  memoRule: (symbol) ->
+    map = @symbolToParentsMap
+    agenda = []
+    addParent = (parent) ->
+      agenda.unshift(parent)
+      parents =  map[parent]
+      if parents then for parent in parents
+        if parent not in agenda
+          agenda.unshift(parent)
+          addParent(parent)
+    addParent(symbol)
     (start) =>
-      hash = symbol+start
       memo = @_memo
-      m = memo[hash]
-      if not m then m = memo[hash] = [undefined, start]
-      while 1
-        if (result = rule(start)) and (result isnt m[0] or @cursor isnt m[1])
-          memo[hash] = m = [result, @cursor]
-        else
-          return result
+      hash0 = symbol+start
+      m = memo[hash0]
+      if m then @cursor = m[1]; return m[0]
+      while agenda.length
+        symbol = agenda.pop()
+        hash = symbol+start
+        m = memo[hash]
+        if not m then m = memo[hash] = [undefined, start]
+        rule = @baseRules[symbol]
+        changed = false
+        while 1
+          if (result = rule(start)) and (result isnt m[0] or @cursor isnt m[1])
+            memo[hash] = m = [result, @cursor]
+            changed = true
+          else break
+        if changed then for parent in map[symbol]
+          if parent not in agenda then agenda.push parent
+      m = memo[hash0]
+      @cursor = m[1]
+      m[0]
 
-  look: (symbol) -> (start) =>
-    rule = @[symbol]
-    hash = symbol+start
-    memo = @_memo
-    m = memo[hash]
-    memoState = @memoState
-    while 1
-      state = memoState[hash] = not memoState[hash]
-      if state then rule(start)
-      m1 = memo[hash]
-      if m1 is m then return m[0]
-      else m = m1
-
-  memo: (symbol) -> (position) =>
-    m = @_memo[symbol+position]
+  memo: (symbol) -> (start) =>
+    m = @_memo[symbol+start]
     if m then @cursor = m[1]; m[0]
+
+
+
