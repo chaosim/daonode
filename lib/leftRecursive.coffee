@@ -1,32 +1,16 @@
 exports.BaseParser =  class
   parse: (code, options) ->
-    oldText = global.text
-    oldTextLength = global.textLength
-    oldTokens = global.tokens
-    oldMemo = global.memo
-    oldMemoState = global.memoState
-    oldIndentList = global.indentList
-    oldyy = global.yy
-
-    global.text = code
-    global.textLength = code.length
+    @text = code
+    @textLength = code.length
     @cursor = 0
-    global.tokens = []
-    global.memo = {}
-    global.memoState = {}
-    global.indentList = []
+    @tokens = []
+    @_memo = {}
+    @memoState = {}
+    @lookDepth = {}
+    @indentList = []
     @tabWidth = 4
-    global.yy = @yy
-    result =  @Root(0)
-
-    global.text = oldText
-    global.textLength = oldTextLength
-    global.tokens = oldTokens
-    global.memo = oldMemo
-    global.memoState = oldMemoState
-    global.indentList = oldIndentList
-
-    return result
+    @yy = @yy
+    return  @Root(0)
 
   andp: (exps) -> (start) =>
     @cursor = start
@@ -44,15 +28,16 @@ exports.BaseParser =  class
     else return true
 
   char: (c) -> (start) =>
-    if text[start]==c then @cursor = start+1; return c
+    if @text[start]==c then @cursor = start+1; return c
 
   literal: (string) -> (start) =>
     len = string.length
-    if text.slice(start,  stop = start+len)==string then @cursor = stop; return true
+    if @text.slice(start,  stop = start+len)==string then @cursor = stop; return true
 
   spaces: (start) ->
     len = 0
     @cursor = start
+    text = @text
     while 1
       switch text[@cursor]
         when ' ' then len++
@@ -62,13 +47,14 @@ exports.BaseParser =  class
 
   spaces1: (start) ->
     len = 0
-    @cursor = start
+    cursor = start
+    text = @text
     while 1
-      switch text[@cursor]
+      switch text[cursor++]
         when ' ' then len++
         when '\t' then len += tabWidth
         else break
-    if len then return len
+    if len then return @cursor = cursor; len
 
   wrap: (item, left=spaces, right=spaces) -> (start) ->
     if left(start) and result = item(@cursor) and right(@cursor)
@@ -76,41 +62,30 @@ exports.BaseParser =  class
 
   recursive: (symbol) ->
     rule = @[symbol]
-    rec = (start) =>
+    (start) =>
       hash = symbol+start
-      memoState[hash] = state = memoState[hash] or 0
-      switch state
-        when 0 #enter
-          memoState[hash]++
-          memo[hash] = [undefined, start]
-          if result = rule(start)
-            memo[hash] = [result, @cursor]
-            rec(start)
-          else
-            memoState[hash] = -1
-            memo[hash] = [undefined, 0]
-            undefined
-        when 1 then memoState[hash]++; undefined #alpha
-        when 2 #extend
-          memoState[hash] = 3
-          if result = rule(start)
-            memo[hash] = [result, @cursor]
-            memoState[hash] = 2
-            rec(start)
-          else
-            memoState[hash] = -1
-            m = memo[hash]
-            @cursor = m[1]
-            m[0]
-        when 3 #reduce
-          m = memo[hash]
-          @cursor = m[1]
-          m[0]
-        when -1  #done
-          m = memo[hash]
-          @cursor = m[1]
-          return m[0]
+      memo = @_memo
+      m = memo[hash]
+      if not m then m = memo[hash] = [undefined, start]
+      while 1
+        if (result = rule(start)) and (result isnt m[0] or @cursor isnt m[1])
+          memo[hash] = m = [result, @cursor]
+        else
+          return result
 
-  getmemo: (symbol) -> (position) => memo[symbol+position][0]
-  reduce: (symbol) -> (start) -> state = memoState[symbol+start]; state==REDUCE
-  alpha: (symbol) -> (start) -> state = memoState[symbol+start]; state==2   #alpha
+  look: (symbol) -> (start) =>
+    rule = @[symbol]
+    hash = symbol+start
+    memo = @_memo
+    m = memo[hash]
+    memoState = @memoState
+    while 1
+      state = memoState[hash] = not memoState[hash]
+      if state then rule(start)
+      m1 = memo[hash]
+      if m1 is m then return m[0]
+      else m = m1
+
+  memo: (symbol) -> (position) =>
+    m = @_memo[symbol+position]
+    if m then @cursor = m[1]; m[0]

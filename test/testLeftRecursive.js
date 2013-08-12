@@ -17,9 +17,9 @@
     }
 
     Parser1.prototype.A = function(start) {
-      var a;
+      var memo;
 
-      return (a = this.A(start)) && this.char('x')(this.cursor) && a + 'x' || this.alpha('A')(start) && this.char('a')(start);
+      return (memo = this.memo('A')(start)) && this.char('x')(this.cursor) && memo + 'x' || memo || this.char('a')(start);
     };
 
     return Parser1;
@@ -32,17 +32,18 @@
     function Parser2() {
       this.B = __bind(this.B, this);
       this.A = __bind(this.A, this);      this.A = this.recursive('A');
+      this.B = this.recursive('B');
       this.Root = this.A;
     }
 
     Parser2.prototype.A = function(start) {
-      var b;
+      var memo;
 
-      return (b = this.B(start)) && this.char('x')(this.cursor) && b + 'x' || this.alpha('A')(start) && this.char('a')(start);
+      return (memo = this.look('B')(start)) && this.char('x')(this.cursor) && memo + 'x' || memo || this.char('a')(start);
     };
 
     Parser2.prototype.B = function(start) {
-      return this.A(start) || this.alpha('A')(start) && this.char('b')(start);
+      return this.look('A')(start) || this.char('b')(start);
     };
 
     return Parser2;

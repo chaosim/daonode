@@ -7,21 +7,24 @@ class Parser1 extends BaseParser
     @Root = @A = @recursive 'A', @A
 
   A: (start) =>
-    (a = @A(start)) and @char('x')(@cursor) and a+'x'\
-    or @alpha('A')(start) and @char('a')(start)
+    (memo = @memo('A')(start)) and @char('x')(@cursor) and memo+'x'\
+    or memo\
+    or @char('a')(start)
 
 class Parser2 extends BaseParser
   constructor: () ->
     @A = @recursive 'A'
+    @B = @recursive 'B'
     @Root = @A
 
   A: (start) =>
-    (b = @B(start)) and @char('x')(@cursor) and b+'x'\
-    or @alpha('A')(start) and @char('a')(start)
+    (memo = @look('B')(start)) and @char('x')(@cursor) and memo+'x'\
+    or memo\
+    or @char('a')(start)
 
   B: (start) =>
-    @A(start)\
-    or  @alpha('A')(start) and @char('b')(start)
+    @look('A')(start)\
+    or @char('b')(start)
 
 exports.Test =
   "test A: Ax|a": (test) ->
