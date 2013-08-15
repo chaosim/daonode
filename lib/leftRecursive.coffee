@@ -1,10 +1,17 @@
 symbolToParentsMap = {}
+rules = undefined
 baseRules = {}
+recursiveRules = {}
+memoCallpath = {}
 _memo = {}
 text = ''
 textLength = 0
 cursor = 0
 _memo = {}
+_memo2 = {}
+
+exports.setRules = (rules1) ->
+  rules = rules1
 
 exports.clear = () ->
   baseRules = {}
@@ -65,69 +72,47 @@ exports.wrap = (item, left=spaces, right=spaces) -> (start) ->
   if left(start) and result = item(cursor) and right(cursor)
     return result
 
-exports.addParentChildrens = (parentChildrens...) ->
-  map = symbolToParentsMap
-  for parentChildren in parentChildrens
-    for parent, children of parentChildren
-      for name in children
-        list = map[name] ?= []
-        if parent isnt name and parent not in list then list.push parent
+exports.setRecursiveSymbols = (rules1, symbols...) ->
+  rules = rules1
+  for symbol in symbols
+    baseRules[symbol] = rules[symbol]
+    rules[symbol] = recursiveRules[symbol] = recursive(symbol)
 
-exports.addRecCircles = (recursiveCircles...) ->
-  map = symbolToParentsMap
-  for circle in recursiveCircles
-    i = 0
-    length = circle.length
-    while i<length
-      if i==length-1 then j = 0 else j = i+1
-      name = circle[i]
-      list = map[name] ?= []
-      parent = circle[j]
-      if parent isnt name and parent not in list then list.push parent
-      i++
-
-exports.setMemoRules= (rules) ->
-  map = symbolToParentsMap
-  for name of map
-    baseRules[name] = rules[name]
-    rules[name] = memoRule(name)
-
-exports.memoRule = memoRule = (symbol) ->
-  map = symbolToParentsMap
-  agenda = []
-  addParent = (parent) ->
-    agenda.unshift(parent)
-    parents =  map[parent]
-    if parents then for parent in parents
-      if parent not in agenda
-        agenda.unshift(parent)
-        addParent(parent)
-  addParent(symbol)
+exports.recursive = recursive = (symbol) ->
+  baserule = baseRules[symbol]
   (start) ->
-    memo = @_memo
-    hash0 = symbol+start
-    m = _memo[hash0]
-    if m then cursor = m[1]; return m[0]
-    while agenda.length
-      symbol = agenda.pop()
+    hash = symbol+start
+    callpath = memoCallpath[start] ?= [symbol]
+    m = _memo[hash] ?= [undefined, -1]
+    if m[1]>=0 then cursor = m[1]; return m[0]
+    m[0] = baserule(start); m[1] = cursor
+    while 1
+      symbol = callpath.pop()
       hash = symbol+start
-      m = _memo[hash]
-      if not m then m = _memo[hash] = [undefined, start]
-      rule = baseRules[symbol]
-      changed = false
-      while 1
-        if (result = rule(start)) and (result isnt m[0] or cursor isnt m[1])
-          _memo[hash] = m = [result, cursor]
-          changed = true
-        else break
-      if changed then for parent in map[symbol]
-        if parent not in agenda then agenda.push parent
-    m = _memo[hash0]
-    cursor = m[1]
-    m[0]
+      m = _memo[hash] ?= [undefined, -1]
+      baserule = baseRules[symbol]
+      result = baserule(start)
+      if symbol in callpath and not result
+#        callpath.pop()
+        cursor = m[1]; return m[0]
+      if m[0] and not result then cursor = m[1]; return m[0]
+      if result==m[0] and cursor==m[1]
+#        callpath.pop()
+        return result
+      else
+#        callpath.pop();
+        m[0] = result; m[1] = cursor
 
-exports.memo= (symbol) -> (start) ->
-  m = _memo[symbol+start]
-  if m then cursor = m[1]; m[0]
+exports.memo = memo = (symbol) -> (start) ->
+  hash = symbol+start
+  m = _memo[hash]
+  if m then m[0]
+
+exports.rec = rec = (symbol) -> (start) ->
+  hash = symbol+start
+  callpath = memoCallpath[start] ?= []
+  callpath.push symbol
+  m = _memo[hash]
+  if m then m[0]
 
 exports.cur = () -> cursor
