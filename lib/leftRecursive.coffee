@@ -1,12 +1,10 @@
-rules = undefined
-symbolDescedentsMap = {}
-originalRules = {}
-_memo = {}
 text = ''
 textLength = 0
 cursor = 0
+rules = undefined
+symbolDescedentsMap = {}
 _memo = {}
-_memo2 = {}
+originalRules = {}
 
 hasOwnProperty = Object.hasOwnProperty
 
@@ -81,9 +79,6 @@ exports.recursive = recursive = (symbol) ->
     for child in symbolDescedentsMap[symbol]
       if child isnt symbol then rules[child] = recursive(child)
     result
-
-exports.setRules = (rules1) ->
-  rules = rules1
 
 exports.memo = memo = (symbol) ->
   (start) ->
